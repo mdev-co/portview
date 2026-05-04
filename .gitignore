@@ -15,13 +15,12 @@ build/
 *.pem
 *.key
 
-# Claude Code - internal config and methodology, kept local
+# Local-only files (kept off public history)
 CLAUDE.md
 CLAUDE.local.md
+AGENTS.md
 .claude/settings.local.json
 .claude/agents/
-
-# Internal docs - personal knowledge base, kept local
 docs/
 
 # IDE
