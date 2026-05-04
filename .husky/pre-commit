@@ -1,1 +1,128 @@
-pnpm exec lint-staged
+#!/bin/sh
+
+# SPS Quality Gates (pre-commit)
+# Runs lint-staged, typecheck, custom forbidden-patterns check, plus warnings on console/TODO.
+# Outputs ASCII table report with status per check.
+
+RED='\033[31;1m'
+GRN='\033[32;1m'
+YEL='\033[33;1m'
+CYN='\033[36;1m'
+WHT='\033[37;1m'
+DIM='\033[90m'
+RST='\033[0m'
+BG_RED='\033[41;37;1m'
+BG_GRN='\033[42;30m'
+BG_YEL='\033[43;30m'
+
+FAILED=0
+WARNED=0
+RESULTS=""
+
+add_result() {
+  RESULTS="${RESULTS}$1|$2|$3\n"
+}
+
+STAGED_TS=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(ts|tsx)$' || true)
+
+echo ""
+printf "${WHT}╔══════════════════════════════════════════════════════════════════╗${RST}\n"
+printf "${WHT}║${RST}  ${CYN}Pre-Commit Quality Gates${RST}                                       ${WHT}║${RST}\n"
+printf "${WHT}╚══════════════════════════════════════════════════════════════════╝${RST}\n\n"
+
+if [ -z "$STAGED_TS" ]; then
+  add_result "Staged TS" "SKIP" "No .ts/.tsx files in staging"
+else
+  FILE_COUNT=$(echo "$STAGED_TS" | wc -l | tr -d ' ')
+  add_result "Staged TS" "INFO" "${FILE_COUNT} .ts/.tsx files"
+fi
+
+# 1. lint-staged (ESLint + Prettier per workspace)
+if pnpm exec lint-staged 2>/dev/null; then
+  add_result "Lint-staged" "PASS" "ESLint + Prettier clean"
+else
+  add_result "Lint-staged" "FAIL" "Run: pnpm exec lint-staged"
+  FAILED=1
+fi
+
+# 2. Typecheck across all workspaces
+if pnpm -r typecheck > /dev/null 2>&1; then
+  add_result "Typecheck" "PASS" "All workspaces tsc clean"
+else
+  add_result "Typecheck" "FAIL" "Run: pnpm -r typecheck"
+  FAILED=1
+fi
+
+# 3. Forbidden patterns check (console.log, debugger, : any)
+if node scripts/pre-commit-check.mjs > /dev/null 2>&1; then
+  add_result "Forbidden patterns" "PASS" "No console.log/debugger/any"
+else
+  add_result "Forbidden patterns" "FAIL" "Run: node scripts/pre-commit-check.mjs"
+  FAILED=1
+fi
+
+# 4. console.log/debugger count - warning only (lint-staged blocks already)
+if [ -n "$STAGED_TS" ]; then
+  CONSOLE_COUNT=$(echo "$STAGED_TS" | xargs grep -cE 'console\.(log|info|debug)|debugger' 2>/dev/null | awk -F: '{s+=$2} END{print s+0}')
+  if [ "$CONSOLE_COUNT" -gt 0 ] 2>/dev/null; then
+    add_result "console/debug" "WARN" "${CONSOLE_COUNT} statements (review)"
+    WARNED=1
+  else
+    add_result "console/debug" "OK" "Clean"
+  fi
+
+  # 5. TODO/FIXME count
+  TODO_COUNT=$(echo "$STAGED_TS" | xargs grep -cE 'TODO|FIXME|XXX|HACK' 2>/dev/null | awk -F: '{s+=$2} END{print s+0}')
+  if [ "$TODO_COUNT" -gt 0 ] 2>/dev/null; then
+    add_result "TODO/FIXME" "WARN" "${TODO_COUNT} markers"
+    WARNED=1
+  else
+    add_result "TODO/FIXME" "OK" "Clean"
+  fi
+fi
+
+# Print results table
+printf "${DIM}+--------------------+--------+----------------------------------------+${RST}\n"
+printf "${DIM}|${RST} ${WHT}%-18s${RST} ${DIM}|${RST} ${WHT}%-6s${RST} ${DIM}|${RST} ${WHT}%-38s${RST} ${DIM}|${RST}\n" "CHECK" "STATUS" "DETAILS"
+printf "${DIM}+--------------------+--------+----------------------------------------+${RST}\n"
+
+printf "$RESULTS" | while IFS='|' read -r check status detail; do
+  [ -z "$check" ] && continue
+  sc="${RST}"
+  case "$status" in
+    PASS|OK) sc="${GRN}" ;;
+    FAIL)    sc="${RED}" ;;
+    WARN)    sc="${YEL}" ;;
+    INFO)    sc="${CYN}" ;;
+    SKIP)    sc="${DIM}" ;;
+  esac
+  printf "${DIM}|${RST} %-18s ${DIM}|${RST} ${sc}%-6s${RST} ${DIM}|${RST} %-38s ${DIM}|${RST}\n" "$check" "$status" "$detail"
+done
+
+printf "${DIM}+--------------------+--------+----------------------------------------+${RST}\n"
+
+# Manual checklist (review before pushing - things that can't be automated)
+printf "\n${WHT}Manual Checklist${RST} ${DIM}(review before pushing)${RST}\n\n"
+printf "${DIM}+----+----------------------------------------------------------------+${RST}\n"
+printf "${DIM}|${RST} ${WHT}%-2s${RST} ${DIM}|${RST} ${WHT}%-62s${RST} ${DIM}|${RST}\n" "##" "CHECK BEFORE PUSH"
+printf "${DIM}+----+----------------------------------------------------------------+${RST}\n"
+printf "${DIM}|${RST} ${CYN}%-2s${RST} ${DIM}|${RST} %-62s ${DIM}|${RST}\n" "1" "No unnecessary API requests (check Network tab)"
+printf "${DIM}|${RST} ${CYN}%-2s${RST} ${DIM}|${RST} %-62s ${DIM}|${RST}\n" "2" "Timers/intervals cleaned in useEffect return"
+printf "${DIM}|${RST} ${CYN}%-2s${RST} ${DIM}|${RST} %-62s ${DIM}|${RST}\n" "3" "No memory leaks (observers, subscriptions cleaned)"
+printf "${DIM}|${RST} ${CYN}%-2s${RST} ${DIM}|${RST} %-62s ${DIM}|${RST}\n" "4" "useRef for high-freq updates, not useState"
+printf "${DIM}|${RST} ${CYN}%-2s${RST} ${DIM}|${RST} %-62s ${DIM}|${RST}\n" "5" "Profile if touching render-heavy components"
+printf "${DIM}|${RST} ${CYN}%-2s${RST} ${DIM}|${RST} %-62s ${DIM}|${RST}\n" "6" "No hardcoded mocks or dev data left in code"
+printf "${DIM}+----+----------------------------------------------------------------+${RST}\n"
+
+echo ""
+if [ $FAILED -eq 1 ]; then
+  printf "  ${BG_RED} BLOCKED ${RST}  Fix errors above before committing.\n"
+  printf "  ${DIM}Tip: pnpm exec lint-staged && pnpm -r typecheck${RST}\n\n"
+  exit 1
+elif [ $WARNED -eq 1 ]; then
+  printf "  ${BG_YEL} PASSED WITH WARNINGS ${RST}  Review items above.\n\n"
+  exit 0
+else
+  printf "  ${BG_GRN} ALL CLEAR ${RST}\n\n"
+  exit 0
+fi
