@@ -1,15 +1,19 @@
-# Smart Port Szczecin (SPS)
+<div align="center">
 
-> Real-time AIS vessel tracker with custom SDR receiver.
+# ⚓ Smart Port Szczecin (SPS)
+
+### Real-time AIS vessel tracker with custom SDR receiver
+
+`Day 0 / 14` · `TypeScript` · `NestJS` · `React 19` · `MapLibre GL` · `PostGIS`
+
+</div>
+
+---
 
 **Stack:** NestJS · React 19 · MapLibre GL · Tailwind v4 + shadcn/ui · PostGIS · TypeScript · pnpm workspaces  
 **Deploy:** Vercel + Fly.io  
 **Tile source:** OpenStreetMap (MVP)  
 **Data:** local SDR (RTL-SDR Blog V4) + WebSDR + [aisstream.io](https://aisstream.io) fallback
-
-## Status
-
-🚧 Day 0 - scaffolding only. Sprint kickoff Day 1.
 
 ## Highlights
 
