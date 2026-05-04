@@ -2,6 +2,7 @@
   "name": "sps",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "description": "Smart Port Szczecin - real-time AIS vessel tracker with custom SDR receiver",
   "engines": {
     "node": ">=22.0.0",
@@ -17,20 +18,45 @@
     "typecheck": "pnpm -r typecheck",
     "test": "pnpm -r test",
     "test:cov": "pnpm -r test:cov",
-    "check-all": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm test",
-    "check-all-strict": "pnpm lint && pnpm format:check && pnpm typecheck && pnpm test && pnpm build",
+    "check-all": "echo '🚀 PRE_COMMIT_SIMULATION: Running all checks...' && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && echo '✅ ALL_CHECKS_PASSED: Ready to commit'",
+    "check-all-strict": "echo '🚀 STRICT CHECK: format + lint + typecheck + test + build' && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build && echo '✅ ALL_STRICT_CHECKS_PASSED'",
     "prepare": "husky"
   },
   "devDependencies": {
+    "@eslint/js": "^9",
     "@trivago/prettier-plugin-sort-imports": "^5.2.2",
+    "eslint": "^9",
+    "eslint-config-prettier": "^10",
+    "globals": "^17.6.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.1.2",
     "prettier": "^3.6.2",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8"
   },
   "packageManager": "pnpm@9.12.0",
   "lint-staged": {
-    "*.{ts,tsx,css,md,json,yaml,yml}": [
+    "apps/api/**/*.{ts,tsx}": [
+      "pnpm --filter @sps/api exec eslint --fix --max-warnings=0 --no-warn-ignored",
+      "prettier --write"
+    ],
+    "apps/web/**/*.{ts,tsx}": [
+      "pnpm --filter @sps/web exec eslint --fix --max-warnings=0 --no-warn-ignored",
+      "prettier --write"
+    ],
+    "apps/ingest/**/*.{ts,tsx}": [
+      "eslint --fix --max-warnings=0 --no-warn-ignored",
+      "prettier --write"
+    ],
+    "packages/shared/**/*.{ts,tsx}": [
+      "eslint --fix --max-warnings=0 --no-warn-ignored",
+      "prettier --write"
+    ],
+    "*.{js,mjs,cjs}": [
+      "eslint --fix --max-warnings=0 --no-warn-ignored",
+      "prettier --write"
+    ],
+    "*.{md,json,yaml,yml,css}": [
       "prettier --write"
     ]
   },
@@ -40,6 +66,12 @@
     "trailingComma": "all",
     "printWidth": 100,
     "tabWidth": 2,
+    "useTabs": false,
+    "bracketSpacing": true,
+    "bracketSameLine": false,
+    "arrowParens": "avoid",
+    "endOfLine": "lf",
+    "quoteProps": "as-needed",
     "plugins": [
       "@trivago/prettier-plugin-sort-imports"
     ],

@@ -7,12 +7,12 @@ services:
       POSTGRES_PASSWORD: sps_local_dev
       POSTGRES_DB: sps
     ports:
-      - "5432:5432"
+      - '5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U sps -d sps"]
+      test: ['CMD-SHELL', 'pg_isready -U sps -d sps']
       interval: 10s
       timeout: 5s
       retries: 5

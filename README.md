@@ -46,4 +46,4 @@ pnpm dev
 
 ---
 
-*Built by Michal Roszko - React/TS engineer specializing in real-time mission-critical UI and GIS.*
+_Built by Michal Roszko - React/TS engineer specializing in real-time mission-critical UI and GIS._

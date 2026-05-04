@@ -15,14 +15,6 @@ build/
 *.pem
 *.key
 
-# Local-only files (kept off public history)
-CLAUDE.md
-CLAUDE.local.md
-AGENTS.md
-.claude/settings.local.json
-.claude/agents/
-docs/
-
 # IDE
 .vscode/
 .idea/
