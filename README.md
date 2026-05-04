@@ -43,7 +43,3 @@ pnpm dev
 ## Live demo
 
 [Day 7 deliverable]
-
----
-
-_Built by Michal Roszko - React/TS engineer specializing in real-time mission-critical UI and GIS._
