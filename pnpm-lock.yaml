@@ -7,9 +7,21 @@ settings:
 importers:
   .:
     devDependencies:
+      '@eslint/js':
+        specifier: ^9
+        version: 9.39.4
       '@trivago/prettier-plugin-sort-imports':
         specifier: ^5.2.2
         version: 5.2.2(prettier@3.8.3)
+      eslint:
+        specifier: ^9
+        version: 9.39.4
+      eslint-config-prettier:
+        specifier: ^10
+        version: 10.1.8(eslint@9.39.4)
+      globals:
+        specifier: ^17.6.0
+        version: 17.6.0
       husky:
         specifier: ^9.1.7
         version: 9.1.7
@@ -22,6 +34,9 @@ importers:
       typescript:
         specifier: ^5.8.3
         version: 5.9.3
+      typescript-eslint:
+        specifier: ^8
+        version: 8.59.1(eslint@9.39.4)(typescript@5.9.3)
 
   apps/api:
     dependencies:
@@ -7178,10 +7193,10 @@ snapshots:
     dependencies:
       '@types/yargs-parser': 21.0.3
 
-  '@typescript-eslint/eslint-plugin@8.59.1(@typescript-eslint/parser@8.59.1(eslint@10.3.0)(typescript@6.0.3))(eslint@10.3.0)(typescript@6.0.3)':
+  '@typescript-eslint/eslint-plugin@8.59.1(@typescript-eslint/parser@8.59.1(eslint@9.39.4)(typescript@5.9.3))(eslint@10.3.0)(typescript@6.0.3)':
     dependencies:
       '@eslint-community/regexpp': 4.12.2
-      '@typescript-eslint/parser': 8.59.1(eslint@10.3.0)(typescript@6.0.3)
+      '@typescript-eslint/parser': 8.59.1(eslint@9.39.4)(typescript@5.9.3)
       '@typescript-eslint/scope-manager': 8.59.1
       '@typescript-eslint/type-utils': 8.59.1(eslint@10.3.0)(typescript@6.0.3)
       '@typescript-eslint/utils': 8.59.1(eslint@10.3.0)(typescript@6.0.3)
@@ -9705,7 +9720,7 @@ snapshots:
 
   typescript-eslint@8.59.1(eslint@10.3.0)(typescript@6.0.3):
     dependencies:
-      '@typescript-eslint/eslint-plugin': 8.59.1(@typescript-eslint/parser@8.59.1(eslint@10.3.0)(typescript@6.0.3))(eslint@10.3.0)(typescript@6.0.3)
+      '@typescript-eslint/eslint-plugin': 8.59.1(@typescript-eslint/parser@8.59.1(eslint@9.39.4)(typescript@5.9.3))(eslint@10.3.0)(typescript@6.0.3)
       '@typescript-eslint/parser': 8.59.1(eslint@10.3.0)(typescript@6.0.3)
       '@typescript-eslint/typescript-estree': 8.59.1(typescript@6.0.3)
       '@typescript-eslint/utils': 8.59.1(eslint@10.3.0)(typescript@6.0.3)
