@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgis/postgis:16-3.4-alpine
+    container_name: sps-postgres
+    environment:
+      POSTGRES_USER: sps
+      POSTGRES_PASSWORD: sps_local_dev
+      POSTGRES_DB: sps
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sps -d sps"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
