@@ -21,6 +21,9 @@ CLAUDE.local.md
 .claude/settings.local.json
 .claude/agents/
 
+# Internal docs - personal knowledge base, kept local
+docs/
+
 # IDE
 .vscode/
 .idea/
