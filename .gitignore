@@ -51,3 +51,4 @@ Thumbs.db
 # ADRs - currently private in Dev-Brain Vault.
 # Uncomment when copying internal ADRs into repo for public publishing.
 # docs/adr/private/
+.husky/_/
