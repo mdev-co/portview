@@ -1,0 +1,51 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+.output/
+*.tsbuildinfo
+
+# Env / secrets
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# Claude Code - internal config and methodology, kept local
+CLAUDE.md
+CLAUDE.local.md
+.claude/settings.local.json
+.claude/agents/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Test outputs
+coverage/
+.nyc_output/
+playwright-report/
+test-results/
+
+# Database
+*.sqlite
+*.sqlite-journal
+
+# OS
+Thumbs.db
+
+# ADRs - currently private in Dev-Brain Vault.
+# Uncomment when copying internal ADRs into repo for public publishing.
+# docs/adr/private/
