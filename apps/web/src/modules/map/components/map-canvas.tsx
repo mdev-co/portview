@@ -5,16 +5,11 @@ import '../core/register-engines';
 import { osmRasterStyle } from '../styles/osm-raster-style';
 
 const SZCZECIN_HARBOR_CENTER: LngLat = [14.5528, 53.4285];
-const SZCZECIN_REGION_BOUNDS: readonly [LngLat, LngLat] = [
-  [13.5, 52.5],
-  [16.5, 54.5],
-];
 
 const MAP_CONFIG: MapEngineConfig = {
   view: {
     center: SZCZECIN_HARBOR_CENTER,
     zoom: 12,
-    maxBounds: SZCZECIN_REGION_BOUNDS,
   },
   style: osmRasterStyle,
   attributionMode: 'compact',
