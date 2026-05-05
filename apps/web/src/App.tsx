@@ -1,16 +1,29 @@
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
+import { RouterProvider, createBrowserRouter } from 'react-router-dom';
+import { MapStatusPill } from '@/modules/map/components/map-status-pill';
+import { IndexRoute } from '@/routes/index-route';
+import { AppShell } from '@/shell/app-shell';
+import { Anchor } from 'lucide-react';
+
+const router = createBrowserRouter([
+  {
+    element: (
+      <AppShell>
+        <AppShell.Header className="border-slate-800 bg-slate-900 text-slate-50">
+          <Anchor className="size-4 text-sky-400" />
+          <h1 className="text-sm font-semibold tracking-tight">Smart Port Szczecin</h1>
+          <div className="ml-auto flex items-center gap-2">
+            <MapStatusPill />
+          </div>
+        </AppShell.Header>
+        <AppShell.Main />
+      </AppShell>
+    ),
+    children: [{ index: true, element: <IndexRoute /> }],
+  },
+]);
 
 function App() {
-  const [count, setCount] = useState(0);
-
-  return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-4 p-8">
-      <h1 className="text-3xl font-semibold">Smart Port Szczecin</h1>
-      <p className="text-muted-foreground text-sm">D1 smoke test: Tailwind v4 + shadcn/ui</p>
-      <Button onClick={() => setCount(c => c + 1)}>Clicks: {count}</Button>
-    </main>
-  );
+  return <RouterProvider router={router} />;
 }
 
 export default App;
