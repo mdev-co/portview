@@ -131,6 +131,9 @@ importers:
       '@sps/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      xstate:
+        specifier: ^5.31.0
+        version: 5.31.0
     devDependencies:
       '@types/node':
         specifier: ^24.0.0
@@ -141,6 +144,9 @@ importers:
       typescript:
         specifier: ^5.8.3
         version: 5.9.3
+      vitest:
+        specifier: ^4.1.5
+        version: 4.1.5(@types/node@24.12.2)(msw@2.14.3(@types/node@24.12.2)(typescript@5.9.3))(vite@8.0.10(@types/node@24.12.2)(esbuild@0.27.7)(jiti@2.6.1)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.4))
 
   apps/web:
     dependencies:
