@@ -8,6 +8,8 @@ export interface NmeaFrame {
 
 export type Unsubscribe = () => void;
 
+export type SourceStats = Readonly<Record<string, number>>;
+
 export interface ISource {
   readonly id: SourceId;
   readonly priority: number;
@@ -15,6 +17,7 @@ export interface ISource {
   stop(): Promise<void>;
   onFrame(callback: (frame: NmeaFrame) => void): Unsubscribe;
   onError(callback: (error: Error) => void): Unsubscribe;
+  getStats?(): SourceStats;
 }
 
 export type IngestStatus =
