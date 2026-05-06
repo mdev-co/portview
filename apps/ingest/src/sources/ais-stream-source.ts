@@ -1,16 +1,24 @@
-import type { ISource, NmeaFrame, SourceId, Unsubscribe } from '@sps/shared';
+import type { ISource, LngLatBounds, NmeaFrame, SourceId, Unsubscribe } from '@sps/shared';
 
 const SOURCE_ID: SourceId = 'ais-stream';
 const SOURCE_PRIORITY = 3;
 const TOKEN_ENV = 'EXTERNAL_FEED_TOKEN';
 const ENDPOINT_ENV = 'EXTERNAL_FEED_ENDPOINT';
 
-type LngLat = readonly [latitude: number, longitude: number];
-
-const DEFAULT_BOUNDING_BOX: readonly [LngLat, LngLat] = [
-  [52.5, 13.5],
-  [54.5, 16.5],
+const DEFAULT_BOUNDING_BOX: LngLatBounds = [
+  [13.5, 52.5],
+  [16.5, 54.5],
 ];
+
+export function boundsToApiPayload(
+  bounds: LngLatBounds,
+): readonly [readonly [number, number], readonly [number, number]] {
+  const [[swLng, swLat], [neLng, neLat]] = bounds;
+  return [
+    [swLat, swLng],
+    [neLat, neLng],
+  ];
+}
 
 export type SourceLogLevel = 'debug' | 'info' | 'warn' | 'error';
 export type SourceLogger = (level: SourceLogLevel, message: string, data?: unknown) => void;
@@ -18,7 +26,7 @@ export type SourceLogger = (level: SourceLogLevel, message: string, data?: unkno
 export interface AisStreamSourceOptions {
   readonly token?: string;
   readonly endpoint?: string;
-  readonly boundingBox?: readonly [LngLat, LngLat];
+  readonly boundingBox?: LngLatBounds;
   readonly logger?: SourceLogger;
 }
 
@@ -42,7 +50,7 @@ export class AisStreamSource implements ISource {
 
   private readonly endpoint: string;
   private readonly token: string;
-  private readonly boundingBox: readonly [LngLat, LngLat];
+  private readonly boundingBox: LngLatBounds;
   private readonly frameListeners = new Set<FrameCallback>();
   private readonly errorListeners = new Set<ErrorCallback>();
   private readonly log?: SourceLogger;
@@ -92,7 +100,7 @@ export class AisStreamSource implements ISource {
 
         const subscribe = {
           APIKey: this.token,
-          BoundingBoxes: [this.boundingBox],
+          BoundingBoxes: [boundsToApiPayload(this.boundingBox)],
         };
         ws.send(JSON.stringify(subscribe));
         this.log?.('info', 'subscribe sent', { boundingBox: this.boundingBox });

@@ -40,6 +40,23 @@ export const mapMachine = setup({
     context: {} as MapMachineContext,
     events: {} as MapMachineEvent,
   },
+  actions: {
+    fireDisposeCurrentAdapter: ({ context }) => {
+      if (context.currentAdapter) {
+        void context.currentAdapter.dispose().catch((err: unknown) => {
+          console.warn('mapMachine: dispose during detach failed', err);
+        });
+      }
+    },
+    clearLifecycleContext: assign({
+      container: null,
+      currentAdapter: null,
+      currentEngineType: null,
+      pendingEngineType: null,
+      pendingConfig: null,
+      error: null,
+    }),
+  },
   actors: {
     initializeEngine: fromPromise<void, InitializeInput>(async ({ input }) => {
       if (!input.adapter || !input.container || !input.config) {
@@ -75,6 +92,13 @@ export const mapMachine = setup({
     pendingConfig: null,
     error: null,
   },
+  on: {
+    CONTAINER_DETACHED: {
+      guard: ({ context }) => context.container !== null,
+      target: '.idle',
+      actions: ['fireDisposeCurrentAdapter', 'clearLifecycleContext'],
+    },
+  },
   states: {
     idle: {
       on: {
@@ -86,10 +110,6 @@ export const mapMachine = setup({
     },
     attached: {
       on: {
-        CONTAINER_DETACHED: {
-          target: 'idle',
-          actions: assign({ container: null }),
-        },
         USE_ENGINE: {
           target: 'initializing',
           actions: assign({

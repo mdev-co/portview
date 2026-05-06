@@ -1,5 +1,29 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { AisStreamSource } from '../ais-stream-source';
+import { AisStreamSource, boundsToApiPayload } from '../ais-stream-source';
+
+describe('boundsToApiPayload', () => {
+  it('swaps internal [lng, lat] tuples to API-required [lat, lng] order', () => {
+    const result = boundsToApiPayload([
+      [13.5, 52.5],
+      [16.5, 54.5],
+    ]);
+    expect(result).toEqual([
+      [52.5, 13.5],
+      [54.5, 16.5],
+    ]);
+  });
+
+  it('preserves component values (no rounding or coercion)', () => {
+    const result = boundsToApiPayload([
+      [-180.0, -85.05112878],
+      [180.0, 85.05112878],
+    ]);
+    expect(result).toEqual([
+      [-85.05112878, -180.0],
+      [85.05112878, 180.0],
+    ]);
+  });
+});
 
 const TOKEN = 'EXTERNAL_FEED_TOKEN';
 const ENDPOINT = 'EXTERNAL_FEED_ENDPOINT';

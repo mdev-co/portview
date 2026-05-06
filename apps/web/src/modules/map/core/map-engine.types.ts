@@ -1,13 +1,15 @@
-export type MapEngineType = 'maplibre';
+import type { LngLat, LngLatBounds } from '@sps/shared';
 
-export type LngLat = readonly [longitude: number, latitude: number];
+export type { LngLat, LngLatBounds } from '@sps/shared';
+
+export type MapEngineType = 'maplibre';
 
 export interface MapViewConfig {
   readonly center: LngLat;
   readonly zoom: number;
   readonly bearing?: number;
   readonly pitch?: number;
-  readonly maxBounds?: readonly [southWest: LngLat, northEast: LngLat];
+  readonly maxBounds?: LngLatBounds;
 }
 
 export interface MapEngineConfig {
