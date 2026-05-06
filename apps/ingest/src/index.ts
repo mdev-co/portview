@@ -6,6 +6,7 @@ import {
   ingestSourceMachine,
   validateNmeaChecksum,
 } from '@sps/shared';
+import { AisStreamSource } from './sources/ais-stream-source';
 import { LocalUdpSource } from './sources/local-udp-source';
 
 const log = createLogger('ingest', {
@@ -17,11 +18,35 @@ const UDP_PORT = Number(process.env.INGEST_UDP_PORT ?? 10110);
 const UDP_HOST = process.env.INGEST_UDP_HOST ?? '127.0.0.1';
 const RATE_LIMIT = Number(process.env.INGEST_RATE_LIMIT ?? 200);
 
-const PRIORITIZED_SOURCE_IDS: readonly SourceId[] = ['local-udp'];
+const sources = new Map<SourceId, ISource>();
+const prioritizedBuilder: SourceId[] = [];
 
-const sources = new Map<SourceId, ISource>([
-  ['local-udp', new LocalUdpSource({ port: UDP_PORT, host: UDP_HOST, rateLimit: RATE_LIMIT })],
-]);
+sources.set(
+  'local-udp',
+  new LocalUdpSource({ port: UDP_PORT, host: UDP_HOST, rateLimit: RATE_LIMIT }),
+);
+prioritizedBuilder.push('local-udp');
+
+try {
+  sources.set(
+    'ais-stream',
+    new AisStreamSource({
+      logger: (level, message, data) => {
+        if (data === undefined) {
+          log[level](`[ais-stream] ${message}`);
+        } else {
+          log[level](data, `[ais-stream] ${message}`);
+        }
+      },
+    }),
+  );
+  prioritizedBuilder.push('ais-stream');
+  log.info('ais-stream source registered');
+} catch (err) {
+  log.warn({ err: String(err) }, 'ais-stream source skipped');
+}
+
+const PRIORITIZED_SOURCE_IDS: readonly SourceId[] = prioritizedBuilder;
 
 const actor = createActor(ingestSourceMachine, {
   input: { prioritizedSourceIds: PRIORITIZED_SOURCE_IDS },
@@ -38,15 +63,21 @@ function detachActiveSource(): void {
   activeErrorUnsub = null;
 }
 
+function isNmeaFormat(raw: string): boolean {
+  return raw.startsWith('$') || raw.startsWith('!');
+}
+
 function attachSource(source: ISource): void {
   activeFrameUnsub = source.onFrame(frame => {
-    const result = validateNmeaChecksum(frame.raw);
-    if (result.valid) {
+    const validation = isNmeaFormat(frame.raw)
+      ? validateNmeaChecksum(frame.raw)
+      : ({ valid: true } as const);
+    if (validation.valid) {
       actor.send({ type: 'FRAME_RECEIVED', sourceId: source.id, frameAt: frame.receivedAt });
       log.debug({ sourceId: source.id, raw: frame.raw }, 'frame accepted');
     } else {
       actor.send({ type: 'FRAME_REJECTED', sourceId: source.id, reason: 'bad-checksum' });
-      log.warn({ sourceId: source.id, reason: result.reason }, 'frame rejected');
+      log.warn({ sourceId: source.id, reason: validation.reason }, 'frame rejected');
     }
   });
   activeErrorUnsub = source.onError(err => {
@@ -88,7 +119,10 @@ actor.subscribe(snapshot => {
 
 actor.start();
 actor.send({ type: 'START' });
-log.info({ port: UDP_PORT, host: UDP_HOST, rateLimit: RATE_LIMIT }, 'ingest worker started');
+log.info(
+  { port: UDP_PORT, host: UDP_HOST, rateLimit: RATE_LIMIT, sources: PRIORITIZED_SOURCE_IDS },
+  'ingest worker started',
+);
 
 let shuttingDown = false;
 async function shutdown(signal: string): Promise<void> {

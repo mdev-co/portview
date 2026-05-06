@@ -24,5 +24,12 @@ export function createLogger(name: string, options: CreateLoggerOptions = {}): A
     type: options.format ?? 'pretty',
     minLevel: options.minLevel ?? 0,
     hideLogPositionForProduction: true,
+    prettyLogTemplate: '{{hh}}:{{MM}}:{{ss}}.{{ms}} {{logLevelName}} {{name}} ',
+    prettyInspectOptions: {
+      breakLength: 200,
+      compact: 3,
+      depth: 4,
+      colors: true,
+    },
   });
 }
