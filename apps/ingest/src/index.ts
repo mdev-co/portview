@@ -8,6 +8,7 @@ import {
 } from '@sps/shared';
 import { AisStreamSource } from './sources/ais-stream-source';
 import { LocalUdpSource } from './sources/local-udp-source';
+import { WebSdrSource } from './sources/web-sdr-source';
 
 const log = createLogger('ingest', {
   format: process.env.NODE_ENV === 'production' ? 'json' : 'pretty',
@@ -26,6 +27,10 @@ sources.set(
   new LocalUdpSource({ port: UDP_PORT, host: UDP_HOST, rateLimit: RATE_LIMIT }),
 );
 prioritizedBuilder.push('local-udp');
+
+sources.set('web-sdr', new WebSdrSource());
+prioritizedBuilder.push('web-sdr');
+log.info('web-sdr source registered (stub)');
 
 try {
   sources.set(
