@@ -23,12 +23,19 @@ export { BitReader, aisCharFromBits, payloadToBits, sixbitFromChar } from './par
 
 export type { LngLat, LngLatBounds } from './types/geo';
 export type { PositionReport } from './types/vessel';
+export type { StaticData, StaticDimensions, StaticEta } from './types/static-data';
 
 export {
   decodePositionReport,
   NotAPositionReportError,
   PositionReportTooShortError,
 } from './parsers/ais-position';
+
+export {
+  decodeStaticData,
+  NotStaticDataError,
+  StaticDataTooShortError,
+} from './parsers/ais-static-data';
 
 export { type AivdmEnvelope, AivdmParseError, parseAivdmEnvelope } from './parsers/aivdm-envelope';
 

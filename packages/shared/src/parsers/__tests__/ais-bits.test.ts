@@ -111,6 +111,16 @@ describe('BitReader', () => {
     expect(reader.readString(4)).toBe('ABA');
   });
 
+  it('throws with readString attribution when requested chars exceed remaining bits', () => {
+    const reader = new BitReader(payloadToBits('12'));
+    expect(() => reader.readString(5)).toThrow(/readString past end/);
+  });
+
+  it('throws on negative readString count', () => {
+    const reader = new BitReader(payloadToBits('12'));
+    expect(() => reader.readString(-1)).toThrow(/negative count/);
+  });
+
   it('readUInt(0) returns 0 without advancing the cursor', () => {
     const reader = new BitReader(payloadToBits('w'));
     expect(reader.readUInt(0)).toBe(0);
