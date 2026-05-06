@@ -25,8 +25,11 @@ export function aisCharFromBits(bits: number): string {
 
 export class BitReader {
   private cursor = 0;
+  private readonly bits: Uint8Array;
 
-  constructor(private readonly bits: Uint8Array) {}
+  constructor(bits: Uint8Array) {
+    this.bits = bits;
+  }
 
   position(): number {
     return this.cursor;
