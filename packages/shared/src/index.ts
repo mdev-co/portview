@@ -18,3 +18,5 @@ export {
 } from './machines/ingest-source.types';
 
 export { isValidNmea, validateNmeaChecksum, type ChecksumResult } from './parsers/nmea-checksum';
+
+export { BitReader, aisCharFromBits, payloadToBits, sixbitFromChar } from './parsers/ais-bits';
