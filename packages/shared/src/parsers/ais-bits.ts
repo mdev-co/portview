@@ -74,6 +74,12 @@ export class BitReader {
 
   readString(charCount: number): string {
     if (charCount < 0) throw new Error(`BitReader.readString: negative count ${charCount}`);
+    const bitsNeeded = charCount * 6;
+    if (this.cursor + bitsNeeded > this.bits.length) {
+      throw new Error(
+        `BitReader.readString past end (cursor=${this.cursor}, charCount=${charCount}, bitsNeeded=${bitsNeeded}, len=${this.bits.length})`,
+      );
+    }
     let result = '';
     for (let i = 0; i < charCount; i += 1) {
       result += aisCharFromBits(this.readUInt(6));
