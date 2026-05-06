@@ -29,3 +29,11 @@ export {
   NotAPositionReportError,
   PositionReportTooShortError,
 } from './parsers/ais-position';
+
+export { type AivdmEnvelope, AivdmParseError, parseAivdmEnvelope } from './parsers/aivdm-envelope';
+
+export {
+  AisMultipartReassembler,
+  type AisMultipartReassemblerOptions,
+  type AssembledPayload,
+} from './parsers/ais-multipart';
