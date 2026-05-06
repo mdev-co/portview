@@ -7,6 +7,7 @@ const SOURCE_PRIORITY = 1;
 const DEFAULT_PORT = 10110;
 const DEFAULT_HOST = '127.0.0.1';
 const DEFAULT_RATE_LIMIT = 200;
+const NMEA_MAX_LENGTH = 82;
 
 export interface LocalUdpSourceOptions {
   readonly port?: number;
@@ -28,6 +29,7 @@ export class LocalUdpSource implements ISource {
   private readonly errorListeners = new Set<ErrorCallback>();
   private socket: dgram.Socket | null = null;
   private droppedByRateLimit = 0;
+  private droppedByLength = 0;
 
   constructor(options: LocalUdpSourceOptions = {}) {
     this.port = options.port ?? DEFAULT_PORT;
@@ -90,7 +92,15 @@ export class LocalUdpSource implements ISource {
     return this.droppedByRateLimit;
   }
 
+  getDroppedByLength(): number {
+    return this.droppedByLength;
+  }
+
   private handleMessage(message: Buffer): void {
+    if (message.length > NMEA_MAX_LENGTH) {
+      this.droppedByLength += 1;
+      return;
+    }
     if (!this.bucket.tryConsume()) {
       this.droppedByRateLimit += 1;
       return;
