@@ -22,3 +22,10 @@ export { isValidNmea, validateNmeaChecksum, type ChecksumResult } from './parser
 export { BitReader, aisCharFromBits, payloadToBits, sixbitFromChar } from './parsers/ais-bits';
 
 export type { LngLat, LngLatBounds } from './types/geo';
+export type { PositionReport } from './types/vessel';
+
+export {
+  decodePositionReport,
+  NotAPositionReportError,
+  PositionReportTooShortError,
+} from './parsers/ais-position';
