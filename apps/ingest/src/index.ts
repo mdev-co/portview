@@ -6,6 +6,11 @@ import {
   ingestSourceMachine,
   validateNmeaChecksum,
 } from '@sps/shared';
+import {
+  type IngestStatsSnapshot,
+  type PerSourceStats,
+  startStatsReporter,
+} from './observability/stats-reporter';
 import { AisStreamSource } from './sources/ais-stream-source';
 import { LocalUdpSource } from './sources/local-udp-source';
 import { WebSdrSource } from './sources/web-sdr-source';
@@ -91,6 +96,8 @@ function attachSource(source: ISource): void {
   });
 }
 
+let previousState: string | null = null;
+
 actor.subscribe(snapshot => {
   const desiredId = snapshot.context.currentSourceId;
   const desiredSource = desiredId ? (sources.get(desiredId) ?? null) : null;
@@ -119,7 +126,33 @@ actor.subscribe(snapshot => {
       });
   }
 
-  log.debug({ state: snapshot.value, currentSourceId: snapshot.context.currentSourceId }, 'state');
+  const currentState = String(snapshot.value);
+  if (currentState !== previousState) {
+    log.info({ from: previousState, to: currentState, sourceId: desiredId }, 'machine transition');
+    previousState = currentState;
+  }
+});
+
+function collectStats(): IngestStatsSnapshot {
+  const snapshot = actor.getSnapshot();
+  const perSource: PerSourceStats[] = [];
+  for (const [id, source] of sources) {
+    if (typeof source.getStats === 'function') {
+      perSource.push({ sourceId: id, stats: source.getStats() });
+    }
+  }
+  return {
+    machineState: String(snapshot.value),
+    currentSourceId: snapshot.context.currentSourceId,
+    framesAccepted: snapshot.context.framesAccepted,
+    framesRejected: snapshot.context.framesRejected,
+    perSource,
+  };
+}
+
+const stopStatsReporter = startStatsReporter({
+  fetch: collectStats,
+  emit: stats => log.info(stats, 'ingest stats'),
 });
 
 actor.start();
@@ -134,6 +167,7 @@ async function shutdown(signal: string): Promise<void> {
   if (shuttingDown) return;
   shuttingDown = true;
   log.info({ signal }, 'shutting down');
+  stopStatsReporter();
   actor.send({ type: 'STOP' });
   if (activeSource) {
     try {

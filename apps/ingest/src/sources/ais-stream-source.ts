@@ -164,6 +164,10 @@ export class AisStreamSource implements ISource {
     return this.messagesReceived;
   }
 
+  getStats(): Readonly<Record<string, number>> {
+    return { messagesReceived: this.messagesReceived };
+  }
+
   private handleMessage(evt: MessageEvent): void {
     const decoded = decodeMessageData(evt.data);
     if (decoded === null) {

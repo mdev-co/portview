@@ -28,6 +28,7 @@ export class LocalUdpSource implements ISource {
   private readonly frameListeners = new Set<FrameCallback>();
   private readonly errorListeners = new Set<ErrorCallback>();
   private socket: dgram.Socket | null = null;
+  private messagesEmitted = 0;
   private droppedByRateLimit = 0;
   private droppedByLength = 0;
 
@@ -96,6 +97,14 @@ export class LocalUdpSource implements ISource {
     return this.droppedByLength;
   }
 
+  getStats(): Readonly<Record<string, number>> {
+    return {
+      messagesEmitted: this.messagesEmitted,
+      droppedByLength: this.droppedByLength,
+      droppedByRateLimit: this.droppedByRateLimit,
+    };
+  }
+
   private handleMessage(message: Buffer): void {
     if (message.length > NMEA_MAX_LENGTH) {
       this.droppedByLength += 1;
@@ -112,6 +121,7 @@ export class LocalUdpSource implements ISource {
       receivedAt: Date.now(),
       sourceId: SOURCE_ID,
     };
+    this.messagesEmitted += 1;
     this.frameListeners.forEach(l => l(frame));
   }
 }

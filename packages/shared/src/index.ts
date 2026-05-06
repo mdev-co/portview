@@ -13,6 +13,7 @@ export {
   type ISource,
   type NmeaFrame,
   type SourceId,
+  type SourceStats,
   type Unsubscribe,
 } from './machines/ingest-source.types';
 
