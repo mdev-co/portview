@@ -35,4 +35,27 @@ export default tseslint.config(
       'no-debugger': 'error',
     },
   },
+  // packages/shared must stay framework-agnostic so it can run in any host
+  // (web, NestJS Node, future React Native). Block framework imports here.
+  {
+    files: ['packages/shared/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          paths: [
+            { name: 'react', message: 'packages/shared must stay framework-agnostic.' },
+            { name: 'react-dom', message: 'packages/shared must stay framework-agnostic.' },
+            { name: 'vite', message: 'packages/shared must stay framework-agnostic.' },
+          ],
+          patterns: [
+            { group: ['react/*'], message: 'packages/shared must stay framework-agnostic.' },
+            { group: ['react-dom/*'], message: 'packages/shared must stay framework-agnostic.' },
+            { group: ['@nestjs/*'], message: 'packages/shared must stay framework-agnostic.' },
+            { group: ['vite/*'], message: 'packages/shared must stay framework-agnostic.' },
+          ],
+        },
+      ],
+    },
+  },
 );
