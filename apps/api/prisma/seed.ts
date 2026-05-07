@@ -248,7 +248,7 @@ const seedVessels: ReadonlyArray<SeedVessel> = [
 ];
 
 if (!process.env.DATABASE_URL) {
-  throw new Error('DATABASE_URL is not set; check apps/api/.env');
+  throw new Error('DATABASE_URL is not set; check repo root .env');
 }
 const prisma = new PrismaClient();
 
