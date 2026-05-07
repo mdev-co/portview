@@ -41,6 +41,13 @@
     "typescript-eslint": "^8"
   },
   "packageManager": "pnpm@9.12.0",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "prisma",
+      "esbuild"
+    ]
+  },
   "lint-staged": {
     "apps/api/**/*.{ts,tsx}": [
       "pnpm --filter @sps/api exec eslint --fix --max-warnings=0 --no-warn-ignored",
