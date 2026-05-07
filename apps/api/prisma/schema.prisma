@@ -1,0 +1,69 @@
+// AIS vessel storage schema.
+//
+// Layout choices:
+// - Vessel: 1 row per MMSI (long-lived static data from AIS msg type 5)
+// - VesselPosition: 1 row per ingested position report (types 1/2/3/18)
+// - position geography(Point, 4326) is added in the migration as a
+//   GENERATED ALWAYS AS column from (lng, lat). Prisma writes lat/lng;
+//   PostGIS computes the spatial column. Spatial queries go through
+//   $queryRaw using ST_DWithin etc.
+// - Snake_case at DB level (@map) for Postgres-idiomatic SQL; camelCase
+//   in Prisma client for TS-idiomatic call sites.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Vessel {
+  mmsi        Int       @id
+  imo         Int?      @unique
+  name        String?   @db.VarChar(20)
+  callSign    String?   @map("call_sign")    @db.VarChar(7)
+  shipType    Int?      @map("ship_type")
+  toBow       Int?      @map("to_bow")
+  toStern     Int?      @map("to_stern")
+  toPort      Int?      @map("to_port")
+  toStarboard Int?      @map("to_starboard")
+  draught     Float?
+  destination String?   @db.VarChar(20)
+  eta         DateTime?
+  lastSeenAt  DateTime? @map("last_seen_at")
+  createdAt   DateTime  @default(now())  @map("created_at")
+  updatedAt   DateTime  @updatedAt        @map("updated_at")
+
+  positions VesselPosition[]
+
+  @@map("vessels")
+}
+
+// Sentinel-aware nullables: the ingest writer (D5+) must convert AIS sentinels
+// to NULL before insert. Sentinels: heading 511, navStatus 15, rateOfTurn -128,
+// imo 0, position lat 91 / lng 181. Enforced at the ingest boundary per ADR-0004.
+model VesselPosition {
+  id                 BigInt    @id @default(autoincrement())
+  vesselMmsi         Int       @map("vessel_mmsi")
+  vessel             Vessel    @relation(fields: [vesselMmsi], references: [mmsi], onDelete: Cascade)
+  lat                Float
+  lng                Float
+  speedOverGround    Float?    @map("speed_over_ground")
+  courseOverGround   Float?    @map("course_over_ground")
+  trueHeading        Int?      @map("true_heading")
+  rateOfTurn         Float?    @map("rate_of_turn")
+  navStatus          Int?      @map("nav_status")
+  broadcastTimestamp DateTime? @map("broadcast_timestamp")
+  ingestTimestamp    DateTime  @default(now()) @map("ingest_timestamp")
+  // GENERATED ALWAYS AS column maintained by PostGIS in the migration.
+  // Declared here so Prisma's drift check matches the DB; reads / writes
+  // go through $queryRaw because Prisma cannot type the geography value.
+  // Read via $queryRaw only - never via Prisma client typed API.
+  position           Unsupported("geography")? @default(dbgenerated("(st_setsrid(st_makepoint(lng, lat), 4326))::geography"))
+
+  @@index([vesselMmsi, ingestTimestamp(sort: Desc)])
+  @@index([position], map: "vessel_positions_position_gist_idx", type: Gist)
+  @@map("vessel_positions")
+}
