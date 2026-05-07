@@ -1,0 +1,60 @@
+name: Backlog
+description: Deferred work tracked but not blocking the current sprint
+title: ''
+labels:
+  - backlog
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this for work that is real but intentionally not in the current sprint. Pick a Conventional Commits prefix in the title (e.g. `feat(web):`, `refactor(shared):`).
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: The thing to do, briefly.
+    validations:
+      required: true
+  - type: textarea
+    id: why-deferred
+    attributes:
+      label: Why deferred
+      description: The trigger that would cause this to be picked up - traffic, scale, a follow-up issue, post-D14, a downstream dependency.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Even if deferred, define done.
+      value: |
+        - [ ]
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - web
+        - api
+        - ingest
+        - shared
+        - infra
+        - docs
+        - cross-cutting
+    validations:
+      required: true
+  - type: dropdown
+    id: trigger
+    attributes:
+      label: Pickup trigger
+      description: When this becomes "now".
+      options:
+        - post-D14 stretch
+        - on confirmed scale demand
+        - on incident or regression
+        - on dependency landing
+        - opportunistic
+    validations:
+      required: true

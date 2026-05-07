@@ -1,0 +1,71 @@
+name: Feature
+description: New feature, enhancement, or implementation work
+title: 'feat(scope): '
+labels:
+  - feature
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this for any new capability or enhancement. Replace `scope` in the title with the affected area (e.g. `feat(api):`, `feat(web):`, `feat(ingest):`, `feat(shared):`).
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: One or two sentences describing the user value or technical capability this delivers.
+      placeholder: Vessels appear on the map within 1 second of an ingest event landing in the API.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: Files, modules, or behaviors that this work touches.
+      value: |
+        -
+    validations:
+      required: true
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: Out of scope
+      description: Explicitly excluded; defer to a follow-up issue if needed.
+      value: |
+        -
+    validations:
+      required: false
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Concrete, verifiable criteria. Use checkboxes so progress is visible on the issue page.
+      value: |
+        - [ ]
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Primary code area touched.
+      options:
+        - web
+        - api
+        - ingest
+        - shared
+        - infra
+        - docs
+        - cross-cutting
+    validations:
+      required: true
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options:
+        - p0 - blocking sprint goal
+        - p1 - planned for current sprint
+        - p2 - planned next sprint
+        - p3 - opportunistic
+    validations:
+      required: true
