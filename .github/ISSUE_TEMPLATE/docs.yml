@@ -1,0 +1,46 @@
+name: Docs / ADR
+description: Documentation, ADR, or architectural narrative
+title: 'docs(scope): '
+labels:
+  - documentation
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this for README updates, ADR additions, or any narrative documentation work. Replace `scope` in the title with the affected area (e.g. `docs(adr):`, `docs(readme):`, `docs(web):`).
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: What is documented or decided.
+      value: |
+        -
+    validations:
+      required: true
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation
+      description: Why this matters now. Cite the trigger (a recent decision, a new ADR, a recurring question).
+    validations:
+      required: false
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      value: |
+        - [ ]
+    validations:
+      required: true
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Kind
+      options:
+        - ADR (new decision)
+        - ADR (update existing)
+        - README
+        - inline narrative (CLAUDE.md, repo notes)
+        - external (LinkedIn, blog draft)
+    validations:
+      required: true

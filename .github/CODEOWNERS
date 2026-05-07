@@ -1,0 +1,15 @@
+# https://docs.github.com/repositories/managing-your-repositorys-settings-and-security/customizing-your-repository/about-code-owners
+# Default owner for everything in the repo.
+*                                @mdev-co
+
+# Architecture decision records require an extra-careful read.
+/adr/                            @mdev-co
+
+# CI and quality gates - any change here affects all PRs.
+/.github/workflows/              @mdev-co
+/.husky/                         @mdev-co
+/eslint.config.js                @mdev-co
+/.npmrc                          @mdev-co
+
+# Cross-cutting framework-agnostic core.
+/packages/shared/                @mdev-co
