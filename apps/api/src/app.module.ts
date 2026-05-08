@@ -1,5 +1,3 @@
-import { join } from 'node:path';
-
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
@@ -12,10 +10,11 @@ import { TelemetryWsModule } from './telemetry-ws/telemetry-ws.module';
 
 @Module({
   imports: [
+    // env is preloaded via dotenv-cli in package.json scripts (start*,
+    // db:*); ConfigModule reads the already-populated process.env.
     ConfigModule.forRoot({
       isGlobal: true,
       cache: true,
-      envFilePath: join(__dirname, '../../..', '.env'),
     }),
     EventEmitterModule.forRoot({
       wildcard: false,
