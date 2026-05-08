@@ -2,6 +2,20 @@ export { createLogger, type AppLogger, type CreateLoggerOptions } from './logger
 
 export { type Mmsi, type Imo, SourceId, sourceIdName } from './types/brands';
 
+export {
+  type RejectReason,
+  type Result,
+  err,
+  ok,
+  isValidMmsi,
+  parseMmsi,
+  isValidImo,
+  parseImo,
+  isValidLatLng,
+  validateLatLng,
+  validateAisMessage,
+} from './validators';
+
 export { ingestSourceMachine } from './machines/ingest-source-machine';
 export {
   DEGRADED_GRACE_MS,
