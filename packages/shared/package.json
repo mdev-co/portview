@@ -3,15 +3,23 @@
   "version": "0.0.1",
   "private": true,
   "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      }
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "tsup",
+    "dev": "tsup --watch",
     "prepare": "pnpm build",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --max-warnings=0",
@@ -23,6 +31,7 @@
     "xstate": "^5.31.0"
   },
   "devDependencies": {
+    "tsup": "^8.5.1",
     "typescript": "^5.8.3",
     "vitest": "^4.1.5"
   }
