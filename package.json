@@ -57,10 +57,6 @@
       "pnpm --filter @sps/web exec eslint --fix --max-warnings=0 --no-warn-ignored",
       "prettier --write"
     ],
-    "apps/ingest/**/*.{ts,tsx}": [
-      "eslint --fix --max-warnings=0 --no-warn-ignored",
-      "prettier --write"
-    ],
     "packages/shared/**/*.{ts,tsx}": [
       "eslint --fix --max-warnings=0 --no-warn-ignored",
       "prettier --write"

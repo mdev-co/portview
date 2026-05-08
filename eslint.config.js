@@ -3,10 +3,10 @@ import prettier from 'eslint-config-prettier';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
 
-// Root ESLint config - baseline rules for apps/ingest, packages/shared,
-// scripts/, and any cross-cutting files. apps/api and apps/web have own
-// configs (NestJS scaffold + Vite scaffold) which take precedence via
-// ESLint flat-config walk-up resolution.
+// Root ESLint config - baseline rules for packages/shared, scripts/,
+// and any cross-cutting files. apps/api and apps/web have own configs
+// (NestJS scaffold + Vite scaffold) which take precedence via ESLint
+// flat-config walk-up resolution.
 export default tseslint.config(
   {
     ignores: [
