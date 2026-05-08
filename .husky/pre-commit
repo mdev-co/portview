@@ -45,7 +45,15 @@ else
   FAILED=1
 fi
 
-# 2. Typecheck across all workspaces
+# 2. Workspace-wide Prettier check across tracked files
+if pnpm format:check > /dev/null 2>&1; then
+  add_result "Format check" "PASS" "Prettier clean across tracked files"
+else
+  add_result "Format check" "FAIL" "Run: pnpm format"
+  FAILED=1
+fi
+
+# 3. Typecheck across all workspaces
 if pnpm -r typecheck > /dev/null 2>&1; then
   add_result "Typecheck" "PASS" "All workspaces tsc clean"
 else
@@ -53,7 +61,7 @@ else
   FAILED=1
 fi
 
-# 3. Forbidden patterns check (console.log, debugger, : any)
+# 4. Forbidden patterns check (console.log, debugger, : any)
 if node scripts/pre-commit-check.mjs > /dev/null 2>&1; then
   add_result "Forbidden patterns" "PASS" "No console.log/debugger/any"
 else
