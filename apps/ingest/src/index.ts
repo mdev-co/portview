@@ -1,7 +1,7 @@
 import { createActor } from 'xstate';
 import {
   type ISource,
-  type SourceId,
+  SourceId,
   createLogger,
   ingestSourceMachine,
   validateNmeaChecksum,
@@ -28,18 +28,18 @@ const sources = new Map<SourceId, ISource>();
 const prioritizedBuilder: SourceId[] = [];
 
 sources.set(
-  'local-udp',
+  SourceId.LocalUdp,
   new LocalUdpSource({ port: UDP_PORT, host: UDP_HOST, rateLimit: RATE_LIMIT }),
 );
-prioritizedBuilder.push('local-udp');
+prioritizedBuilder.push(SourceId.LocalUdp);
 
-sources.set('web-sdr', new WebSdrSource());
-prioritizedBuilder.push('web-sdr');
+sources.set(SourceId.WebSdr, new WebSdrSource());
+prioritizedBuilder.push(SourceId.WebSdr);
 log.info('web-sdr source registered (stub)');
 
 try {
   sources.set(
-    'ais-stream',
+    SourceId.AisStream,
     new AisStreamSource({
       logger: (level, message, data) => {
         if (data === undefined) {
@@ -50,7 +50,7 @@ try {
       },
     }),
   );
-  prioritizedBuilder.push('ais-stream');
+  prioritizedBuilder.push(SourceId.AisStream);
   log.info('ais-stream source registered');
 } catch (err) {
   log.warn({ err: String(err) }, 'ais-stream source skipped');
@@ -100,7 +100,7 @@ let previousState: string | null = null;
 
 actor.subscribe(snapshot => {
   const desiredId = snapshot.context.currentSourceId;
-  const desiredSource = desiredId ? (sources.get(desiredId) ?? null) : null;
+  const desiredSource = desiredId !== null ? (sources.get(desiredId) ?? null) : null;
 
   if (activeSource && activeSource !== desiredSource) {
     const stopping = activeSource;

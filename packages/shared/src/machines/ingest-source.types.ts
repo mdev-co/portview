@@ -1,4 +1,6 @@
-export type SourceId = 'local-udp' | 'web-sdr' | 'ais-stream';
+import { SourceId } from '../types/brands';
+
+export { SourceId };
 
 export interface NmeaFrame {
   readonly raw: string;

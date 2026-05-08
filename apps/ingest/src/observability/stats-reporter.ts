@@ -1,13 +1,13 @@
-import type { SourceStats } from '@sps/shared';
+import type { SourceId, SourceStats } from '@sps/shared';
 
 export interface PerSourceStats {
-  readonly sourceId: string;
+  readonly sourceId: SourceId;
   readonly stats: SourceStats;
 }
 
 export interface IngestStatsSnapshot {
   readonly machineState: string;
-  readonly currentSourceId: string | null;
+  readonly currentSourceId: SourceId | null;
   readonly framesAccepted: number;
   readonly framesRejected: number;
   readonly perSource: readonly PerSourceStats[];

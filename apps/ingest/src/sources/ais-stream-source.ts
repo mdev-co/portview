@@ -1,6 +1,7 @@
-import type { ISource, LngLatBounds, NmeaFrame, SourceId, Unsubscribe } from '@sps/shared';
+import type { ISource, LngLatBounds, NmeaFrame, Unsubscribe } from '@sps/shared';
+import { SourceId } from '@sps/shared';
 
-const SOURCE_ID: SourceId = 'ais-stream';
+const SOURCE_ID = SourceId.AisStream;
 const SOURCE_PRIORITY = 3;
 const TOKEN_ENV = 'EXTERNAL_FEED_TOKEN';
 const ENDPOINT_ENV = 'EXTERNAL_FEED_ENDPOINT';

@@ -5,10 +5,10 @@ import {
   DEGRADED_GRACE_MS,
   EXHAUSTED_RETRY_MS,
   HEALTHY_WINDOW_MS,
-  type SourceId,
+  SourceId,
 } from '../ingest-source.types';
 
-const PRIORITIZED: readonly SourceId[] = ['local-udp', 'web-sdr', 'ais-stream'];
+const PRIORITIZED: readonly SourceId[] = [SourceId.LocalUdp, SourceId.WebSdr, SourceId.AisStream];
 
 function makeActor() {
   return createActor(ingestSourceMachine, {
@@ -37,14 +37,14 @@ describe('ingestSourceMachine', () => {
     actor.send({ type: 'START' });
     const snapshot = actor.getSnapshot();
     expect(snapshot.value).toBe('connecting');
-    expect(snapshot.context.currentSourceId).toBe('local-udp');
+    expect(snapshot.context.currentSourceId).toBe(SourceId.LocalUdp);
   });
 
   it('on SOURCE_CONNECTED enters active', () => {
     const actor = makeActor();
     actor.start();
     actor.send({ type: 'START' });
-    actor.send({ type: 'SOURCE_CONNECTED', sourceId: 'local-udp' });
+    actor.send({ type: 'SOURCE_CONNECTED', sourceId: SourceId.LocalUdp });
     expect(actor.getSnapshot().value).toBe('active');
   });
 
@@ -52,7 +52,7 @@ describe('ingestSourceMachine', () => {
     const actor = makeActor();
     actor.start();
     actor.send({ type: 'START' });
-    actor.send({ type: 'SOURCE_CONNECTED', sourceId: 'ais-stream' });
+    actor.send({ type: 'SOURCE_CONNECTED', sourceId: SourceId.AisStream });
     expect(actor.getSnapshot().value).toBe('connecting');
   });
 
@@ -60,9 +60,9 @@ describe('ingestSourceMachine', () => {
     const actor = makeActor();
     actor.start();
     actor.send({ type: 'START' });
-    actor.send({ type: 'SOURCE_CONNECTED', sourceId: 'local-udp' });
-    actor.send({ type: 'FRAME_RECEIVED', sourceId: 'local-udp', frameAt: 1000 });
-    actor.send({ type: 'FRAME_RECEIVED', sourceId: 'local-udp', frameAt: 2000 });
+    actor.send({ type: 'SOURCE_CONNECTED', sourceId: SourceId.LocalUdp });
+    actor.send({ type: 'FRAME_RECEIVED', sourceId: SourceId.LocalUdp, frameAt: 1000 });
+    actor.send({ type: 'FRAME_RECEIVED', sourceId: SourceId.LocalUdp, frameAt: 2000 });
     const ctx = actor.getSnapshot().context;
     expect(ctx.framesAccepted).toBe(2);
     expect(ctx.lastFrameAt).toBe(2000);
@@ -72,8 +72,8 @@ describe('ingestSourceMachine', () => {
     const actor = makeActor();
     actor.start();
     actor.send({ type: 'START' });
-    actor.send({ type: 'SOURCE_CONNECTED', sourceId: 'local-udp' });
-    actor.send({ type: 'FRAME_REJECTED', sourceId: 'local-udp', reason: 'bad-checksum' });
+    actor.send({ type: 'SOURCE_CONNECTED', sourceId: SourceId.LocalUdp });
+    actor.send({ type: 'FRAME_REJECTED', sourceId: SourceId.LocalUdp, reason: 'bad-checksum' });
     const snapshot = actor.getSnapshot();
     expect(snapshot.value).toBe('active');
     expect(snapshot.context.framesRejected).toBe(1);
@@ -83,7 +83,7 @@ describe('ingestSourceMachine', () => {
     const actor = makeActor();
     actor.start();
     actor.send({ type: 'START' });
-    actor.send({ type: 'SOURCE_CONNECTED', sourceId: 'local-udp' });
+    actor.send({ type: 'SOURCE_CONNECTED', sourceId: SourceId.LocalUdp });
     vi.advanceTimersByTime(HEALTHY_WINDOW_MS);
     expect(actor.getSnapshot().value).toBe('degraded');
   });
@@ -92,9 +92,9 @@ describe('ingestSourceMachine', () => {
     const actor = makeActor();
     actor.start();
     actor.send({ type: 'START' });
-    actor.send({ type: 'SOURCE_CONNECTED', sourceId: 'local-udp' });
+    actor.send({ type: 'SOURCE_CONNECTED', sourceId: SourceId.LocalUdp });
     vi.advanceTimersByTime(HEALTHY_WINDOW_MS);
-    actor.send({ type: 'FRAME_RECEIVED', sourceId: 'local-udp', frameAt: 50_000 });
+    actor.send({ type: 'FRAME_RECEIVED', sourceId: SourceId.LocalUdp, frameAt: 50_000 });
     expect(actor.getSnapshot().value).toBe('active');
   });
 
@@ -102,9 +102,9 @@ describe('ingestSourceMachine', () => {
     const actor = makeActor();
     actor.start();
     actor.send({ type: 'START' });
-    actor.send({ type: 'SOURCE_CONNECTED', sourceId: 'local-udp' });
+    actor.send({ type: 'SOURCE_CONNECTED', sourceId: SourceId.LocalUdp });
     vi.advanceTimersByTime(HEALTHY_WINDOW_MS - 1);
-    actor.send({ type: 'FRAME_RECEIVED', sourceId: 'local-udp', frameAt: 1 });
+    actor.send({ type: 'FRAME_RECEIVED', sourceId: SourceId.LocalUdp, frameAt: 1 });
     vi.advanceTimersByTime(HEALTHY_WINDOW_MS - 1);
     expect(actor.getSnapshot().value).toBe('active');
   });
@@ -113,23 +113,27 @@ describe('ingestSourceMachine', () => {
     const actor = makeActor();
     actor.start();
     actor.send({ type: 'START' });
-    actor.send({ type: 'SOURCE_CONNECTED', sourceId: 'local-udp' });
+    actor.send({ type: 'SOURCE_CONNECTED', sourceId: SourceId.LocalUdp });
     vi.advanceTimersByTime(HEALTHY_WINDOW_MS);
     vi.advanceTimersByTime(DEGRADED_GRACE_MS);
     const snapshot = actor.getSnapshot();
     expect(snapshot.value).toBe('connecting');
-    expect(snapshot.context.currentSourceId).toBe('web-sdr');
-    expect(snapshot.context.triedSourceIds).toContain('local-udp');
+    expect(snapshot.context.currentSourceId).toBe(SourceId.WebSdr);
+    expect(snapshot.context.triedSourceIds).toContain(SourceId.LocalUdp);
   });
 
   it('SOURCE_FAILED in connecting moves to next priority', () => {
     const actor = makeActor();
     actor.start();
     actor.send({ type: 'START' });
-    actor.send({ type: 'SOURCE_FAILED', sourceId: 'local-udp', reason: 'connection refused' });
+    actor.send({
+      type: 'SOURCE_FAILED',
+      sourceId: SourceId.LocalUdp,
+      reason: 'connection refused',
+    });
     const snapshot = actor.getSnapshot();
     expect(snapshot.value).toBe('connecting');
-    expect(snapshot.context.currentSourceId).toBe('web-sdr');
+    expect(snapshot.context.currentSourceId).toBe(SourceId.WebSdr);
     expect(snapshot.context.errorMessage).toBe('connection refused');
   });
 
@@ -137,9 +141,9 @@ describe('ingestSourceMachine', () => {
     const actor = makeActor();
     actor.start();
     actor.send({ type: 'START' });
-    actor.send({ type: 'SOURCE_FAILED', sourceId: 'local-udp', reason: 'fail-1' });
-    actor.send({ type: 'SOURCE_FAILED', sourceId: 'web-sdr', reason: 'fail-2' });
-    actor.send({ type: 'SOURCE_FAILED', sourceId: 'ais-stream', reason: 'fail-3' });
+    actor.send({ type: 'SOURCE_FAILED', sourceId: SourceId.LocalUdp, reason: 'fail-1' });
+    actor.send({ type: 'SOURCE_FAILED', sourceId: SourceId.WebSdr, reason: 'fail-2' });
+    actor.send({ type: 'SOURCE_FAILED', sourceId: SourceId.AisStream, reason: 'fail-3' });
     expect(actor.getSnapshot().value).toBe('exhausted');
   });
 
@@ -147,14 +151,14 @@ describe('ingestSourceMachine', () => {
     const actor = makeActor();
     actor.start();
     actor.send({ type: 'START' });
-    actor.send({ type: 'SOURCE_FAILED', sourceId: 'local-udp', reason: 'x' });
-    actor.send({ type: 'SOURCE_FAILED', sourceId: 'web-sdr', reason: 'x' });
-    actor.send({ type: 'SOURCE_FAILED', sourceId: 'ais-stream', reason: 'x' });
+    actor.send({ type: 'SOURCE_FAILED', sourceId: SourceId.LocalUdp, reason: 'x' });
+    actor.send({ type: 'SOURCE_FAILED', sourceId: SourceId.WebSdr, reason: 'x' });
+    actor.send({ type: 'SOURCE_FAILED', sourceId: SourceId.AisStream, reason: 'x' });
     expect(actor.getSnapshot().value).toBe('exhausted');
     vi.advanceTimersByTime(EXHAUSTED_RETRY_MS);
     const snapshot = actor.getSnapshot();
     expect(snapshot.value).toBe('connecting');
-    expect(snapshot.context.currentSourceId).toBe('local-udp');
+    expect(snapshot.context.currentSourceId).toBe(SourceId.LocalUdp);
     expect(snapshot.context.triedSourceIds).toEqual([]);
     expect(snapshot.context.errorMessage).toBeNull();
   });
@@ -163,7 +167,7 @@ describe('ingestSourceMachine', () => {
     const actor = makeActor();
     actor.start();
     actor.send({ type: 'START' });
-    actor.send({ type: 'SOURCE_CONNECTED', sourceId: 'local-udp' });
+    actor.send({ type: 'SOURCE_CONNECTED', sourceId: SourceId.LocalUdp });
     actor.send({ type: 'STOP' });
     expect(actor.getSnapshot().value).toBe('idle');
   });
@@ -172,9 +176,9 @@ describe('ingestSourceMachine', () => {
     const actor = makeActor();
     actor.start();
     actor.send({ type: 'START' });
-    actor.send({ type: 'SOURCE_FAILED', sourceId: 'local-udp', reason: 'x' });
-    actor.send({ type: 'SOURCE_FAILED', sourceId: 'web-sdr', reason: 'x' });
-    actor.send({ type: 'SOURCE_FAILED', sourceId: 'ais-stream', reason: 'x' });
+    actor.send({ type: 'SOURCE_FAILED', sourceId: SourceId.LocalUdp, reason: 'x' });
+    actor.send({ type: 'SOURCE_FAILED', sourceId: SourceId.WebSdr, reason: 'x' });
+    actor.send({ type: 'SOURCE_FAILED', sourceId: SourceId.AisStream, reason: 'x' });
     actor.send({ type: 'STOP' });
     expect(actor.getSnapshot().value).toBe('idle');
   });
@@ -183,12 +187,12 @@ describe('ingestSourceMachine', () => {
     const actor = makeActor();
     actor.start();
     actor.send({ type: 'START' });
-    actor.send({ type: 'SOURCE_FAILED', sourceId: 'local-udp', reason: 'x' });
+    actor.send({ type: 'SOURCE_FAILED', sourceId: SourceId.LocalUdp, reason: 'x' });
     actor.send({ type: 'STOP' });
-    expect(actor.getSnapshot().context.triedSourceIds).toContain('local-udp');
+    expect(actor.getSnapshot().context.triedSourceIds).toContain(SourceId.LocalUdp);
     actor.send({ type: 'START' });
     const snapshot = actor.getSnapshot();
     expect(snapshot.context.triedSourceIds).toEqual([]);
-    expect(snapshot.context.currentSourceId).toBe('local-udp');
+    expect(snapshot.context.currentSourceId).toBe(SourceId.LocalUdp);
   });
 });

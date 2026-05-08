@@ -1,8 +1,9 @@
 import dgram from 'node:dgram';
-import type { ISource, NmeaFrame, SourceId, Unsubscribe } from '@sps/shared';
+import type { ISource, NmeaFrame, Unsubscribe } from '@sps/shared';
+import { SourceId } from '@sps/shared';
 import { TokenBucket } from './token-bucket';
 
-const SOURCE_ID: SourceId = 'local-udp';
+const SOURCE_ID = SourceId.LocalUdp;
 const SOURCE_PRIORITY = 1;
 const DEFAULT_PORT = 10110;
 const DEFAULT_HOST = '127.0.0.1';
