@@ -21,86 +21,9 @@ Three coordinated mechanisms, materialised in this commit:
 
 ## Pipeline
 
-> Majk, wyrenderuj poniższy blok D2 do SVG i podmień fenced-code na `![GIGO pipeline](./0006-pipeline.svg)`. Źródło D2 zostaje pod obrazkiem jako komentarz HTML.
+![GIGO pipeline — containers, components and trust zones](./0006-pipeline.svg)
 
-```d2
-direction: down
-vars: {
-  d2-config: {
-    theme-id: 8
-    pad: 20
-  }
-}
-
-upstream: "Untrusted upstream" {
-  udp: "Local UDP :10110\\nNMEA bytes" {
-    shape: hexagon
-    icon: https://icons.terrastruct.com/dev%2Fnodejs.svg
-  }
-  ws_regional: "Regional WebSDR\\nNMEA bytes (stub)" {
-    shape: hexagon
-  }
-  ws_external: "External feed\\nJSON" {
-    shape: hexagon
-  }
-}
-
-ingest: "@sps/ingest (Node worker)" {
-  shape: package
-  icon: https://icons.terrastruct.com/dev%2Fnodejs.svg
-
-  decoder: "Decoder (boundary gate)" {
-    shape: rectangle
-    csum: "NMEA checksum"
-    aivdm: "AIVDM envelope"
-    mp: "Multipart reassembly"
-    bit: "Bit decode by message type"
-    val: "validateAisMessage\\nsemantic invariants"
-
-    csum -> aivdm: "ok"
-    aivdm -> mp: "ok"
-    mp -> bit: "complete fragment"
-    bit -> val: "known type"
-  }
-
-  dlq: "DeadLetterWriter" {
-    shape: cylinder
-  }
-
-  decoder -> dlq: "rejected (DecodeRejection)"
-}
-
-shared: "@sps/shared" {
-  shape: package
-  validators: "validators/"
-  brands: "types/brands"
-  parsers: "parsers/"
-}
-
-trusted: "Trusted store\\n(D5+ DB writer)" {
-  shape: cylinder
-  icon: https://icons.terrastruct.com/dev%2Fpostgresql.svg
-  style.fill: "#eafaee"
-  style.stroke: "#3a8f4a"
-}
-
-audit: "rejected_frames.jsonl\\n~/.sps-data/" {
-  shape: page
-  style.fill: "#fdeaea"
-  style.stroke: "#c33"
-}
-
-upstream.udp -> ingest.decoder.csum: "writes NMEA frame"
-upstream.ws_regional -> ingest.decoder.csum: "writes NMEA frame"
-upstream.ws_external -> ingest: "forwards JSON (D5+ decode)"
-
-ingest.decoder.bit -> shared.parsers: "uses"
-ingest.decoder.val -> shared.validators: "invokes"
-shared.validators -> shared.brands: "constructs"
-
-ingest.decoder.val -> trusted: "valid AisMessage"
-ingest.dlq -> audit: "appends JSONL row"
-```
+> Source: [`0006-pipeline.d2`](./0006-pipeline.d2). Re-render with `d2 adr/0006-pipeline.d2 adr/0006-pipeline.svg --theme=8 --pad=20`.
 
 Each rejection variant is a discriminated union member. The DLQ row carries the variant verbatim, so an analyst tracing a transmission corruption sees exactly which invariant fired. Sentinel-disguised nulls, out-of-range coordinates and impossible MMSIs never reach the trusted store.
 
