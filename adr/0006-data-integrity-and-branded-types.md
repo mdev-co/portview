@@ -21,45 +21,88 @@ Three coordinated mechanisms, materialised in this commit:
 
 ## Pipeline
 
-```mermaid
-flowchart TB
-    subgraph Sources["Untrusted upstream"]
-        S1[Local UDP :10110]
-        S2[Regional WebSocket]
-        S3[External feed]
-    end
+> Majk, wyrenderuj poniższy blok D2 do SVG i podmień fenced-code na `![GIGO pipeline](./0006-pipeline.svg)`. Źródło D2 zostaje pod obrazkiem jako komentarz HTML.
 
-    subgraph Gate["GIGO boundary"]
-        direction TB
-        G1{NMEA<br/>checksum}
-        G2{AIVDM<br/>envelope}
-        G3{Multipart<br/>reassembly}
-        G4{Bit decode<br/>by type}
-        G5{validateAisMessage<br/>semantic invariants}
-        G1 -->|ok| G2 -->|ok| G3 -->|complete| G4 -->|known type| G5
-    end
+```d2
+direction: down
+vars: {
+  d2-config: {
+    theme-id: 8
+    pad: 20
+  }
+}
 
-    subgraph Outputs["Trusted vs poison"]
-        OK[(Trusted store<br/>D5+ DB writer)]
-        DLQ[(rejected_frames.jsonl<br/>append-only audit trail)]
-        BUF((multipart<br/>buffered))
-    end
+upstream: "Untrusted upstream" {
+  udp: "Local UDP :10110\\nNMEA bytes" {
+    shape: hexagon
+    icon: https://icons.terrastruct.com/dev%2Fnodejs.svg
+  }
+  ws_regional: "Regional WebSDR\\nNMEA bytes (stub)" {
+    shape: hexagon
+  }
+  ws_external: "External feed\\nJSON" {
+    shape: hexagon
+  }
+}
 
-    Sources --> G1
-    G1 -->|bad checksum| DLQ
-    G2 -->|malformed| DLQ
-    G3 -->|pending| BUF
-    G4 -->|unsupported| DLQ
-    G5 -->|invalid mmsi/imo/coords| DLQ
-    G5 -->|valid| OK
+ingest: "@sps/ingest (Node worker)" {
+  shape: package
+  icon: https://icons.terrastruct.com/dev%2Fnodejs.svg
 
-    classDef rejected fill:#fee,stroke:#c33
-    classDef accepted fill:#efe,stroke:#3a3
-    class DLQ rejected
-    class OK accepted
+  decoder: "Decoder (boundary gate)" {
+    shape: rectangle
+    csum: "NMEA checksum"
+    aivdm: "AIVDM envelope"
+    mp: "Multipart reassembly"
+    bit: "Bit decode by message type"
+    val: "validateAisMessage\\nsemantic invariants"
+
+    csum -> aivdm: "ok"
+    aivdm -> mp: "ok"
+    mp -> bit: "complete fragment"
+    bit -> val: "known type"
+  }
+
+  dlq: "DeadLetterWriter" {
+    shape: cylinder
+  }
+
+  decoder -> dlq: "rejected (DecodeRejection)"
+}
+
+shared: "@sps/shared" {
+  shape: package
+  validators: "validators/"
+  brands: "types/brands"
+  parsers: "parsers/"
+}
+
+trusted: "Trusted store\\n(D5+ DB writer)" {
+  shape: cylinder
+  icon: https://icons.terrastruct.com/dev%2Fpostgresql.svg
+  style.fill: "#eafaee"
+  style.stroke: "#3a8f4a"
+}
+
+audit: "rejected_frames.jsonl\\n~/.sps-data/" {
+  shape: page
+  style.fill: "#fdeaea"
+  style.stroke: "#c33"
+}
+
+upstream.udp -> ingest.decoder.csum: "writes NMEA frame"
+upstream.ws_regional -> ingest.decoder.csum: "writes NMEA frame"
+upstream.ws_external -> ingest: "forwards JSON (D5+ decode)"
+
+ingest.decoder.bit -> shared.parsers: "uses"
+ingest.decoder.val -> shared.validators: "invokes"
+shared.validators -> shared.brands: "constructs"
+
+ingest.decoder.val -> trusted: "valid AisMessage"
+ingest.dlq -> audit: "appends JSONL row"
 ```
 
-Each rejection variant is a discriminated union member. The DLQ row carries the variant verbatim, so an analyst tracing a transmission corruption sees exactly which invariant fired. Sentinel-disguised nulls, out-of-range coordinates, and impossible MMSIs never reach the trusted store.
+Each rejection variant is a discriminated union member. The DLQ row carries the variant verbatim, so an analyst tracing a transmission corruption sees exactly which invariant fired. Sentinel-disguised nulls, out-of-range coordinates and impossible MMSIs never reach the trusted store.
 
 ## Tradeoffs
 
