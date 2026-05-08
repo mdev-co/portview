@@ -33,10 +33,13 @@
     "@nestjs/core": "^11.0.1",
     "@nestjs/event-emitter": "^3.1.0",
     "@nestjs/platform-express": "^11.0.1",
+    "@nestjs/platform-ws": "^11.1.19",
+    "@nestjs/websockets": "^11.1.19",
     "@prisma/client": "^6",
     "@sps/shared": "workspace:^",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
+    "ws": "^8.20.0",
     "xstate": "^5.31.0"
   },
   "devDependencies": {
@@ -49,6 +52,7 @@
     "@types/jest": "^30.0.0",
     "@types/node": "^24.0.0",
     "@types/supertest": "^7.0.0",
+    "@types/ws": "^8.18.1",
     "dotenv-cli": "^11.0.0",
     "eslint": "^9.18.0",
     "eslint-config-prettier": "^10.0.1",

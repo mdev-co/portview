@@ -8,6 +8,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { IngestModule } from './ingest/ingest.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { TelemetryWsModule } from './telemetry-ws/telemetry-ws.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { PrismaModule } from './prisma/prisma.module';
     }),
     PrismaModule,
     IngestModule,
+    TelemetryWsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
