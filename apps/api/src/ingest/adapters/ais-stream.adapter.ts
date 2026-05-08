@@ -4,6 +4,22 @@ import type {
   PositionReport,
   StaticData,
 } from '@sps/shared';
+import {
+  AIS_COG_UNKNOWN_SENTINEL,
+  AIS_EPFD_TYPE_DEFAULT,
+  AIS_HEADING_UNKNOWN_SENTINEL,
+  AIS_LAT_UNKNOWN_SENTINEL,
+  AIS_LNG_UNKNOWN_SENTINEL,
+  AIS_MANEUVER_INDICATOR_DEFAULT,
+  AIS_NAV_STATUS_UNKNOWN,
+  AIS_RADIO_STATUS_DEFAULT,
+  AIS_RATE_OF_TURN_OUT_OF_RANGE_BOUND,
+  AIS_RATE_OF_TURN_UNKNOWN_SENTINEL,
+  AIS_REPEAT_INDICATOR_DEFAULT,
+  AIS_SHIP_TYPE_DEFAULT,
+  AIS_SOG_UNKNOWN_THRESHOLD,
+  AIS_VERSION_DEFAULT,
+} from '@sps/shared';
 
 /**
  * Boundary adapter for the AIS Stream WebSocket JSON feed.
@@ -17,16 +33,11 @@ import type {
  *   StandardClassBPositionReport -> AisMessage type 18
  *   ShipStaticData             -> AisMessage type 5
  *
- * Sentinel handling matches the parsers in @sps/shared:
- *   RateOfTurn          -128, +-127.x = unknown -> null
- *   Sog                 102.3, 102.4 = unknown -> null
- *   Cog                 360 = unknown -> null
- *   TrueHeading         511 = unknown -> null
- *   Latitude/Longitude  91 / 181 = unknown -> null
- *
- * Anything else (unknown payload kind, missing required field, malformed
- * JSON, off-spec coordinate) returns `null`. The ingest service then
- * counts the frame as rejected on the FSM and writes a DLQ entry.
+ * Sentinel handling matches the parsers in @sps/shared and the spec
+ * constants in `types/ais-spec.ts`. Anything else (unknown payload
+ * kind, missing required field, malformed JSON, off-spec coordinate)
+ * is rejected. The ingest service then counts the frame as rejected on
+ * the FSM and writes a DLQ entry.
  */
 
 export type AisStreamAdapterRejection =
@@ -39,13 +50,6 @@ export type AisStreamAdapterResult =
   | { readonly kind: 'message'; readonly value: AisMessage }
   | { readonly kind: 'rejected'; readonly reason: AisStreamAdapterRejection };
 
-const SENTINEL_LAT_UNKNOWN = 91;
-const SENTINEL_LNG_UNKNOWN = 181;
-const SENTINEL_HEADING_UNKNOWN = 511;
-const SENTINEL_COG_UNKNOWN = 360;
-const SENTINEL_SOG_UNKNOWN_LOWER = 102.3;
-const SENTINEL_ROT_UNKNOWN = -128;
-
 function asObject(value: unknown): Record<string, unknown> | null {
   return typeof value === 'object' && value !== null
     ? (value as Record<string, unknown>)
@@ -57,8 +61,8 @@ function asNumber(value: unknown): number | null {
 }
 
 function asInt(value: unknown): number | null {
-  const n = asNumber(value);
-  return n === null ? null : Math.trunc(n);
+  const numeric = asNumber(value);
+  return numeric === null ? null : Math.trunc(numeric);
 }
 
 function asBool(value: unknown): boolean {
@@ -76,15 +80,15 @@ function nullIfSentinel(value: number | null, sentinel: number): number | null {
 
 function nullIfSog(value: number | null): number | null {
   if (value === null) return null;
-  return value >= SENTINEL_SOG_UNKNOWN_LOWER ? null : value;
+  return value >= AIS_SOG_UNKNOWN_THRESHOLD ? null : value;
 }
 
 function decodeRateOfTurn(value: unknown): number | null {
-  const n = asNumber(value);
-  if (n === null) return null;
-  if (n === SENTINEL_ROT_UNKNOWN) return null;
-  if (Math.abs(n) >= 127.5) return null;
-  return n;
+  const numeric = asNumber(value);
+  if (numeric === null) return null;
+  if (numeric === AIS_RATE_OF_TURN_UNKNOWN_SENTINEL) return null;
+  if (Math.abs(numeric) >= AIS_RATE_OF_TURN_OUT_OF_RANGE_BOUND) return null;
+  return numeric;
 }
 
 function decodePosition(
@@ -92,11 +96,11 @@ function decodePosition(
 ): readonly [number, number] | null {
   const lat = nullIfSentinel(
     asNumber(payload['Latitude']),
-    SENTINEL_LAT_UNKNOWN,
+    AIS_LAT_UNKNOWN_SENTINEL,
   );
   const lng = nullIfSentinel(
     asNumber(payload['Longitude']),
-    SENTINEL_LNG_UNKNOWN,
+    AIS_LNG_UNKNOWN_SENTINEL,
   );
   return lat === null || lng === null ? null : [lng, lat];
 }
@@ -109,49 +113,55 @@ function decodeMessageId(payload: Record<string, unknown>): 1 | 2 | 3 {
 function decodePositionReport(
   payload: Record<string, unknown>,
   mmsi: number,
-): PositionReport | null {
+): PositionReport {
   return {
     messageType: decodeMessageId(payload),
-    repeatIndicator: asInt(payload['RepeatIndicator']) ?? 0,
+    repeatIndicator:
+      asInt(payload['RepeatIndicator']) ?? AIS_REPEAT_INDICATOR_DEFAULT,
     mmsi,
-    navigationStatus: asInt(payload['NavigationalStatus']) ?? 15,
+    navigationStatus:
+      asInt(payload['NavigationalStatus']) ?? AIS_NAV_STATUS_UNKNOWN,
     rateOfTurn: decodeRateOfTurn(payload['RateOfTurn']),
     speedOverGround: nullIfSog(asNumber(payload['Sog'])),
     positionAccuracy: asBool(payload['PositionAccuracy']),
     position: decodePosition(payload),
     courseOverGround: nullIfSentinel(
       asNumber(payload['Cog']),
-      SENTINEL_COG_UNKNOWN,
+      AIS_COG_UNKNOWN_SENTINEL,
     ),
     trueHeading: nullIfSentinel(
       asInt(payload['TrueHeading']),
-      SENTINEL_HEADING_UNKNOWN,
+      AIS_HEADING_UNKNOWN_SENTINEL,
     ),
     timestamp: asInt(payload['Timestamp']),
-    maneuverIndicator: asInt(payload['SpecialManoeuvreIndicator']) ?? 0,
+    maneuverIndicator:
+      asInt(payload['SpecialManoeuvreIndicator']) ??
+      AIS_MANEUVER_INDICATOR_DEFAULT,
     raim: asBool(payload['Raim']),
-    radioStatus: asInt(payload['CommunicationState']) ?? 0,
+    radioStatus:
+      asInt(payload['CommunicationState']) ?? AIS_RADIO_STATUS_DEFAULT,
   };
 }
 
 function decodeClassBPosition(
   payload: Record<string, unknown>,
   mmsi: number,
-): ClassBPositionReport | null {
+): ClassBPositionReport {
   return {
     messageType: 18,
-    repeatIndicator: asInt(payload['RepeatIndicator']) ?? 0,
+    repeatIndicator:
+      asInt(payload['RepeatIndicator']) ?? AIS_REPEAT_INDICATOR_DEFAULT,
     mmsi,
     speedOverGround: nullIfSog(asNumber(payload['Sog'])),
     positionAccuracy: asBool(payload['PositionAccuracy']),
     position: decodePosition(payload),
     courseOverGround: nullIfSentinel(
       asNumber(payload['Cog']),
-      SENTINEL_COG_UNKNOWN,
+      AIS_COG_UNKNOWN_SENTINEL,
     ),
     trueHeading: nullIfSentinel(
       asInt(payload['TrueHeading']),
-      SENTINEL_HEADING_UNKNOWN,
+      AIS_HEADING_UNKNOWN_SENTINEL,
     ),
     timestamp: asInt(payload['Timestamp']),
     csUnit: asBool(payload['ClassBUnit']),
@@ -161,7 +171,8 @@ function decodeClassBPosition(
     message22Flag: asBool(payload['ClassBMsg22']),
     assignedFlag: asBool(payload['AssignedMode']),
     raim: asBool(payload['Raim']),
-    radioStatus: asInt(payload['CommunicationState']) ?? 0,
+    radioStatus:
+      asInt(payload['CommunicationState']) ?? AIS_RADIO_STATUS_DEFAULT,
   };
 }
 
@@ -173,13 +184,14 @@ function decodeStaticData(
   const dimensions = asObject(payload['Dimension']);
   return {
     messageType: 5,
-    repeatIndicator: asInt(payload['RepeatIndicator']) ?? 0,
+    repeatIndicator:
+      asInt(payload['RepeatIndicator']) ?? AIS_REPEAT_INDICATOR_DEFAULT,
     mmsi,
-    aisVersion: asInt(payload['AisVersion']) ?? 0,
+    aisVersion: asInt(payload['AisVersion']) ?? AIS_VERSION_DEFAULT,
     imo: asInt(payload['ImoNumber']),
     callSign: asString(payload['CallSign']).trim(),
     vesselName: asString(payload['Name']).trim(),
-    shipType: asInt(payload['Type']) ?? 0,
+    shipType: asInt(payload['Type']) ?? AIS_SHIP_TYPE_DEFAULT,
     dimensions:
       dimensions === null
         ? null
@@ -189,7 +201,7 @@ function decodeStaticData(
             toPort: asInt(dimensions['C']) ?? 0,
             toStarboard: asInt(dimensions['D']) ?? 0,
           },
-    epfdType: asInt(payload['FixType']) ?? 0,
+    epfdType: asInt(payload['FixType']) ?? AIS_EPFD_TYPE_DEFAULT,
     eta: {
       month: asInt(eta['Month']),
       day: asInt(eta['Day']),
@@ -206,10 +218,10 @@ export function adaptAisStreamMessage(raw: string): AisStreamAdapterResult {
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
-  } catch (err) {
+  } catch (error) {
     return {
       kind: 'rejected',
-      reason: { kind: 'malformed-json', detail: String(err) },
+      reason: { kind: 'malformed-json', detail: String(error) },
     };
   }
 
@@ -238,17 +250,10 @@ export function adaptAisStreamMessage(raw: string): AisStreamAdapterResult {
         reason: { kind: 'invalid-payload', detail: 'missing mmsi' },
       };
     }
-    const value = decodePositionReport(positionReport, mmsi);
-    if (value === null) {
-      return {
-        kind: 'rejected',
-        reason: {
-          kind: 'invalid-payload',
-          detail: 'PositionReport decode returned null',
-        },
-      };
-    }
-    return { kind: 'message', value };
+    return {
+      kind: 'message',
+      value: decodePositionReport(positionReport, mmsi),
+    };
   }
 
   if (classBPosition !== null) {
@@ -260,17 +265,10 @@ export function adaptAisStreamMessage(raw: string): AisStreamAdapterResult {
         reason: { kind: 'invalid-payload', detail: 'missing mmsi' },
       };
     }
-    const value = decodeClassBPosition(classBPosition, mmsi);
-    if (value === null) {
-      return {
-        kind: 'rejected',
-        reason: {
-          kind: 'invalid-payload',
-          detail: 'StandardClassBPositionReport decode returned null',
-        },
-      };
-    }
-    return { kind: 'message', value };
+    return {
+      kind: 'message',
+      value: decodeClassBPosition(classBPosition, mmsi),
+    };
   }
 
   if (staticData !== null) {

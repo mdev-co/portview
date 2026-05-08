@@ -61,7 +61,7 @@ export class LocalUdpSource implements ISource {
         () => {
           socket.removeListener('error', onBindError);
           socket.on('error', (err) => {
-            this.errorListeners.forEach((l) => l(err));
+            this.errorListeners.forEach((listener) => listener(err));
           });
           this.socket = socket;
           resolve();
@@ -126,6 +126,6 @@ export class LocalUdpSource implements ISource {
       sourceId: SOURCE_ID,
     };
     this.messagesEmitted += 1;
-    this.frameListeners.forEach((l) => l(frame));
+    this.frameListeners.forEach((listener) => listener(frame));
   }
 }
