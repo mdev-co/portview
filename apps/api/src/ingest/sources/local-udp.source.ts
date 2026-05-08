@@ -22,17 +22,9 @@ type FrameCallback = (frame: NmeaFrame) => void;
 type ErrorCallback = (error: Error) => void;
 
 /**
- * Local UDP listener for AIS NMEA datagrams from a co-located rtl_ais
- * receiver. Binds to (host, port) and emits validated NmeaFrame events
- * up to `rateLimit` per second.
- *
- * `start()` does not resolve on the bind callback alone. It waits up
- * to `firstFrameTimeoutMs` (5 s by default) for the first datagram to
- * arrive; if no traffic appears in that window the bind is closed and
- * `start()` rejects, which lets the priority FSM advance to the next
- * source instead of sitting in `active` for a full HEALTHY_WINDOW (30 s)
- * just because the socket bound successfully on a host with no SDR
- * attached.
+ * UDP listener for AIS NMEA datagrams. start() resolves only after
+ * the first datagram arrives within `firstFrameTimeoutMs`, otherwise
+ * rejects so an empty bind does not look healthy upstream.
  */
 export class LocalUdpSource implements ISource {
   readonly id: SourceId = SOURCE_ID;
