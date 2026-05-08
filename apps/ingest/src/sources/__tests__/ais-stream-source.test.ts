@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { SourceId } from '@sps/shared';
 import { AisStreamSource, boundsToApiPayload } from '../ais-stream-source';
 
 describe('boundsToApiPayload', () => {
@@ -80,7 +81,7 @@ describe('AisStreamSource', () => {
 
   it('exposes the configured source id and priority', () => {
     const source = new AisStreamSource({ token: 'k', endpoint: 'wss://example/stream' });
-    expect(source.id).toBe('ais-stream');
+    expect(source.id).toBe(SourceId.AisStream);
     expect(source.priority).toBe(3);
   });
 });

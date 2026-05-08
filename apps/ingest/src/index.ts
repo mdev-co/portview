@@ -1,11 +1,7 @@
 import { createActor } from 'xstate';
-import {
-  type ISource,
-  type SourceId,
-  createLogger,
-  ingestSourceMachine,
-  validateNmeaChecksum,
-} from '@sps/shared';
+import { type ISource, SourceId, createLogger, ingestSourceMachine } from '@sps/shared';
+import { Decoder } from './decoder';
+import { DeadLetterWriter } from './dlq';
 import {
   type IngestStatsSnapshot,
   type PerSourceStats,
@@ -28,18 +24,18 @@ const sources = new Map<SourceId, ISource>();
 const prioritizedBuilder: SourceId[] = [];
 
 sources.set(
-  'local-udp',
+  SourceId.LocalUdp,
   new LocalUdpSource({ port: UDP_PORT, host: UDP_HOST, rateLimit: RATE_LIMIT }),
 );
-prioritizedBuilder.push('local-udp');
+prioritizedBuilder.push(SourceId.LocalUdp);
 
-sources.set('web-sdr', new WebSdrSource());
-prioritizedBuilder.push('web-sdr');
+sources.set(SourceId.WebSdr, new WebSdrSource());
+prioritizedBuilder.push(SourceId.WebSdr);
 log.info('web-sdr source registered (stub)');
 
 try {
   sources.set(
-    'ais-stream',
+    SourceId.AisStream,
     new AisStreamSource({
       logger: (level, message, data) => {
         if (data === undefined) {
@@ -50,7 +46,7 @@ try {
       },
     }),
   );
-  prioritizedBuilder.push('ais-stream');
+  prioritizedBuilder.push(SourceId.AisStream);
   log.info('ais-stream source registered');
 } catch (err) {
   log.warn({ err: String(err) }, 'ais-stream source skipped');
@@ -73,21 +69,47 @@ function detachActiveSource(): void {
   activeErrorUnsub = null;
 }
 
+const decoder = new Decoder();
+const dlq = new DeadLetterWriter();
+
 function isNmeaFormat(raw: string): boolean {
   return raw.startsWith('$') || raw.startsWith('!');
 }
 
 function attachSource(source: ISource): void {
   activeFrameUnsub = source.onFrame(frame => {
-    const validation = isNmeaFormat(frame.raw)
-      ? validateNmeaChecksum(frame.raw)
-      : ({ valid: true } as const);
-    if (validation.valid) {
+    if (!isNmeaFormat(frame.raw)) {
+      // External-feed JSON (AIS Stream WS) is forwarded as-is to FRAME_RECEIVED;
+      // its decode path lands at the API boundary, not here.
       actor.send({ type: 'FRAME_RECEIVED', sourceId: source.id, frameAt: frame.receivedAt });
-      log.debug({ sourceId: source.id, raw: frame.raw }, 'frame accepted');
-    } else {
-      actor.send({ type: 'FRAME_REJECTED', sourceId: source.id, reason: 'bad-checksum' });
-      log.warn({ sourceId: source.id, reason: validation.reason }, 'frame rejected');
+      return;
+    }
+    const outcome = decoder.decode(frame.raw);
+    switch (outcome.kind) {
+      case 'message':
+        actor.send({ type: 'FRAME_RECEIVED', sourceId: source.id, frameAt: frame.receivedAt });
+        log.debug(
+          { sourceId: source.id, messageType: outcome.value.messageType },
+          'frame accepted',
+        );
+        break;
+      case 'pending':
+        // Multipart fragment buffered; not counted as accept or reject.
+        break;
+      case 'rejected':
+        dlq.write({
+          raw: frame.raw,
+          sourceId: source.id,
+          receivedAt: frame.receivedAt,
+          reason: outcome.reason,
+        });
+        actor.send({
+          type: 'FRAME_REJECTED',
+          sourceId: source.id,
+          reason: outcome.reason.kind,
+        });
+        log.warn({ sourceId: source.id, reason: outcome.reason.kind }, 'frame rejected');
+        break;
     }
   });
   activeErrorUnsub = source.onError(err => {
@@ -100,7 +122,7 @@ let previousState: string | null = null;
 
 actor.subscribe(snapshot => {
   const desiredId = snapshot.context.currentSourceId;
-  const desiredSource = desiredId ? (sources.get(desiredId) ?? null) : null;
+  const desiredSource = desiredId !== null ? (sources.get(desiredId) ?? null) : null;
 
   if (activeSource && activeSource !== desiredSource) {
     const stopping = activeSource;
@@ -176,6 +198,7 @@ async function shutdown(signal: string): Promise<void> {
       log.error({ err: String(err) }, 'shutdown stop failed');
     }
   }
+  dlq.close();
   process.exit(0);
 }
 

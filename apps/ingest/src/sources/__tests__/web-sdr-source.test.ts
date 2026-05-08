@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { SourceId } from '@sps/shared';
 import { WebSdrSource } from '../web-sdr-source';
 
 describe('WebSdrSource', () => {
   it('exposes the configured source id and priority', () => {
     const source = new WebSdrSource();
-    expect(source.id).toBe('web-sdr');
+    expect(source.id).toBe(SourceId.WebSdr);
     expect(source.priority).toBe(2);
   });
 

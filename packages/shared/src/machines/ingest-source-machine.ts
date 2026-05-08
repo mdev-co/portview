@@ -24,9 +24,10 @@ export const ingestSourceMachine = setup({
   },
   actions: {
     markCurrentSourceTried: assign(({ context }) => ({
-      triedSourceIds: context.currentSourceId
-        ? [...context.triedSourceIds, context.currentSourceId]
-        : context.triedSourceIds,
+      triedSourceIds:
+        context.currentSourceId !== null
+          ? [...context.triedSourceIds, context.currentSourceId]
+          : context.triedSourceIds,
     })),
     setErrorFromFailure: assign(({ event }) => ({
       errorMessage: event.type === 'SOURCE_FAILED' ? event.reason : null,

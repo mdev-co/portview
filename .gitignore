@@ -37,6 +37,9 @@ test-results/
 *.sqlite
 *.sqlite-journal
 
+# Local-only ingest outputs (DLQ jsonl, captured samples)
+.data/
+
 # OS
 Thumbs.db
 

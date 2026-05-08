@@ -1,4 +1,6 @@
-export type SourceId = 'local-udp' | 'web-sdr' | 'ais-stream';
+import { SourceId } from '../types/brands';
+
+export { SourceId };
 
 export interface NmeaFrame {
   readonly raw: string;
@@ -28,7 +30,15 @@ export type IngestStatus =
   | 'switching'
   | 'exhausted';
 
-export type FrameRejectionReason = 'bad-checksum' | 'rate-limit';
+export type FrameRejectionReason =
+  | 'bad-checksum'
+  | 'rate-limit'
+  | 'parse-error'
+  | 'unsupported-message-type'
+  | 'invalid-mmsi'
+  | 'invalid-imo'
+  | 'out-of-range-lat'
+  | 'out-of-range-lng';
 
 export interface IngestContext {
   readonly prioritizedSourceIds: readonly SourceId[];

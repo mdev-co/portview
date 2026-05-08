@@ -1,6 +1,7 @@
-import type { ISource, NmeaFrame, SourceId, Unsubscribe } from '@sps/shared';
+import type { ISource, NmeaFrame, Unsubscribe } from '@sps/shared';
+import { SourceId } from '@sps/shared';
 
-const SOURCE_ID: SourceId = 'web-sdr';
+const SOURCE_ID = SourceId.WebSdr;
 const SOURCE_PRIORITY = 2;
 
 type FrameCallback = (frame: NmeaFrame) => void;

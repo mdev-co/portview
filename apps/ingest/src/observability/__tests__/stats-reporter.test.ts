@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { SourceId } from '@sps/shared';
 import { type IngestStatsSnapshot, startStatsReporter } from '../stats-reporter';
 
 const SAMPLE: IngestStatsSnapshot = {
   machineState: 'active',
-  currentSourceId: 'local-udp',
+  currentSourceId: SourceId.LocalUdp,
   framesAccepted: 0,
   framesRejected: 0,
   perSource: [],
