@@ -3,6 +3,14 @@ export { createLogger, type AppLogger, type CreateLoggerOptions } from './logger
 export { type Mmsi, type Imo, SourceId, sourceIdName } from './types/brands';
 
 export {
+  LeDataView,
+  VESSEL_FRAME_BYTES,
+  type VesselUpdateFrame,
+  decodeVesselFrame,
+  encodeVesselFrame,
+} from './codecs';
+
+export {
   type RejectReason,
   type Result,
   err,
