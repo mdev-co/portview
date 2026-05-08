@@ -20,7 +20,13 @@
     "test:cov": "pnpm -r test:cov",
     "check-all": "echo '🚀 PRE_COMMIT_SIMULATION: Running all checks...' && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && echo '✅ ALL_CHECKS_PASSED: Ready to commit'",
     "check-all-strict": "echo '🚀 STRICT CHECK: format + lint + typecheck + test + build' && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build && echo '✅ ALL_STRICT_CHECKS_PASSED'",
-    "prepare": "husky"
+    "prepare": "husky",
+    "db:validate": "pnpm --filter @sps/api db:validate",
+    "db:migrate": "pnpm --filter @sps/api db:migrate",
+    "db:seed": "pnpm --filter @sps/api db:seed",
+    "db:reset": "pnpm --filter @sps/api db:reset",
+    "db:studio": "pnpm --filter @sps/api db:studio",
+    "db:smoke": "pnpm --filter @sps/api db:smoke"
   },
   "devDependencies": {
     "@eslint/js": "^9",
@@ -35,6 +41,13 @@
     "typescript-eslint": "^8"
   },
   "packageManager": "pnpm@9.12.0",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/client",
+      "prisma",
+      "esbuild"
+    ]
+  },
   "lint-staged": {
     "apps/api/**/*.{ts,tsx}": [
       "pnpm --filter @sps/api exec eslint --fix --max-warnings=0 --no-warn-ignored",
