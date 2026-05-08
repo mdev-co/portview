@@ -1,6 +1,5 @@
-import { describe, expect, it } from 'vitest';
 import { SourceId } from '@sps/shared';
-import { WebSdrSource } from '../web-sdr-source';
+import { WebSdrSource } from './web-sdr.source';
 
 describe('WebSdrSource', () => {
   it('exposes the configured source id and priority', () => {

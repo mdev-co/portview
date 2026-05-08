@@ -1,9 +1,10 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { SourceId } from '@sps/shared';
-import { DeadLetterWriter } from '../dlq';
+import { type DlqRow, DeadLetterWriter } from './dlq';
+
+const parseRow = (raw: string): DlqRow => JSON.parse(raw) as DlqRow;
 
 describe('DeadLetterWriter', () => {
   let tmp: string;
@@ -27,8 +28,7 @@ describe('DeadLetterWriter', () => {
       reason: { kind: 'bad-checksum', detail: 'mismatch' },
     });
     writer.close();
-    const content = readFileSync(target, 'utf8').trim();
-    const row = JSON.parse(content);
+    const row = parseRow(readFileSync(target, 'utf8').trim());
     expect(row).toMatchObject({
       source: 'LocalUdp',
       raw: '!AIVDM,1,1,,A,xxx,0*00',
@@ -50,9 +50,9 @@ describe('DeadLetterWriter', () => {
     writer.close();
     const lines = readFileSync(target, 'utf8').trim().split('\n');
     expect(lines).toHaveLength(3);
-    const parsed = lines.map(l => JSON.parse(l));
-    expect(parsed.map(r => r.raw)).toEqual(['frame-0', 'frame-1', 'frame-2']);
-    expect(parsed.every(r => r.source === 'AisStream')).toBe(true);
+    const parsed = lines.map(parseRow);
+    expect(parsed.map((r) => r.raw)).toEqual(['frame-0', 'frame-1', 'frame-2']);
+    expect(parsed.every((r) => r.source === 'AisStream')).toBe(true);
   });
 
   it('serialises a semantic reject reason with its payload', () => {
@@ -64,7 +64,7 @@ describe('DeadLetterWriter', () => {
       reason: { kind: 'invalid-mmsi', value: 100_000_000 },
     });
     writer.close();
-    const row = JSON.parse(readFileSync(target, 'utf8').trim());
+    const row = parseRow(readFileSync(target, 'utf8').trim());
     expect(row.reason).toEqual({ kind: 'invalid-mmsi', value: 100_000_000 });
     expect(row.source).toBe('WebSdr');
   });
@@ -88,9 +88,6 @@ describe('DeadLetterWriter', () => {
       maxBytes: 200,
       rotateCheckEvery: 2,
     });
-    // Each row is well under 200 bytes; we need several rows to exceed
-    // the cap, and then enough subsequent writes to trip the rotate
-    // check (every 2 writes here).
     for (let i = 0; i < 12; i += 1) {
       writer.write({
         raw: `frame-${i}-with-some-padding-to-grow-the-file-faster-${'x'.repeat(40)}`,
@@ -101,8 +98,6 @@ describe('DeadLetterWriter', () => {
     }
     writer.close();
     expect(existsSync(`${target}.old`)).toBe(true);
-    // The active file exists post-rotation and contains the most recent
-    // entries (rotation truncated the previous content via rename).
     expect(readFileSync(target, 'utf8').length).toBeGreaterThan(0);
   });
 });

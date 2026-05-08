@@ -43,7 +43,10 @@ export class TokenBucket {
     const now = this.now();
     const elapsed = now - this.lastRefillAt;
     if (elapsed <= 0) return;
-    this.tokens = Math.min(this.capacity, this.tokens + elapsed * this.refillPerMs);
+    this.tokens = Math.min(
+      this.capacity,
+      this.tokens + elapsed * this.refillPerMs,
+    );
     this.lastRefillAt = now;
   }
 }

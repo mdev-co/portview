@@ -63,7 +63,8 @@ export class DeadLetterWriter {
   private writesSinceRotateCheck = 0;
 
   constructor(options: DeadLetterWriterOptions = {}) {
-    this.filePath = options.path ?? process.env[ENV_PATH_OVERRIDE] ?? defaultPath();
+    this.filePath =
+      options.path ?? process.env[ENV_PATH_OVERRIDE] ?? defaultPath();
     this.maxBytes = options.maxBytes ?? DEFAULT_MAX_BYTES;
     this.rotateCheckEvery = options.rotateCheckEvery ?? DEFAULT_ROTATE_CHECK;
   }

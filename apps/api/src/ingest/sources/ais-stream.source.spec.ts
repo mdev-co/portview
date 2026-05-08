@@ -1,6 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { SourceId } from '@sps/shared';
-import { AisStreamSource, boundsToApiPayload } from '../ais-stream-source';
+import { AisStreamSource, boundsToApiPayload } from './ais-stream.source';
 
 describe('boundsToApiPayload', () => {
   it('swaps internal [lng, lat] tuples to API-required [lat, lng] order', () => {
@@ -75,12 +74,16 @@ describe('AisStreamSource', () => {
 
   it('accepts both via options without env', () => {
     expect(
-      () => new AisStreamSource({ token: 'k', endpoint: 'wss://example/stream' }),
+      () =>
+        new AisStreamSource({ token: 'k', endpoint: 'wss://example/stream' }),
     ).not.toThrow();
   });
 
   it('exposes the configured source id and priority', () => {
-    const source = new AisStreamSource({ token: 'k', endpoint: 'wss://example/stream' });
+    const source = new AisStreamSource({
+      token: 'k',
+      endpoint: 'wss://example/stream',
+    });
     expect(source.id).toBe(SourceId.AisStream);
     expect(source.priority).toBe(3);
   });

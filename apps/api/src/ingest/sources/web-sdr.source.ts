@@ -14,12 +14,12 @@ export class WebSdrSource implements ISource {
   private readonly frameListeners = new Set<FrameCallback>();
   private readonly errorListeners = new Set<ErrorCallback>();
 
-  async start(): Promise<void> {
-    throw new Error('WebSdrSource is not yet implemented');
+  start(): Promise<void> {
+    return Promise.reject(new Error('WebSdrSource is not yet implemented'));
   }
 
-  async stop(): Promise<void> {
-    return;
+  stop(): Promise<void> {
+    return Promise.resolve();
   }
 
   onFrame(callback: FrameCallback): Unsubscribe {

@@ -97,12 +97,18 @@ export class Decoder {
       if (bits.length < MIN_PAYLOAD_BITS) {
         return {
           kind: 'rejected',
-          reason: { kind: 'parse-error', detail: 'payload shorter than 6 bits' },
+          reason: {
+            kind: 'parse-error',
+            detail: 'payload shorter than 6 bits',
+          },
         };
       }
       messageType = new BitReader(bits).readUInt(MIN_PAYLOAD_BITS);
     } catch (err) {
-      return { kind: 'rejected', reason: { kind: 'parse-error', detail: String(err) } };
+      return {
+        kind: 'rejected',
+        reason: { kind: 'parse-error', detail: String(err) },
+      };
     }
 
     let message: AisMessage;
@@ -126,7 +132,10 @@ export class Decoder {
           };
       }
     } catch (err) {
-      return { kind: 'rejected', reason: { kind: 'parse-error', detail: String(err) } };
+      return {
+        kind: 'rejected',
+        reason: { kind: 'parse-error', detail: String(err) },
+      };
     }
 
     const validation = validateAisMessage(message);

@@ -26,9 +26,9 @@ printf "${WHT}╔═════════════════════
 printf "${WHT}║${RST}  ${CYN}Pre-Push Quality Gates${RST}                                         ${WHT}║${RST}\n"
 printf "${WHT}╚══════════════════════════════════════════════════════════════════╝${RST}\n\n"
 
-# 1. Vitest packages (shared, ingest) — only tests affected by changes
-if pnpm --filter "@sps/shared" --filter "@sps/ingest" exec vitest run --changed > /dev/null 2>&1; then
-  add_result "Vitest changed" "PASS" "shared + ingest"
+# 1. Vitest package (shared) — only tests affected by changes
+if pnpm --filter "@sps/shared" exec vitest run --changed > /dev/null 2>&1; then
+  add_result "Vitest changed" "PASS" "shared"
 else
   add_result "Vitest changed" "FAIL" "Run: pnpm --filter @sps/shared exec vitest run --changed"
   FAILED=1

@@ -1,4 +1,9 @@
-import type { ISource, LngLatBounds, NmeaFrame, Unsubscribe } from '@sps/shared';
+import type {
+  ISource,
+  LngLatBounds,
+  NmeaFrame,
+  Unsubscribe,
+} from '@sps/shared';
 import { SourceId } from '@sps/shared';
 
 const SOURCE_ID = SourceId.AisStream;
@@ -22,7 +27,11 @@ export function boundsToApiPayload(
 }
 
 export type SourceLogLevel = 'debug' | 'info' | 'warn' | 'error';
-export type SourceLogger = (level: SourceLogLevel, message: string, data?: unknown) => void;
+export type SourceLogger = (
+  level: SourceLogLevel,
+  message: string,
+  data?: unknown,
+) => void;
 
 export interface AisStreamSourceOptions {
   readonly token?: string;
@@ -38,8 +47,10 @@ function decodeMessageData(data: unknown): string | null {
   if (typeof data === 'string') return data;
   if (data instanceof ArrayBuffer) return Buffer.from(data).toString('utf8');
   if (ArrayBuffer.isView(data)) {
-    const view = data as ArrayBufferView;
-    return Buffer.from(view.buffer, view.byteOffset, view.byteLength).toString('utf8');
+    const view = data;
+    return Buffer.from(view.buffer, view.byteOffset, view.byteLength).toString(
+      'utf8',
+    );
   }
   if (Buffer.isBuffer(data)) return data.toString('utf8');
   return null;
@@ -106,8 +117,8 @@ export class AisStreamSource implements ISource {
         ws.send(JSON.stringify(subscribe));
         this.log?.('info', 'subscribe sent', { boundingBox: this.boundingBox });
 
-        ws.addEventListener('message', evt => this.handleMessage(evt));
-        ws.addEventListener('close', evt => {
+        ws.addEventListener('message', (evt) => this.handleMessage(evt));
+        ws.addEventListener('close', (evt) => {
           if (this.socket === ws) {
             this.socket = null;
             this.log?.('warn', 'WebSocket closed', {
@@ -116,7 +127,7 @@ export class AisStreamSource implements ISource {
               wasClean: evt.wasClean,
               messagesReceived: this.messagesReceived,
             });
-            this.errorListeners.forEach(l =>
+            this.errorListeners.forEach((l) =>
               l(
                 new Error(
                   `WebSocket closed (code ${evt.code}${evt.reason ? `: ${evt.reason}` : ''})`,
@@ -125,10 +136,12 @@ export class AisStreamSource implements ISource {
             );
           }
         });
-        ws.addEventListener('error', evt => {
+        ws.addEventListener('error', (evt) => {
           if (this.socket === ws) {
             this.log?.('error', 'WebSocket runtime error', { event: evt.type });
-            this.errorListeners.forEach(l => l(new Error(`WebSocket runtime error: ${evt.type}`)));
+            this.errorListeners.forEach((l) =>
+              l(new Error(`WebSocket runtime error: ${evt.type}`)),
+            );
           }
         });
 
@@ -145,7 +158,7 @@ export class AisStreamSource implements ISource {
     const ws = this.socket;
     if (!ws) return;
     this.socket = null;
-    return new Promise<void>(resolve => {
+    return new Promise<void>((resolve) => {
       const onClose = (): void => {
         ws.removeEventListener('close', onClose);
         resolve();
@@ -181,7 +194,8 @@ export class AisStreamSource implements ISource {
     const decoded = decodeMessageData(evt.data);
     if (decoded === null) {
       this.log?.('warn', 'unsupported message data type', {
-        ctor: (evt.data as { constructor?: { name: string } } | null)?.constructor?.name,
+        ctor: (evt.data as { constructor?: { name: string } } | null)
+          ?.constructor?.name,
       });
       return;
     }
@@ -200,6 +214,6 @@ export class AisStreamSource implements ISource {
       receivedAt: Date.now(),
       sourceId: SOURCE_ID,
     };
-    this.frameListeners.forEach(l => l(frame));
+    this.frameListeners.forEach((l) => l(frame));
   }
 }

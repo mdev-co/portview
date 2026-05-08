@@ -54,16 +54,19 @@ export class LocalUdpSource implements ISource {
       };
       socket.once('error', onBindError);
 
-      socket.on('message', msg => this.handleMessage(msg));
+      socket.on('message', (msg) => this.handleMessage(msg));
 
-      socket.bind({ port: this.port, address: this.host, exclusive: true }, () => {
-        socket.removeListener('error', onBindError);
-        socket.on('error', err => {
-          this.errorListeners.forEach(l => l(err));
-        });
-        this.socket = socket;
-        resolve();
-      });
+      socket.bind(
+        { port: this.port, address: this.host, exclusive: true },
+        () => {
+          socket.removeListener('error', onBindError);
+          socket.on('error', (err) => {
+            this.errorListeners.forEach((l) => l(err));
+          });
+          this.socket = socket;
+          resolve();
+        },
+      );
     });
   }
 
@@ -71,7 +74,7 @@ export class LocalUdpSource implements ISource {
     const socket = this.socket;
     if (!socket) return;
     this.socket = null;
-    return new Promise<void>(resolve => {
+    return new Promise<void>((resolve) => {
       socket.close(() => resolve());
     });
   }
@@ -123,6 +126,6 @@ export class LocalUdpSource implements ISource {
       sourceId: SOURCE_ID,
     };
     this.messagesEmitted += 1;
-    this.frameListeners.forEach(l => l(frame));
+    this.frameListeners.forEach((l) => l(frame));
   }
 }
