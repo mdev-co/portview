@@ -21,9 +21,9 @@ Three coordinated mechanisms, materialised in this commit:
 
 ## Pipeline
 
-![GIGO pipeline — containers, components and trust zones](./0006-pipeline.svg)
+![GIGO pipeline — containers, components and trust zones](./0006-pipeline.png)
 
-> Source: [`0006-pipeline.d2`](./0006-pipeline.d2). Re-render with `d2 adr/0006-pipeline.d2 adr/0006-pipeline.svg --theme=8 --pad=20`.
+> Source: [`0006-pipeline.d2`](./0006-pipeline.d2). The same source is also rendered to [`0006-pipeline.svg`](./0006-pipeline.svg) for portfolio export. Re-render with `d2 adr/0006-pipeline.d2 adr/0006-pipeline.png --theme=8 --pad=20` (or substitute `.svg` for vector output).
 
 Each rejection variant is a discriminated union member. The DLQ row carries the variant verbatim, so an analyst tracing a transmission corruption sees exactly which invariant fired. Sentinel-disguised nulls, out-of-range coordinates and impossible MMSIs never reach the trusted store.
 
