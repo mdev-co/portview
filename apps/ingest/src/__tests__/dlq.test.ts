@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -80,5 +80,29 @@ describe('DeadLetterWriter', () => {
     });
     writer.close();
     expect(readFileSync(nested, 'utf8').trim().length).toBeGreaterThan(0);
+  });
+
+  it('rotates to .old when the file exceeds maxBytes', () => {
+    const writer = new DeadLetterWriter({
+      path: target,
+      maxBytes: 200,
+      rotateCheckEvery: 2,
+    });
+    // Each row is well under 200 bytes; we need several rows to exceed
+    // the cap, and then enough subsequent writes to trip the rotate
+    // check (every 2 writes here).
+    for (let i = 0; i < 12; i += 1) {
+      writer.write({
+        raw: `frame-${i}-with-some-padding-to-grow-the-file-faster-${'x'.repeat(40)}`,
+        sourceId: SourceId.LocalUdp,
+        receivedAt: 1_700_000_000_000 + i,
+        reason: { kind: 'bad-checksum', detail: 'mismatch' },
+      });
+    }
+    writer.close();
+    expect(existsSync(`${target}.old`)).toBe(true);
+    // The active file exists post-rotation and contains the most recent
+    // entries (rotation truncated the previous content via rename).
+    expect(readFileSync(target, 'utf8').length).toBeGreaterThan(0);
   });
 });
