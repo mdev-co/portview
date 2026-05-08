@@ -1,0 +1,73 @@
+direction: down
+vars: {
+  d2-config: {
+    theme-id: 8
+    pad: 20
+  }
+}
+
+upstream: "Untrusted upstream" {
+  udp: "Local UDP :10110\nNMEA bytes" {
+    shape: hexagon
+    icon: https://icons.terrastruct.com/dev%2Fnodejs.svg
+  }
+  ws_external: "External feed\nJSON" {
+    shape: hexagon
+  }
+}
+
+api: "@sps/api (Node + NestJS)" {
+  shape: package
+  icon: https://icons.terrastruct.com/dev%2Fnodejs.svg
+
+  ingest: "IngestModule" {
+    shape: rectangle
+    sources: "Sources"
+    decoder: "Decoder (GIGO)"
+    fsm: "Priority FSM"
+    sources -> decoder: "frames"
+    decoder -> fsm: "accept / reject"
+  }
+
+  bus: "EventEmitter2 bus" {
+    shape: cloud
+  }
+
+  ws: "TelemetryWsGateway" {
+    shape: rectangle
+    encode: "encodeVesselFrame\n(LE, 38 B)"
+    backpressure: "bufferedAmount\nguard"
+    encode -> backpressure: "frame"
+  }
+
+  ingest.decoder -> bus: "publishVesselUpdate"
+  bus -> ws.encode: "@OnEvent(vessel.update)"
+}
+
+shared: "@sps/shared (codecs)" {
+  shape: package
+  api.ingest.decoder -> shared: "uses"
+  api.ws.encode -> shared: "uses"
+}
+
+web: "@sps/web (browser)" {
+  shape: package
+  icon: https://icons.terrastruct.com/dev%2Freact.svg
+
+  client: "telemetry-client" {
+    decode: "decodeVesselFrame"
+    setkey: "vessels.setKey(mmsi, ...)"
+    decode -> setkey: "LiveVessel"
+  }
+}
+
+dlq: "rejected_frames.jsonl\n~/.sps-data/" {
+  shape: page
+  style.fill: "#fdeaea"
+  style.stroke: "#c33"
+}
+
+upstream.udp -> api.ingest.sources: "NMEA bytes"
+upstream.ws_external -> api.ingest.sources: "JSON"
+api.ingest.decoder -> dlq: "rejected (DLQ)"
+api.ws.backpressure -> web.client.decode: "binary frame\n(/ws/telemetry, 38 B)"
