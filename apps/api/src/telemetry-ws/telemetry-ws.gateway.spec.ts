@@ -66,7 +66,7 @@ describe('TelemetryWsGateway.onVesselUpdate', () => {
     };
   });
 
-  it('encodes a 38-byte binary frame and broadcasts to every open client', () => {
+  it('encodes a binary frame of VESSEL_FRAME_BYTES and broadcasts to every open client', () => {
     const a = makeClient();
     const b = makeClient();
     clients.add(a);

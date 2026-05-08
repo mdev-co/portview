@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { SourceId } from '../../types/brands';
 import { LeDataView } from '../le-data-view';
 import {
+  VESSEL_FLAG_HAS_FIX,
+  VESSEL_FLAG_HAS_IDENTITY,
+  VESSEL_FLAG_IS_MOVING,
   VESSEL_FRAME_BYTES,
   type VesselUpdateFrame,
   decodeVesselFrame,
@@ -20,13 +23,15 @@ const FULL: VesselUpdateFrame = {
   cog: 217.4,
   trueHeading: 215,
   timestampUnix: 1_715_000_000,
+  flags: VESSEL_FLAG_IS_MOVING | VESSEL_FLAG_HAS_FIX | VESSEL_FLAG_HAS_IDENTITY,
+  reserved: 0,
 };
 
 describe('vessel codec', () => {
   it('produces a frame of exactly VESSEL_FRAME_BYTES', () => {
     const bytes = encodeVesselFrame(FULL);
     expect(bytes.byteLength).toBe(VESSEL_FRAME_BYTES);
-    expect(VESSEL_FRAME_BYTES).toBe(38);
+    expect(VESSEL_FRAME_BYTES).toBe(40);
   });
 
   it('round-trips a fully populated frame', () => {
@@ -42,6 +47,8 @@ describe('vessel codec', () => {
     expect(decoded.cog).toBeCloseTo(FULL.cog!, 4);
     expect(decoded.trueHeading).toBe(FULL.trueHeading);
     expect(decoded.timestampUnix).toBe(FULL.timestampUnix);
+    expect(decoded.flags).toBe(FULL.flags);
+    expect(decoded.reserved).toBe(FULL.reserved);
   });
 
   it('round-trips null sentinels for every nullable field', () => {
@@ -92,9 +99,27 @@ describe('vessel codec', () => {
 
   it('rejects a frame of wrong length on decode', () => {
     const tooShort = new Uint8Array(VESSEL_FRAME_BYTES - 1);
-    expect(() => decodeVesselFrame(tooShort)).toThrow(/exactly 38 bytes/);
+    expect(() => decodeVesselFrame(tooShort)).toThrow(/exactly 40 bytes/);
     const tooLong = new Uint8Array(VESSEL_FRAME_BYTES + 1);
-    expect(() => decodeVesselFrame(tooLong)).toThrow(/exactly 38 bytes/);
+    expect(() => decodeVesselFrame(tooLong)).toThrow(/exactly 40 bytes/);
+  });
+
+  it('round-trips every individual flag bit', () => {
+    const flagSet = [VESSEL_FLAG_IS_MOVING, VESSEL_FLAG_HAS_FIX, VESSEL_FLAG_HAS_IDENTITY];
+    for (const flag of flagSet) {
+      const decoded = decodeVesselFrame(encodeVesselFrame({ ...FULL, flags: flag }));
+      expect(decoded.flags).toBe(flag);
+    }
+  });
+
+  it('writes flags at offset 38 and reserved at offset 39', () => {
+    const bytes = encodeVesselFrame({
+      ...FULL,
+      flags: VESSEL_FLAG_HAS_FIX,
+      reserved: 0,
+    });
+    expect(bytes[38]).toBe(VESSEL_FLAG_HAS_FIX);
+    expect(bytes[39]).toBe(0);
   });
 
   it('encodes negative rateOfTurn as a signed byte', () => {

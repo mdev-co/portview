@@ -17,4 +17,5 @@ export type LiveVessel = {
   readonly cog: number | null;
   readonly trueHeading: number | null;
   readonly timestampUnix: number;
+  readonly flags: number;
 };

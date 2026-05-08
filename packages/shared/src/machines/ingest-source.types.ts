@@ -38,7 +38,11 @@ export type FrameRejectionReason =
   | 'invalid-mmsi'
   | 'invalid-imo'
   | 'out-of-range-lat'
-  | 'out-of-range-lng';
+  | 'out-of-range-lng'
+  | 'malformed-json'
+  | 'missing-message'
+  | 'unsupported-payload'
+  | 'invalid-payload';
 
 export interface IngestContext {
   readonly prioritizedSourceIds: readonly SourceId[];

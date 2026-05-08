@@ -2,7 +2,7 @@ import type { SourceId } from '../types/brands';
 import { LeDataView } from './le-data-view';
 
 /**
- * Wire-level vessel update frame. Fixed-width, 38 bytes, little-endian.
+ * Wire-level vessel update frame. Fixed-width, 40 bytes, little-endian.
  *
  * Sentinel encodings (no extra wire bit, all decoded to `null` at the
  * boundary):
@@ -25,12 +25,18 @@ import { LeDataView } from './le-data-view';
  *     28      f32  cog                    degrees, NaN = unknown
  *     32      u16  trueHeading            degrees, 0xFFFF = unknown
  *     34      u32  timestampUnix          seconds since epoch
+ *     38      u8   flags                  bit 0 isMoving, 1 hasFix, 2 hasIdentity
+ *     39      u8   reserved               zero on the wire, room for future flags
  *
- * Total: 38 bytes. JSON equivalent ~150 bytes; ~75% reduction on the
- * wire at 1 Hz per vessel.
+ * Total: 40 bytes (dword-aligned). JSON equivalent ~150 bytes; ~73%
+ * reduction on the wire at 1 Hz per vessel.
  */
 
-export const VESSEL_FRAME_BYTES = 38;
+export const VESSEL_FRAME_BYTES = 40;
+
+export const VESSEL_FLAG_IS_MOVING = 1 << 0;
+export const VESSEL_FLAG_HAS_FIX = 1 << 1;
+export const VESSEL_FLAG_HAS_IDENTITY = 1 << 2;
 
 const OFFSET_MESSAGE_TYPE = 0;
 const OFFSET_NAV_STATUS = 1;
@@ -43,6 +49,8 @@ const OFFSET_SOG = 24;
 const OFFSET_COG = 28;
 const OFFSET_TRUE_HEADING = 32;
 const OFFSET_TIMESTAMP = 34;
+const OFFSET_FLAGS = 38;
+const OFFSET_RESERVED = 39;
 
 const NAV_STATUS_UNKNOWN = 0xff;
 const RATE_OF_TURN_UNKNOWN = -128;
@@ -60,6 +68,8 @@ export type VesselUpdateFrame = {
   readonly cog: number | null;
   readonly trueHeading: number | null;
   readonly timestampUnix: number;
+  readonly flags: number;
+  readonly reserved: number;
 };
 
 export function encodeVesselFrame(frame: VesselUpdateFrame): Uint8Array {
@@ -77,6 +87,8 @@ export function encodeVesselFrame(frame: VesselUpdateFrame): Uint8Array {
   view.setF32(OFFSET_COG, frame.cog ?? Number.NaN);
   view.setU16(OFFSET_TRUE_HEADING, frame.trueHeading ?? HEADING_UNKNOWN);
   view.setU32(OFFSET_TIMESTAMP, frame.timestampUnix);
+  view.setU8(OFFSET_FLAGS, frame.flags & 0xff);
+  view.setU8(OFFSET_RESERVED, frame.reserved & 0xff);
 
   return new Uint8Array(buffer);
 }
@@ -109,5 +121,7 @@ export function decodeVesselFrame(bytes: Uint8Array): VesselUpdateFrame {
     cog: Number.isNaN(cogRaw) ? null : cogRaw,
     trueHeading: headingRaw === HEADING_UNKNOWN ? null : headingRaw,
     timestampUnix: view.getU32(OFFSET_TIMESTAMP),
+    flags: view.getU8(OFFSET_FLAGS),
+    reserved: view.getU8(OFFSET_RESERVED),
   };
 }

@@ -11,8 +11,10 @@ import {
   SourceId,
   ingestSourceMachine,
   sourceIdName,
+  validateAisMessage,
 } from '@sps/shared';
 import { type Actor, createActor } from 'xstate';
+import { adaptAisStreamMessage } from './adapters/ais-stream.adapter';
 import { Decoder } from './decoder';
 import { DeadLetterWriter } from './dlq';
 import { publishVesselUpdate } from './ingest.events';
@@ -198,13 +200,21 @@ export class IngestService implements OnModuleInit, OnModuleDestroy {
 
   private attachSource(source: ISource): void {
     this.activeFrameUnsub = source.onFrame((frame) => {
+      if (this.isJsonFormat(frame.raw)) {
+        this.handleJsonFrame(source, frame.raw, frame.receivedAt);
+        return;
+      }
       if (!this.isNmeaFormat(frame.raw)) {
-        // External-feed JSON forwarded to the FSM as accepted; its decode path
-        // lands at the API boundary (D5+ JSON adapter), not here.
-        this.actor?.send({
-          type: 'FRAME_RECEIVED',
+        this.dlq.write({
+          raw: frame.raw,
           sourceId: source.id,
-          frameAt: frame.receivedAt,
+          receivedAt: frame.receivedAt,
+          reason: { kind: 'parse-error', detail: 'unrecognized frame format' },
+        });
+        this.actor?.send({
+          type: 'FRAME_REJECTED',
+          sourceId: source.id,
+          reason: 'parse-error',
         });
         return;
       }
@@ -258,6 +268,57 @@ export class IngestService implements OnModuleInit, OnModuleDestroy {
 
   private isNmeaFormat(raw: string): boolean {
     return raw.startsWith('$') || raw.startsWith('!');
+  }
+
+  private isJsonFormat(raw: string): boolean {
+    return raw.startsWith('{');
+  }
+
+  private handleJsonFrame(
+    source: ISource,
+    raw: string,
+    receivedAt: number,
+  ): void {
+    const adapted = adaptAisStreamMessage(raw);
+    if (adapted.kind === 'rejected') {
+      this.dlq.write({
+        raw,
+        sourceId: source.id,
+        receivedAt,
+        reason: adapted.reason,
+      });
+      this.actor?.send({
+        type: 'FRAME_REJECTED',
+        sourceId: source.id,
+        reason: adapted.reason.kind,
+      });
+      return;
+    }
+    const validation = validateAisMessage(adapted.value);
+    if (!validation.ok) {
+      this.dlq.write({
+        raw,
+        sourceId: source.id,
+        receivedAt,
+        reason: validation.error,
+      });
+      this.actor?.send({
+        type: 'FRAME_REJECTED',
+        sourceId: source.id,
+        reason: validation.error.kind,
+      });
+      return;
+    }
+    this.actor?.send({
+      type: 'FRAME_RECEIVED',
+      sourceId: source.id,
+      frameAt: receivedAt,
+    });
+    publishVesselUpdate(this.eventBus, {
+      message: validation.value,
+      sourceId: source.id,
+      receivedAt,
+    });
   }
 
   private logStateTransition(state: string, sourceId: SourceId | null): void {

@@ -2,12 +2,15 @@ import { appendFileSync, mkdirSync, renameSync, statSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { type SourceId, sourceIdName } from '@sps/shared';
+import type { AisStreamAdapterRejection } from './adapters/ais-stream.adapter';
 import type { DecodeRejection } from './decoder';
+
+export type DlqReason = DecodeRejection | AisStreamAdapterRejection;
 
 export type DlqRow = {
   readonly ts: string;
   readonly source: string;
-  readonly reason: DecodeRejection;
+  readonly reason: DlqReason;
   readonly raw: string;
 };
 
@@ -15,7 +18,7 @@ export type DlqWriteParams = {
   readonly raw: string;
   readonly sourceId: SourceId;
   readonly receivedAt: number;
-  readonly reason: DecodeRejection;
+  readonly reason: DlqReason;
 };
 
 export type DeadLetterWriterOptions = {

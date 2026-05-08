@@ -1,6 +1,9 @@
 import {
   type AisMessage,
   SourceId,
+  VESSEL_FLAG_HAS_FIX,
+  VESSEL_FLAG_HAS_IDENTITY,
+  VESSEL_FLAG_IS_MOVING,
   decodeVesselFrame,
   encodeVesselFrame,
 } from '@sps/shared';
@@ -82,7 +85,46 @@ describe('buildVesselFrame', () => {
       cog: 217.4,
       trueHeading: 215,
       timestampUnix: TIMESTAMP_UNIX,
+      flags:
+        VESSEL_FLAG_IS_MOVING | VESSEL_FLAG_HAS_FIX | VESSEL_FLAG_HAS_IDENTITY,
+      reserved: 0,
     });
+  });
+
+  it('clears isMoving when sog is at or below the 0.5 kn threshold', () => {
+    const slow: AisMessage = { ...POSITION_REPORT, speedOverGround: 0.4 };
+    const frame = buildVesselFrame({
+      message: slow,
+      sourceId: SourceId.LocalUdp,
+      receivedAt: RECEIVED_AT,
+    });
+    expect(frame.flags & VESSEL_FLAG_IS_MOVING).toBe(0);
+    expect(frame.flags & VESSEL_FLAG_HAS_FIX).toBe(VESSEL_FLAG_HAS_FIX);
+  });
+
+  it('clears hasFix and isMoving when position is null', () => {
+    const noFix: AisMessage = {
+      ...POSITION_REPORT,
+      position: null,
+      speedOverGround: 10,
+    };
+    const frame = buildVesselFrame({
+      message: noFix,
+      sourceId: SourceId.LocalUdp,
+      receivedAt: RECEIVED_AT,
+    });
+    expect(frame.flags & VESSEL_FLAG_HAS_FIX).toBe(0);
+    expect(frame.flags & VESSEL_FLAG_IS_MOVING).toBe(VESSEL_FLAG_IS_MOVING);
+  });
+
+  it('clears hasIdentity for mmsi outside the 200..799 MID region', () => {
+    const auxiliary: AisMessage = { ...POSITION_REPORT, mmsi: 99_345_678 };
+    const frame = buildVesselFrame({
+      message: auxiliary,
+      sourceId: SourceId.LocalUdp,
+      receivedAt: RECEIVED_AT,
+    });
+    expect(frame.flags & VESSEL_FLAG_HAS_IDENTITY).toBe(0);
   });
 
   it('blanks navStatus and rateOfTurn for a Class B report', () => {

@@ -92,6 +92,7 @@ export function createTelemetryClient(options: TelemetryClientOptions = {}): Tel
         cog: frame.cog,
         trueHeading: frame.trueHeading,
         timestampUnix: frame.timestampUnix,
+        flags: frame.flags,
       };
       setVessel(vessel);
       options.onVessel?.(vessel);
