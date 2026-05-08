@@ -1,3 +1,8 @@
+/**
+ * NMEA 0183 checksum validator. The byte after `*` in every sentence
+ * is the XOR of the bytes between `$`/`!` and `*`. A mismatch is the
+ * cheapest way to drop a corrupted frame before any bit-level work.
+ */
 export interface ChecksumResult {
   readonly valid: boolean;
   readonly reason?: 'no-start-delimiter' | 'no-checksum-marker' | 'malformed-checksum' | 'mismatch';

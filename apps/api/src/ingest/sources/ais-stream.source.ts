@@ -56,6 +56,12 @@ function decodeMessageData(data: unknown): string | null {
   return null;
 }
 
+/**
+ * AisStream WebSocket fallback. Subscribes to a bounding box on the
+ * upstream feed and emits raw JSON envelopes verbatim; the
+ * JSON-to-AisMessage adapter sits downstream in
+ * apps/api/src/ingest/adapters/ais-stream.adapter.ts.
+ */
 export class AisStreamSource implements ISource {
   readonly id: SourceId = SOURCE_ID;
   readonly priority = SOURCE_PRIORITY;
