@@ -1,0 +1,70 @@
+#!/bin/sh
+
+# SPS Quality Gates (pre-push)
+# Runs only changed tests per package via runner-native flags.
+# Vitest packages use --changed; Jest package uses --onlyChanged.
+
+RED='\033[31;1m'
+GRN='\033[32;1m'
+YEL='\033[33;1m'
+CYN='\033[36;1m'
+WHT='\033[37;1m'
+DIM='\033[90m'
+RST='\033[0m'
+BG_RED='\033[41;37;1m'
+BG_GRN='\033[42;30m'
+
+FAILED=0
+RESULTS=""
+
+add_result() {
+  RESULTS="${RESULTS}$1|$2|$3\n"
+}
+
+echo ""
+printf "${WHT}╔══════════════════════════════════════════════════════════════════╗${RST}\n"
+printf "${WHT}║${RST}  ${CYN}Pre-Push Quality Gates${RST}                                         ${WHT}║${RST}\n"
+printf "${WHT}╚══════════════════════════════════════════════════════════════════╝${RST}\n\n"
+
+# 1. Vitest packages (shared, ingest) — only tests affected by changes
+if pnpm --filter "@sps/shared" --filter "@sps/ingest" exec vitest run --changed > /dev/null 2>&1; then
+  add_result "Vitest changed" "PASS" "shared + ingest"
+else
+  add_result "Vitest changed" "FAIL" "Run: pnpm --filter @sps/shared exec vitest run --changed"
+  FAILED=1
+fi
+
+# 2. Jest package (api) — only tests affected by changes
+if pnpm --filter "@sps/api" exec jest --onlyChanged > /dev/null 2>&1; then
+  add_result "Jest changed" "PASS" "api"
+else
+  add_result "Jest changed" "FAIL" "Run: pnpm --filter @sps/api exec jest --onlyChanged"
+  FAILED=1
+fi
+
+# Print results table
+printf "${DIM}+--------------------+--------+----------------------------------------+${RST}\n"
+printf "${DIM}|${RST} ${WHT}%-18s${RST} ${DIM}|${RST} ${WHT}%-6s${RST} ${DIM}|${RST} ${WHT}%-38s${RST} ${DIM}|${RST}\n" "CHECK" "STATUS" "DETAILS"
+printf "${DIM}+--------------------+--------+----------------------------------------+${RST}\n"
+
+printf "$RESULTS" | while IFS='|' read -r check status detail; do
+  [ -z "$check" ] && continue
+  sc="${RST}"
+  case "$status" in
+    PASS) sc="${GRN}" ;;
+    FAIL) sc="${RED}" ;;
+  esac
+  printf "${DIM}|${RST} %-18s ${DIM}|${RST} ${sc}%-6s${RST} ${DIM}|${RST} %-38s ${DIM}|${RST}\n" "$check" "$status" "$detail"
+done
+
+printf "${DIM}+--------------------+--------+----------------------------------------+${RST}\n"
+
+echo ""
+if [ $FAILED -eq 1 ]; then
+  printf "  ${BG_RED} BLOCKED ${RST}  Tests failing — fix before pushing.\n"
+  printf "  ${DIM}Tip: pnpm -r test${RST}\n\n"
+  exit 1
+else
+  printf "  ${BG_GRN} ALL CLEAR ${RST}\n\n"
+  exit 0
+fi
