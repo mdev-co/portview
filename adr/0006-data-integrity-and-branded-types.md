@@ -22,22 +22,44 @@ Three coordinated mechanisms, materialised in this commit:
 ## Pipeline
 
 ```mermaid
-flowchart LR
-    A[Raw NMEA frame] --> B{Checksum}
-    B -- bad --> R[(Rejected)]
-    B -- ok --> C{AIVDM envelope}
-    C -- malformed --> R
-    C -- ok --> D{Multipart}
-    D -- pending --> P((buffered))
-    D -- complete --> E{Bit decode by type}
-    E -- unsupported --> R
-    E -- ok --> F{validateAisMessage}
-    F -- invalid --> R
-    F -- ok --> G[(Trusted store)]
-    R --> H[.data/rejected_frames.jsonl]
+flowchart TB
+    subgraph Sources["Untrusted upstream"]
+        S1[Local UDP :10110]
+        S2[Regional WebSocket]
+        S3[External feed]
+    end
+
+    subgraph Gate["GIGO boundary"]
+        direction TB
+        G1{NMEA<br/>checksum}
+        G2{AIVDM<br/>envelope}
+        G3{Multipart<br/>reassembly}
+        G4{Bit decode<br/>by type}
+        G5{validateAisMessage<br/>semantic invariants}
+        G1 -->|ok| G2 -->|ok| G3 -->|complete| G4 -->|known type| G5
+    end
+
+    subgraph Outputs["Trusted vs poison"]
+        OK[(Trusted store<br/>D5+ DB writer)]
+        DLQ[(rejected_frames.jsonl<br/>append-only audit trail)]
+        BUF((multipart<br/>buffered))
+    end
+
+    Sources --> G1
+    G1 -->|bad checksum| DLQ
+    G2 -->|malformed| DLQ
+    G3 -->|pending| BUF
+    G4 -->|unsupported| DLQ
+    G5 -->|invalid mmsi/imo/coords| DLQ
+    G5 -->|valid| OK
+
+    classDef rejected fill:#fee,stroke:#c33
+    classDef accepted fill:#efe,stroke:#3a3
+    class DLQ rejected
+    class OK accepted
 ```
 
-Each rejection variant is a discriminated union member. The DLQ row carries the variant verbatim, so an analyst tracing a transmission corruption sees exactly which invariant fired.
+Each rejection variant is a discriminated union member. The DLQ row carries the variant verbatim, so an analyst tracing a transmission corruption sees exactly which invariant fired. Sentinel-disguised nulls, out-of-range coordinates, and impossible MMSIs never reach the trusted store.
 
 ## Tradeoffs
 
