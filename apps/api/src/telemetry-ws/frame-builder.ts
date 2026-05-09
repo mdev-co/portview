@@ -1,5 +1,8 @@
 import {
   type AisMessage,
+  MMSI_MID_DIVISOR,
+  MMSI_MID_MAX,
+  MMSI_MID_MIN,
   type SourceId,
   VESSEL_FLAG_HAS_FIX,
   VESSEL_FLAG_HAS_IDENTITY,
@@ -13,13 +16,11 @@ export type FrameBuilderInput = {
   readonly receivedAt: number;
 };
 
-const MOVING_SOG_KNOTS = 0.5;
-const MID_REGION_MIN = 200;
-const MID_REGION_MAX = 799;
+const MOVING_SOG_KNOTS_THRESHOLD = 0.5;
 
 function hasIdentity(mmsi: number): boolean {
-  const mid = Math.floor(mmsi / 1_000_000);
-  return mid >= MID_REGION_MIN && mid <= MID_REGION_MAX;
+  const mid = Math.floor(mmsi / MMSI_MID_DIVISOR);
+  return mid >= MMSI_MID_MIN && mid <= MMSI_MID_MAX;
 }
 
 function computeFlags(
@@ -28,7 +29,9 @@ function computeFlags(
   position: readonly [number, number] | null,
 ): number {
   let flags = 0;
-  if (sog !== null && sog > MOVING_SOG_KNOTS) flags |= VESSEL_FLAG_IS_MOVING;
+  if (sog !== null && sog > MOVING_SOG_KNOTS_THRESHOLD) {
+    flags |= VESSEL_FLAG_IS_MOVING;
+  }
   if (position !== null) flags |= VESSEL_FLAG_HAS_FIX;
   if (hasIdentity(mmsi)) flags |= VESSEL_FLAG_HAS_IDENTITY;
   return flags;
@@ -53,56 +56,52 @@ export function buildVesselFrame(input: FrameBuilderInput): VesselUpdateFrame {
   const lng = position !== null ? position[0] : null;
   const lat = position !== null ? position[1] : null;
 
+  const base = {
+    messageType: message.messageType,
+    mmsi: message.mmsi,
+    sourceId,
+    timestampUnix,
+    reserved: 0,
+  };
+
   switch (message.messageType) {
     case 1:
     case 2:
     case 3:
       return {
-        messageType: message.messageType,
-        mmsi: message.mmsi,
+        ...base,
         navStatus: message.navigationStatus,
-        sourceId,
         rateOfTurn: message.rateOfTurn,
         lng,
         lat,
         sog: message.speedOverGround,
         cog: message.courseOverGround,
         trueHeading: message.trueHeading,
-        timestampUnix,
         flags: computeFlags(message.mmsi, message.speedOverGround, position),
-        reserved: 0,
       };
     case 18:
       return {
-        messageType: message.messageType,
-        mmsi: message.mmsi,
+        ...base,
         navStatus: null,
-        sourceId,
         rateOfTurn: null,
         lng,
         lat,
         sog: message.speedOverGround,
         cog: message.courseOverGround,
         trueHeading: message.trueHeading,
-        timestampUnix,
         flags: computeFlags(message.mmsi, message.speedOverGround, position),
-        reserved: 0,
       };
     case 5:
       return {
-        messageType: message.messageType,
-        mmsi: message.mmsi,
+        ...base,
         navStatus: null,
-        sourceId,
         rateOfTurn: null,
         lng: null,
         lat: null,
         sog: null,
         cog: null,
         trueHeading: null,
-        timestampUnix,
         flags: computeFlags(message.mmsi, null, null),
-        reserved: 0,
       };
   }
 }

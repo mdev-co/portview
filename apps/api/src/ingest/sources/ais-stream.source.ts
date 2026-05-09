@@ -127,8 +127,8 @@ export class AisStreamSource implements ISource {
               wasClean: evt.wasClean,
               messagesReceived: this.messagesReceived,
             });
-            this.errorListeners.forEach((l) =>
-              l(
+            this.errorListeners.forEach((listener) =>
+              listener(
                 new Error(
                   `WebSocket closed (code ${evt.code}${evt.reason ? `: ${evt.reason}` : ''})`,
                 ),
@@ -139,8 +139,8 @@ export class AisStreamSource implements ISource {
         ws.addEventListener('error', (evt) => {
           if (this.socket === ws) {
             this.log?.('error', 'WebSocket runtime error', { event: evt.type });
-            this.errorListeners.forEach((l) =>
-              l(new Error(`WebSocket runtime error: ${evt.type}`)),
+            this.errorListeners.forEach((listener) =>
+              listener(new Error(`WebSocket runtime error: ${evt.type}`)),
             );
           }
         });
@@ -214,6 +214,6 @@ export class AisStreamSource implements ISource {
       receivedAt: Date.now(),
       sourceId: SOURCE_ID,
     };
-    this.frameListeners.forEach((l) => l(frame));
+    this.frameListeners.forEach((listener) => listener(frame));
   }
 }
