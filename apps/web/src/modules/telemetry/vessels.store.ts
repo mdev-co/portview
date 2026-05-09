@@ -1,22 +1,41 @@
-import { map } from 'nanostores';
+import { map, onMount } from 'nanostores';
 import type { LiveVessel } from './types';
 
-/**
- * Atomic per-key vessel store keyed by MMSI. setKey notifies only
- * subscribers of that specific MMSI; whole-list re-renders are
- * impossible by construction. Sized for the SPS PoC scale (50-500 live
- * vessels at 1 Hz); scales to the low thousands without changes.
- */
 export const $vessels = map<Record<number, LiveVessel>>({});
 
 /**
- * Merge an inbound vessel update into the store. Nullable spatial and
- * navigation fields fall back to the previous value when the inbound
- * frame leaves them unset, so a static-data frame (AIS type 5, no
- * position) never wipes a previously known fix. Non-nullable fields
- * (mmsi, messageType, sourceId, timestampUnix, flags, reserved) always
- * take the inbound value.
+ * AIS Class A anchored / Class B stationary broadcast every 3 minutes.
+ * AisStream free tier sub-samples and occasionally drops reports.
+ * 10-minute window tolerates two missed broadcast cycles before
+ * evicting the vessel from the store.
  */
+const STALE_THRESHOLD_SECONDS = 600;
+const SWEEP_INTERVAL_MS = 30_000;
+
+/** Drop vessels whose last update is older than STALE_THRESHOLD_SECONDS. */
+function sweepStale(nowSeconds: number = Math.floor(Date.now() / 1_000)): void {
+  const snapshot = $vessels.get();
+  let evicted = 0;
+  const next: Record<number, LiveVessel> = {};
+  for (const key in snapshot) {
+    const vessel = snapshot[key];
+    if (vessel === undefined) continue;
+    if (nowSeconds - vessel.timestampUnix > STALE_THRESHOLD_SECONDS) {
+      evicted += 1;
+      continue;
+    }
+    next[Number(key)] = vessel;
+  }
+  if (evicted > 0) $vessels.set(next);
+}
+
+onMount($vessels, () => {
+  const interval = setInterval(sweepStale, SWEEP_INTERVAL_MS);
+  return () => clearInterval(interval);
+});
+
+export const __test = { sweepStale, STALE_THRESHOLD_SECONDS };
+
 export function setVessel(update: LiveVessel): void {
   const prev = $vessels.get()[update.mmsi];
   if (prev === undefined) {
@@ -36,7 +55,6 @@ export function setVessel(update: LiveVessel): void {
   });
 }
 
-/** Number of vessels currently tracked. Cheap O(1) Object.keys length. */
 export function vesselCount(): number {
   return Object.keys($vessels.get()).length;
 }

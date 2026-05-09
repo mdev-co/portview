@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { SourceId } from '@sps/shared';
 import type { LiveVessel } from '../types';
-import { $vessels, setVessel, vesselCount } from '../vessels.store';
+import { $vessels, __test, setVessel, vesselCount } from '../vessels.store';
 
 const FULL: LiveVessel = {
   mmsi: 261_345_678,
@@ -91,5 +91,50 @@ describe('vessels store setVessel', () => {
     expect(merged.sog).toBe(0);
     expect(merged.cog).toBe(0);
     expect(merged.rateOfTurn).toBe(0);
+  });
+});
+
+describe('vessels store sweepStale', () => {
+  beforeEach(() => {
+    $vessels.set({});
+  });
+
+  it('drops vessels older than the staleness threshold', () => {
+    const now = 1_715_000_000;
+    const fresh: LiveVessel = { ...FULL, mmsi: 100, timestampUnix: now - 30 };
+    const stale: LiveVessel = {
+      ...FULL,
+      mmsi: 200,
+      timestampUnix: now - __test.STALE_THRESHOLD_SECONDS - 5,
+    };
+    setVessel(fresh);
+    setVessel(stale);
+    expect(vesselCount()).toBe(2);
+
+    __test.sweepStale(now);
+    const remaining = $vessels.get();
+    expect(vesselCount()).toBe(1);
+    expect(remaining[100]).toBeDefined();
+    expect(remaining[200]).toBeUndefined();
+  });
+
+  it('keeps vessels exactly at the threshold (not yet stale)', () => {
+    const now = 1_715_000_000;
+    const onEdge: LiveVessel = {
+      ...FULL,
+      mmsi: 300,
+      timestampUnix: now - __test.STALE_THRESHOLD_SECONDS,
+    };
+    setVessel(onEdge);
+    __test.sweepStale(now);
+    expect($vessels.get()[300]).toBeDefined();
+  });
+
+  it('is a no-op when no vessels are stale', () => {
+    const now = 1_715_000_000;
+    setVessel({ ...FULL, mmsi: 400, timestampUnix: now - 10 });
+    const before = $vessels.get();
+    __test.sweepStale(now);
+    expect($vessels.get()).toBe(before);
   });
 });
