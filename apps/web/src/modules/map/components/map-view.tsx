@@ -1,6 +1,7 @@
 import type { MapStatus } from '../core/map-state';
 import { useMapState } from '../hooks/use-map-state';
 import { MapCanvas } from './map-canvas';
+import { VesselLayer } from './vessel-layer';
 
 const LOADING_LABEL: Record<MapStatus, (error: Error | null) => string | null> = {
   idle: () => 'Initializing...',
@@ -20,6 +21,7 @@ export function MapView() {
   return (
     <div className="relative h-full w-full">
       <MapCanvas />
+      <VesselLayer />
       {label !== null && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <div
