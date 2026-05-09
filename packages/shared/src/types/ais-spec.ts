@@ -9,7 +9,20 @@
  * corruption bugs in similar codebases (see ADR-0006 on data integrity).
  */
 
-/** ITU-R M.1371-5 §3.1: NavStatus 15 = "not defined". */
+/**
+ * ITU-R M.1371-5 §3.1: NavStatus values. The full enum is documented in
+ * the spec; constants below cover the values the SPS pipeline branches
+ * on. Values not listed here are passed through verbatim.
+ */
+export const AIS_NAV_STATUS_UNDER_WAY_USING_ENGINE = 0;
+export const AIS_NAV_STATUS_AT_ANCHOR = 1;
+export const AIS_NAV_STATUS_NOT_UNDER_COMMAND = 2;
+export const AIS_NAV_STATUS_RESTRICTED_MANEUVERABILITY = 3;
+export const AIS_NAV_STATUS_CONSTRAINED_BY_DRAUGHT = 4;
+export const AIS_NAV_STATUS_MOORED = 5;
+export const AIS_NAV_STATUS_AGROUND = 6;
+export const AIS_NAV_STATUS_ENGAGED_IN_FISHING = 7;
+export const AIS_NAV_STATUS_UNDER_WAY_SAILING = 8;
 export const AIS_NAV_STATUS_UNKNOWN = 15;
 
 /** ITU-R M.1371-5 §3.1: repeatIndicator 0 = "default, no repeat". */
