@@ -4,10 +4,6 @@ export interface TokenBucketOptions {
   readonly now?: () => number;
 }
 
-/**
- * Standard token bucket. Constant-time `tryConsume`, with a clock
- * injection point so tests can advance time without sleeping.
- */
 export class TokenBucket {
   private readonly capacity: number;
   private readonly refillPerMs: number;

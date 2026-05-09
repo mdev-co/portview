@@ -7,11 +7,6 @@ const SOURCE_PRIORITY = 2;
 type FrameCallback = (frame: NmeaFrame) => void;
 type ErrorCallback = (error: Error) => void;
 
-/**
- * Placeholder for a regional WebSDR fallback. start() rejects so the
- * priority FSM moves on; the slot reserves the source-id and priority
- * until a real WebSDR client is wired in.
- */
 export class WebSdrSource implements ISource {
   readonly id: SourceId = SOURCE_ID;
   readonly priority = SOURCE_PRIORITY;

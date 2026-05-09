@@ -1,11 +1,5 @@
 import type { AivdmEnvelope } from './aivdm-envelope';
 
-/**
- * Reassembles fragmented AIVDM messages keyed on (channel, messageId).
- * Bounded buffers + per-fragment TTL cap memory growth on noisy feeds;
- * stale fragment groups expire and are reported as parse errors rather
- * than blocking later traffic.
- */
 export type AssembledPayload = Pick<
   AivdmEnvelope,
   'payload' | 'fillBits' | 'channel' | 'messageId'

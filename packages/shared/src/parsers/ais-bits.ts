@@ -1,9 +1,3 @@
-/**
- * AIS sixbit alphabet. AIVDM payloads are encoded as ASCII characters
- * 48..87 and 96..119, each carrying six bits of the bit-stream. This
- * module decodes a payload string into a Uint8Array<bit> and exposes
- * a BitReader that walks fields by their bit width per ITU-R M.1371.
- */
 export function sixbitFromChar(charCode: number): number {
   if (charCode >= 48 && charCode < 88) return charCode - 48;
   if (charCode >= 96 && charCode < 120) return charCode - 56;

@@ -1,9 +1,3 @@
-/**
- * Structural parser for an AIVDM/AIVDO sentence (the NMEA wrapper that
- * carries an AIS payload). Validates field count and fill-bit range,
- * extracts envelope fields; no bit-level decode happens here — that
- * belongs to the message-type-specific parsers downstream.
- */
 const AIVDM_FIELD_COUNT = 7;
 const MIN_FRAGMENT = 1;
 const MAX_FILL_BITS = 5;
