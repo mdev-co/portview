@@ -80,4 +80,31 @@ describe('vesselsToGeoJSON', () => {
     const collection = vesselsToGeoJSON({});
     expect(collection.features).toHaveLength(0);
   });
+
+  it('exposes hasHeading=true when trueHeading is set', () => {
+    const collection = vesselsToGeoJSON({
+      [261_345_678]: vessel({ trueHeading: 215 }),
+    });
+    const f = collection.features[0] as { properties: { heading: number; hasHeading: boolean } };
+    expect(f.properties.hasHeading).toBe(true);
+    expect(f.properties.heading).toBe(215);
+  });
+
+  it('falls back to cog when trueHeading is null', () => {
+    const collection = vesselsToGeoJSON({
+      [261_345_678]: vessel({ trueHeading: null, cog: 90 }),
+    });
+    const f = collection.features[0] as { properties: { heading: number; hasHeading: boolean } };
+    expect(f.properties.hasHeading).toBe(true);
+    expect(f.properties.heading).toBe(90);
+  });
+
+  it('marks hasHeading=false when both trueHeading and cog are null', () => {
+    const collection = vesselsToGeoJSON({
+      [261_345_678]: vessel({ trueHeading: null, cog: null }),
+    });
+    const f = collection.features[0] as { properties: { heading: number; hasHeading: boolean } };
+    expect(f.properties.hasHeading).toBe(false);
+    expect(f.properties.heading).toBe(0);
+  });
 });
