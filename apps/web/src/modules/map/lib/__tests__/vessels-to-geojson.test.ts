@@ -173,8 +173,8 @@ describe('vesselsToGeoJSON', () => {
 
   it('marks selected=false on every feature when no mmsi is selected', () => {
     const collection = vesselsToGeoJSON({
-      [261_111_111]: vessel({ mmsi: 261_111_111, flags: VESSEL_FLAG_HAS_FIX }),
-      [261_222_222]: vessel({ mmsi: 261_222_222, flags: VESSEL_FLAG_HAS_FIX }),
+      [261_111_111]: vessel({ mmsi: 261_111_111 as Mmsi, flags: VESSEL_FLAG_HAS_FIX }),
+      [261_222_222]: vessel({ mmsi: 261_222_222 as Mmsi, flags: VESSEL_FLAG_HAS_FIX }),
     });
     for (const f of collection.features) {
       expect((f as { properties: { selected: boolean } }).properties.selected).toBe(false);
@@ -184,8 +184,8 @@ describe('vesselsToGeoJSON', () => {
   it('marks selected=true only on the matching mmsi feature', () => {
     const collection = vesselsToGeoJSON(
       {
-        [261_111_111]: vessel({ mmsi: 261_111_111, flags: VESSEL_FLAG_HAS_FIX }),
-        [261_222_222]: vessel({ mmsi: 261_222_222, flags: VESSEL_FLAG_HAS_FIX }),
+        [261_111_111]: vessel({ mmsi: 261_111_111 as Mmsi, flags: VESSEL_FLAG_HAS_FIX }),
+        [261_222_222]: vessel({ mmsi: 261_222_222 as Mmsi, flags: VESSEL_FLAG_HAS_FIX }),
       },
       {},
       261_222_222,
