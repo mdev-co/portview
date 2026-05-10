@@ -60,7 +60,7 @@ describe('interpolateVesselPosition', () => {
     expect(result.lat).toBeGreaterThan(53);
   });
 
-  it('falls back to the original position when delta_t exceeds the hard cap', () => {
+  it('falls back to the original position when delta_t exceeds the freshness window', () => {
     const result = interpolateVesselPosition(
       vessel({ sog: 10, cog: 90, lng: 14, lat: 53, timestampUnix: 1_715_000_000 }),
       1_715_000_700,
@@ -68,21 +68,55 @@ describe('interpolateVesselPosition', () => {
     expect(result).toEqual({ lng: 14, lat: 53 });
   });
 
-  it('damps velocity exponentially as delta grows', () => {
+  it('damps velocity exponentially within the freshness window', () => {
     const fresh = interpolateVesselPosition(
       vessel({ sog: 10, cog: 90, lng: 14, lat: 53, timestampUnix: 1_715_000_000 }),
       1_715_000_005,
     );
-    const stale = interpolateVesselPosition(
+    const damped = interpolateVesselPosition(
       vessel({ sog: 10, cog: 90, lng: 14, lat: 53, timestampUnix: 1_715_000_000 }),
-      1_715_000_180,
+      1_715_000_080,
     );
-    if (!fresh || !stale) throw new Error('expected positions');
+    if (!fresh || !damped) throw new Error('expected positions');
     const freshDistance = Math.abs(fresh.lng - 14);
-    const staleDistance = Math.abs(stale.lng - 14);
-    // Stale frame should not extrapolate proportional to elapsed time;
-    // damping suppresses the apparent velocity.
-    expect(staleDistance).toBeLessThan(freshDistance * 36);
+    const dampedDistance = Math.abs(damped.lng - 14);
+    // 80s of damped motion should be well below 16x the 5s case
+    // (linear projection would be ~16x; damping suppresses it).
+    expect(dampedDistance).toBeLessThan(freshDistance * 16);
+    expect(dampedDistance).toBeGreaterThan(freshDistance);
+  });
+
+  it('keeps extrapolating up to but not past the 90s freshness boundary', () => {
+    const before = interpolateVesselPosition(
+      vessel({ sog: 10, cog: 90, lng: 14, lat: 53, timestampUnix: 1_715_000_000 }),
+      1_715_000_089,
+    );
+    const after = interpolateVesselPosition(
+      vessel({ sog: 10, cog: 90, lng: 14, lat: 53, timestampUnix: 1_715_000_000 }),
+      1_715_000_091,
+    );
+    if (!before || !after) throw new Error('expected positions');
+    expect(before.lng).toBeGreaterThan(14);
+    expect(after).toEqual({ lng: 14, lat: 53 });
+  });
+
+  it('regression: a Class B vessel with 5 minute staleness does not drift onto land', () => {
+    // Reproduces the observed bug: SOG 7.7 kn, delta 300s, COG due north.
+    // Pre-fix this rendered ~594m north of the last fix (onto Park Zeromskiego
+    // when last fix was on the Odra Zachodnia waterfront).
+    const lastFix = { lng: 14.567325, lat: 53.427835 };
+    const result = interpolateVesselPosition(
+      vessel({
+        messageType: 18,
+        sog: 7.7,
+        cog: 0,
+        lng: lastFix.lng,
+        lat: lastFix.lat,
+        timestampUnix: 1_715_000_000,
+      }),
+      1_715_000_300,
+    );
+    expect(result).toEqual(lastFix);
   });
 
   it('falls back to the original position when nowSeconds is in the past', () => {

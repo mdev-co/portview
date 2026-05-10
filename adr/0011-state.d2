@@ -1,0 +1,62 @@
+direction: down
+vars: {
+  d2-config: {
+    theme-id: 8
+    pad: 40
+  }
+}
+
+ais: "AIS report received\nlast_position, sog, cog, timestamp" {
+  shape: hexagon
+  icon: https://icons.terrastruct.com/dev%2Fnodejs.svg
+}
+
+clock: "rAF tick\nnowSeconds" {
+  shape: hexagon
+}
+
+calc: "deltaSec = nowSeconds - timestamp" {
+  shape: rectangle
+}
+
+decision: "deltaSec < 90s ?\n(1 Class B cycle + 30s tolerance)" {
+  shape: diamond
+}
+
+fresh: "Fresh window\nextrapolate position\nlast + sog * cos(cog) * delta * damping(300s half-life)" {
+  shape: rectangle
+  style: {
+    fill: "#dbeafe"
+    stroke: "#1e40af"
+  }
+}
+
+stale: "Stale window\nfreeze at last reported position\n(prevents 600m+ drift onto land,\nobserved on MMSI 261182517 in Szczecin)" {
+  shape: rectangle
+  style: {
+    fill: "#fef3c7"
+    stroke: "#92400e"
+  }
+}
+
+tracker: "smooth-transition tracker\ncubic ease-in-out lerp 1.5s" {
+  shape: rectangle
+  icon: https://icons.terrastruct.com/dev%2Freact.svg
+}
+
+map: "MapLibre marker rendered" {
+  shape: hexagon
+}
+
+ais -> calc: "vessel.timestampUnix"
+clock -> calc
+calc -> decision
+
+decision -> fresh: "yes (within 90s)"
+decision -> stale: "no (past 90s)"
+
+fresh -> tracker: "extrapolated lng / lat"
+stale -> tracker: "last lng / lat"
+
+tracker -> map: "smoothed lng / lat"
+
