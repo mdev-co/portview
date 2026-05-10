@@ -220,6 +220,8 @@ describe('AisMessage discriminated union', () => {
           return `static-${msg.mmsi}`;
         case 18:
           return `position-class-b-${msg.mmsi}`;
+        case 24:
+          return `static-class-b-${msg.mmsi}`;
         default: {
           const exhaustive: never = msg;
           return exhaustive;
@@ -228,6 +230,6 @@ describe('AisMessage discriminated union', () => {
     })(message);
 
     expect(label).toBe(`position-class-b-${classB.mmsi}`);
-    expectTypeOf<AisMessage['messageType']>().toEqualTypeOf<1 | 2 | 3 | 5 | 18>();
+    expectTypeOf<AisMessage['messageType']>().toEqualTypeOf<1 | 2 | 3 | 5 | 18 | 24>();
   });
 });
