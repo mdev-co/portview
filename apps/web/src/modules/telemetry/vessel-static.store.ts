@@ -1,5 +1,5 @@
 import { map, onMount } from 'nanostores';
-import type { VesselStaticDataFrame } from '@sps/shared';
+import { AIS_SHIP_TYPE_DEFAULT, type StaticEta, type VesselStaticDataFrame } from '@sps/shared';
 import { $vessels } from './vessels.store';
 
 /**
@@ -23,8 +23,37 @@ const SWEEP_INTERVAL_MS = 60_000;
 
 export const $vesselStaticData = map<Record<number, VesselStaticDataFrame>>({});
 
-export function setVesselStatic(frame: VesselStaticDataFrame): void {
-  $vesselStaticData.setKey(frame.mmsi, frame);
+function isEtaPopulated(eta: StaticEta): boolean {
+  return eta.month !== null || eta.day !== null || eta.hour !== null || eta.minute !== null;
+}
+
+/**
+ * Merge an incoming static frame with whatever is already stored for
+ * the same MMSI. Class B type 24 arrives in two parts (PartA = name,
+ * PartB = callSign + shipType + dimensions) - the gateway emits each
+ * part with the absent-side fields as empty strings or null, and this
+ * function keeps the previously-populated values when the new frame
+ * leaves them blank. Class A type 5 is always complete, so the merge
+ * is a no-op replace for it.
+ */
+export function setVesselStatic(incoming: VesselStaticDataFrame): void {
+  const previous = $vesselStaticData.get()[incoming.mmsi];
+  if (previous === undefined) {
+    $vesselStaticData.setKey(incoming.mmsi, incoming);
+    return;
+  }
+  $vesselStaticData.setKey(incoming.mmsi, {
+    ...previous,
+    ...incoming,
+    vesselName: incoming.vesselName.length > 0 ? incoming.vesselName : previous.vesselName,
+    callSign: incoming.callSign.length > 0 ? incoming.callSign : previous.callSign,
+    shipType: incoming.shipType !== AIS_SHIP_TYPE_DEFAULT ? incoming.shipType : previous.shipType,
+    dimensions: incoming.dimensions ?? previous.dimensions,
+    imo: incoming.imo ?? previous.imo,
+    draught: incoming.draught ?? previous.draught,
+    destination: incoming.destination.length > 0 ? incoming.destination : previous.destination,
+    eta: isEtaPopulated(incoming.eta) ? incoming.eta : previous.eta,
+  });
 }
 
 export function vesselStaticCount(): number {

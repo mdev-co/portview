@@ -2,7 +2,7 @@
 import { type ReactNode, createContext, memo, useContext, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { useMapEngine } from '@/modules/map/hooks/use-map-engine';
-import { VESSEL_PALETTE } from '@/modules/map/styles/vessel-palette';
+import { VESSEL_CATEGORY_PALETTE, VESSEL_PALETTE } from '@/modules/map/styles/vessel-palette';
 import type { LiveVessel } from '@/modules/telemetry';
 import {
   Anchor,
@@ -22,7 +22,12 @@ import {
   Ship,
   Waypoints,
 } from 'lucide-react';
-import { type VesselStaticDataFrame, sourceIdName } from '@sps/shared';
+import {
+  type VesselStaticDataFrame,
+  shipCategoryLabel,
+  shipTypeCategory,
+  sourceIdName,
+} from '@sps/shared';
 import { useVesselStatic } from '../hooks/use-vessel-static';
 import { STATUS_LABEL, deriveVesselStatus } from '../lib/derive-status';
 import {
@@ -40,8 +45,9 @@ import {
   formatSog,
   formatVesselName,
 } from '../lib/format';
+import { VesselIllustration } from './vessel-illustration';
 
-const FLY_TO_ZOOM = 13.5;
+const FLY_TO_ZOOM = 16;
 
 const styles = {
   wrapper: 'relative',
@@ -67,6 +73,12 @@ const styles = {
   fieldIcon: 'text-muted-foreground/80 mt-0.5 size-4 shrink-0',
   fieldLabel: 'text-muted-foreground text-[0.7rem] font-semibold uppercase tracking-wider',
   fieldValue: 'text-foreground mt-0.5 font-mono text-sm font-medium tabular-nums',
+  illustrationFrame:
+    'border-primary/20 bg-muted/40 border-y-2 border-y-primary/15 px-4 py-3 flex items-center justify-center',
+  illustrationSvg: 'text-foreground/80 h-24 w-full max-w-[420px]',
+  categoryBadge:
+    'inline-flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wider',
+  categoryDot: 'size-1.5 rounded-full',
 } as const;
 
 type DetailField = {
@@ -177,6 +189,24 @@ function StatusDot() {
   );
 }
 
+function CategoryBadge() {
+  const { vessel } = useRow();
+  const staticFrame = useVesselStatic(vessel.mmsi);
+  if (staticFrame === null || staticFrame.shipType <= 0) return null;
+  const category = shipTypeCategory(staticFrame.shipType);
+  if (category === 'other') return null;
+  const palette = VESSEL_CATEGORY_PALETTE[category];
+  return (
+    <span
+      className={cn(styles.categoryBadge, palette.text, palette.border)}
+      aria-label={`Category: ${shipCategoryLabel(category)}`}
+    >
+      <span className={cn(styles.categoryDot, palette.dot.split(' ')[0])} aria-hidden />
+      {shipCategoryLabel(category)}
+    </span>
+  );
+}
+
 const TIME_TICK_INTERVAL_MS = 1_000;
 
 function Label() {
@@ -208,6 +238,7 @@ function Label() {
     <span className={styles.body}>
       <span className={styles.titleRow}>
         <span className={cn(styles.mmsi, hasName && 'font-sans tracking-normal')}>{title}</span>
+        <CategoryBadge />
         <span ref={timeRef} className={styles.time} />
       </span>
       <span className={styles.statusLine}>
@@ -262,20 +293,30 @@ function Details() {
   const staticFrame = useVesselStatic(vessel.mmsi);
   if (!selected) return null;
   return (
-    <div className={styles.detailGrid}>
-      {LIVE_DETAIL_FIELDS.map(field => (
-        <Field key={field.label} icon={field.icon} label={field.label} value={field.read(vessel)} />
-      ))}
-      {staticFrame !== null &&
-        STATIC_DETAIL_FIELDS.map(field => (
+    <>
+      <div className={styles.illustrationFrame}>
+        <VesselIllustration className={styles.illustrationSvg} />
+      </div>
+      <div className={styles.detailGrid}>
+        {LIVE_DETAIL_FIELDS.map(field => (
           <Field
             key={field.label}
             icon={field.icon}
             label={field.label}
-            value={field.read(staticFrame)}
+            value={field.read(vessel)}
           />
         ))}
-    </div>
+        {staticFrame !== null &&
+          STATIC_DETAIL_FIELDS.map(field => (
+            <Field
+              key={field.label}
+              icon={field.icon}
+              label={field.label}
+              value={field.read(staticFrame)}
+            />
+          ))}
+      </div>
+    </>
   );
 }
 
@@ -302,6 +343,7 @@ function Field({
 Root.displayName = 'VesselListItem';
 Row.displayName = 'VesselListItem.Row';
 StatusDot.displayName = 'VesselListItem.StatusDot';
+CategoryBadge.displayName = 'VesselListItem.CategoryBadge';
 Label.displayName = 'VesselListItem.Label';
 Actions.displayName = 'VesselListItem.Actions';
 Details.displayName = 'VesselListItem.Details';
@@ -310,6 +352,7 @@ Field.displayName = 'VesselListItem.Field';
 export const VesselListItem = Object.assign(Root, {
   Row,
   StatusDot,
+  CategoryBadge,
   Label,
   Actions,
   Details,

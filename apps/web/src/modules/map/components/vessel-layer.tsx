@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { $selectedMmsi, clearSelection, selectVessel } from '@/modules/selection';
-import { $vessels } from '@/modules/telemetry';
+import { $vesselStaticData, $vessels } from '@/modules/telemetry';
 import { useStore } from '@nanostores/react';
 import type { MapLayerMouseEvent, MapMouseEvent, Map as MaplibreMap } from 'maplibre-gl';
 import { useMapEngine } from '../hooks/use-map-engine';
@@ -9,11 +9,12 @@ import { ensureVesselArrowIcon } from '../lib/vessel-arrow-icon';
 import { vesselsToGeoJSON } from '../lib/vessels-to-geojson';
 import {
   VESSEL_ARROW_LAYER_ID,
+  VESSEL_LABEL_LAYER_ID,
   VESSEL_LAYER_ID,
   VESSEL_SOURCE_ID,
 } from '../styles/osm-raster-style';
 
-const VESSEL_INTERACTIVE_LAYERS = [VESSEL_LAYER_ID, VESSEL_ARROW_LAYER_ID];
+const VESSEL_INTERACTIVE_LAYERS = [VESSEL_LAYER_ID, VESSEL_ARROW_LAYER_ID, VESSEL_LABEL_LAYER_ID];
 
 const HOVER_CURSOR = 'pointer';
 const SELECTED_STATE = { selected: true };
@@ -43,7 +44,10 @@ export function VesselLayer(): null {
     }
 
     const render = (): void => {
-      controller.setSourceData(VESSEL_SOURCE_ID, vesselsToGeoJSON($vessels.get()));
+      controller.setSourceData(
+        VESSEL_SOURCE_ID,
+        vesselsToGeoJSON($vessels.get(), $vesselStaticData.get()),
+      );
     };
 
     render();
@@ -55,11 +59,13 @@ export function VesselLayer(): null {
     };
     rafId = window.requestAnimationFrame(tick);
 
-    const unsubscribe = $vessels.listen(render);
+    const unsubscribePosition = $vessels.listen(render);
+    const unsubscribeStatic = $vesselStaticData.listen(render);
 
     return () => {
       window.cancelAnimationFrame(rafId);
-      unsubscribe();
+      unsubscribePosition();
+      unsubscribeStatic();
     };
   }, [controller, status]);
 
