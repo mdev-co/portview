@@ -1,6 +1,6 @@
 # ADR-0011: Dead reckoning extrapolation freezes after 90s of staleness
 
-- Status: Accepted
+- Status: Accepted (amended 2026-05-10 - see Amendment section)
 - Date: 2026-05-10
 
 ## Context
@@ -39,3 +39,14 @@ Lower `MAX_REASONABLE_DELTA_SEC` from 600 to 90. Beyond 90 seconds without a fre
 
 - D7-PR5 will add the visual stale indicator (opacity fade or dotted ring) so the operator sees explicitly that a vessel is past the freshness window.
 - Future ML-driven approach: train a model on observed AIS gaps + vessel class + sog to predict whether a vessel is actually moving during a sub-sampling gap or genuinely stopped. Out of scope for the SPS portfolio sprint.
+
+## Amendment - 2026-05-10: combined freeze + 200m hard cap
+
+The original ADR rejected a hard distance cap on the grounds that the cap value would be "essentially arbitrary, tied to local geography rather than AIS protocol semantics". Field experience with the merged 90s freeze showed that argument was incomplete:
+
+- Within the 90s freshness window the damped extrapolation is still unbounded by distance. At 14 kn × 60s × damping(0.87) the projected drift is ~376m, large enough to put a Class B vessel onto a road or building running parallel to the riverbank.
+- A Class B vessel observed near Kolobrzeg with 60s staleness was rendered on land while still inside the 90s "fresh" window. The 90s freeze alone does not stop the visual defect; it only bounds the worst case.
+
+Decision (this amendment): keep the 90s freeze AND add `MAX_EXTRAPOLATION_METERS = 200` as a hard cap on the projected distance within the freshness window. The two bounds compose: extrapolation is bounded by the smaller of (a) damped sog × delta and (b) 200m, then frozen entirely after 90s.
+
+The 200m value remains operationally chosen (river width 150m, working port basin 300m), not protocol-derived. The earlier ADR was correct that this number is local; what changed is that we accept a small amount of locality in exchange for ruling out a class of visible defects that the freeze alone leaves on the table. The interview defence is now: "we trust last fix beyond 90s; within 90s we cap at the largest distance a working harbour basin allows".
