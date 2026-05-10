@@ -36,14 +36,31 @@ const fillColorByMovementAndCategory: ExpressionSpecification = [
 
 const isSelected: ExpressionSpecification = ['boolean', ['get', 'selected'], false];
 
+/**
+ * A fix older than the dead-reckoning freshness window (90s) but younger
+ * than the TTL eviction boundary (600s) gets a visibly dimmed stroke so
+ * the operator can tell at a glance that the position is no longer
+ * being smoothly interpolated. Threshold sits between the two so a
+ * freshly frozen marker fades earlier than the opacity ramp by itself
+ * would suggest. Selection wins over staleness (operator picked this
+ * vessel, we keep the amber ring regardless).
+ */
+const STALE_FIX_AGE_SECONDS = 120;
+const isStaleFix: ExpressionSpecification = ['>=', ['get', 'ageSeconds'], STALE_FIX_AGE_SECONDS];
+
+const STALE_STROKE_HEX = '#94a3b8';
+
 // Selection keeps the category fill so a Cargo / Tanker / Service vessel
 // stays readable at a glance; the amber accent moves to the stroke and
 // halo where it reads as a ring around the marker rather than swapping
-// the entire shape's colour.
+// the entire shape's colour. Stale fixes shift the stroke to dim slate
+// when not selected.
 const strokeColorBySelection: ExpressionSpecification = [
   'case',
   isSelected,
   VESSEL_PALETTE.selected.hex,
+  isStaleFix,
+  STALE_STROKE_HEX,
   VESSEL_PALETTE.stroke.hex,
 ];
 
