@@ -100,6 +100,19 @@ describe('interpolateVesselPosition', () => {
     expect(after).toEqual({ lng: 14, lat: 53 });
   });
 
+  it('caps extrapolation distance at 200m even within the freshness window', () => {
+    // 14 kn at 60s elapsed, damping ~0.87, would project ~376m without the cap.
+    // With the 200m cap, displacement must stay below ~0.0019 deg lat.
+    const result = interpolateVesselPosition(
+      vessel({ sog: 14, cog: 0, lng: 14, lat: 53, timestampUnix: 1_715_000_000 }),
+      1_715_000_060,
+    );
+    if (!result) throw new Error('expected position');
+    const latDeltaMeters = (result.lat - 53) * 111_000;
+    expect(latDeltaMeters).toBeGreaterThan(0);
+    expect(latDeltaMeters).toBeLessThanOrEqual(201);
+  });
+
   it('regression: a Class B vessel with 5 minute staleness does not drift onto land', () => {
     // Reproduces the observed bug: SOG 7.7 kn, delta 300s, COG due north.
     // Pre-fix this rendered ~594m north of the last fix (onto Park Zeromskiego
