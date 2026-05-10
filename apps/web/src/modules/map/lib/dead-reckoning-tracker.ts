@@ -76,11 +76,20 @@ export function smoothedDisplayPosition(
   }
 
   if (vessel.timestampUnix !== prev.lastSeenTimestampUnix) {
-    prev.startLng = prev.displayedLng;
-    prev.startLat = prev.displayedLat;
+    // If the previous transition is still running (next AIS report arrived
+    // before the lerp finished), update the target in place so the
+    // animation glides to the freshest position instead of restarting from
+    // a stale `start` point on every burst report. The visual symptom
+    // before this fix was a vessel appearing to "stall" while bursting
+    // rapid updates, because each restart truncated the previous lerp.
+    const elapsedMs = nowMs - prev.transitionStartedAtMs;
+    if (elapsedMs >= TRANSITION_DURATION_MS) {
+      prev.startLng = prev.displayedLng;
+      prev.startLat = prev.displayedLat;
+      prev.transitionStartedAtMs = nowMs;
+    }
     prev.targetLng = target.lng;
     prev.targetLat = target.lat;
-    prev.transitionStartedAtMs = nowMs;
     prev.lastSeenTimestampUnix = vessel.timestampUnix;
   } else {
     prev.targetLng = target.lng;

@@ -18,6 +18,7 @@ type VesselFeatureProperties = {
   readonly isMoving: boolean;
   readonly ageSeconds: number;
   readonly category: ShipTypeCategory;
+  readonly selected: boolean;
   readonly name?: string;
 };
 
@@ -55,6 +56,7 @@ function nameFor(
 export function vesselsToGeoJSON(
   vessels: Readonly<Record<number, LiveVessel>>,
   staticData: Readonly<Record<number, VesselStaticDataFrame>> = {},
+  selectedMmsi: number | null = null,
   nowSeconds: number = Math.floor(Date.now() / 1_000),
 ): GeoJSONFeatureCollection {
   const features: VesselFeature[] = [];
@@ -87,6 +89,7 @@ export function vesselsToGeoJSON(
         isMoving,
         ageSeconds: Math.max(0, nowSeconds - vessel.timestampUnix),
         category: categoryFor(staticData, vessel.mmsi),
+        selected: vessel.mmsi === selectedMmsi,
         ...(name !== undefined && { name }),
       },
     });

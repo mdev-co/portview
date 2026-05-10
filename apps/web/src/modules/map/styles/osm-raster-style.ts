@@ -8,35 +8,43 @@ export const VESSEL_ARROW_LAYER_ID = 'vessels-arrows';
 export const VESSEL_LABEL_LAYER_ID = 'vessels-labels';
 export const VESSEL_ARROW_ICON_ID = 'vessel-arrow';
 
-const statusFallbackColor: ExpressionSpecification = [
-  'case',
-  ['boolean', ['get', 'isMoving'], false],
-  VESSEL_PALETTE.underway.hex,
-  VESSEL_PALETTE.anchored.hex,
-];
-
-const COLORED_CATEGORIES = SHIP_TYPE_CATEGORIES.filter(c => c !== 'other');
-
-const categoryMatchPairs: string[] = COLORED_CATEGORIES.flatMap(c => [
+const categoryMatchPairs: string[] = SHIP_TYPE_CATEGORIES.flatMap(c => [
   c,
   VESSEL_CATEGORY_PALETTE[c].hex,
 ]);
 
 // MapLibre's ExpressionSpecification is a discriminated tuple union that the
 // TS compiler cannot narrow from a spread; the runtime shape is correct
-// (alternating string keys + values, expression fallback at the tail).
+// (alternating string keys + values, hex fallback at the tail).
 const colorByCategory = [
   'match',
   ['get', 'category'],
   ...categoryMatchPairs,
-  statusFallbackColor,
+  VESSEL_CATEGORY_PALETTE.other.hex,
 ] as unknown as ExpressionSpecification;
 
-const colorBySelectionAndCategory: ExpressionSpecification = [
+// A vessel under way (SOG > IS_MOVING threshold encoded into the flags
+// upstream) takes the underway green fill so the eye picks up movement
+// before it picks up category. Stationary vessels keep the category
+// colour so anchored fleets stay legible at a glance.
+const fillColorByMovementAndCategory: ExpressionSpecification = [
   'case',
-  ['boolean', ['feature-state', 'selected'], false],
-  VESSEL_PALETTE.selected.hex,
+  ['boolean', ['get', 'isMoving'], false],
+  VESSEL_PALETTE.underway.hex,
   colorByCategory,
+];
+
+const isSelected: ExpressionSpecification = ['boolean', ['get', 'selected'], false];
+
+// Selection keeps the category fill so a Cargo / Tanker / Service vessel
+// stays readable at a glance; the amber accent moves to the stroke and
+// halo where it reads as a ring around the marker rather than swapping
+// the entire shape's colour.
+const strokeColorBySelection: ExpressionSpecification = [
+  'case',
+  isSelected,
+  VESSEL_PALETTE.selected.hex,
+  VESSEL_PALETTE.stroke.hex,
 ];
 
 /**
@@ -95,15 +103,15 @@ export const osmRasterStyle: StyleSpecification = {
           ['linear'],
           ['zoom'],
           8,
-          ['case', ['boolean', ['feature-state', 'selected'], false], 7, 5],
+          ['case', isSelected, 7, 5],
           14,
-          ['case', ['boolean', ['feature-state', 'selected'], false], 12, 9],
+          ['case', isSelected, 12, 9],
           18,
-          ['case', ['boolean', ['feature-state', 'selected'], false], 18, 14],
+          ['case', isSelected, 18, 14],
         ],
-        'circle-color': colorBySelectionAndCategory,
-        'circle-stroke-width': ['case', ['boolean', ['feature-state', 'selected'], false], 3, 2],
-        'circle-stroke-color': VESSEL_PALETTE.stroke.hex,
+        'circle-color': fillColorByMovementAndCategory,
+        'circle-stroke-width': ['case', isSelected, 3, 2],
+        'circle-stroke-color': strokeColorBySelection,
         'circle-opacity': opacityByAge,
       },
     },
@@ -120,9 +128,9 @@ export const osmRasterStyle: StyleSpecification = {
         'icon-size': ['interpolate', ['linear'], ['zoom'], 8, 1.1, 14, 1.7, 18, 2.4],
       },
       paint: {
-        'icon-color': colorBySelectionAndCategory,
-        'icon-halo-color': VESSEL_PALETTE.stroke.hex,
-        'icon-halo-width': ['case', ['boolean', ['feature-state', 'selected'], false], 4, 1.6],
+        'icon-color': fillColorByMovementAndCategory,
+        'icon-halo-color': strokeColorBySelection,
+        'icon-halo-width': ['case', isSelected, 4, 1.6],
         'icon-opacity': opacityByAge,
       },
     },
