@@ -85,6 +85,24 @@ export type { PositionReport } from './types/vessel';
 export type { StaticData, StaticDimensions, StaticEta } from './types/static-data';
 export { VESSEL_STATIC_FRAME_KIND, type VesselStaticDataFrame } from './types/vessel-static';
 export {
+  VESSEL_HISTORY_MAX_POINTS,
+  VESSEL_SNAPSHOT_FRAME_KIND,
+  type VesselHistoryPoint,
+  type VesselKalmanState,
+  type VesselSnapshotEntry,
+  type VesselSnapshotFrame,
+} from './types/vessel-snapshot';
+export {
+  type Covariance4,
+  DEFAULT_ACCEL_SIGMA,
+  DEFAULT_MEASUREMENT_SIGMA,
+  initKalmanState2D,
+  type KalmanState2D,
+  predictKalman2D,
+  stepKalman2D,
+  updateKalman2D,
+} from './kalman';
+export {
   SHIP_TYPE_BANDS,
   SHIP_TYPE_CATEGORIES,
   shipCategoryLabel,
