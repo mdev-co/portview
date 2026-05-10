@@ -1,4 +1,5 @@
 import { map, onMount } from 'nanostores';
+import { VESSEL_FLAG_HAS_FIX } from '@sps/shared';
 import type { LiveVessel } from './types';
 
 export const $vessels = map<Record<number, LiveVessel>>({});
@@ -42,6 +43,13 @@ export function setVessel(update: LiveVessel): void {
     $vessels.setKey(update.mmsi, update);
     return;
   }
+  // A static-only frame (AIS type 5 / 24) carries no position and computes
+  // flags=0 server-side, so a naive spread would erase the HAS_FIX bit
+  // earned by an earlier position frame and the marker would vanish until
+  // the next type 1/2/3/18. Carry HAS_FIX over from prev when the update
+  // brings no new position info.
+  const hasNewPosition = update.lng !== null || update.lat !== null;
+  const flags = hasNewPosition ? update.flags : update.flags | (prev.flags & VESSEL_FLAG_HAS_FIX);
   $vessels.setKey(update.mmsi, {
     ...prev,
     ...update,
@@ -52,6 +60,7 @@ export function setVessel(update: LiveVessel): void {
     trueHeading: update.trueHeading ?? prev.trueHeading,
     navStatus: update.navStatus ?? prev.navStatus,
     rateOfTurn: update.rateOfTurn ?? prev.rateOfTurn,
+    flags,
   });
 }
 

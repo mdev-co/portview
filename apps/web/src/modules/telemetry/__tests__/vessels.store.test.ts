@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { type Mmsi, SourceId } from '@sps/shared';
+import { type Mmsi, SourceId, VESSEL_FLAG_HAS_FIX } from '@sps/shared';
 import type { LiveVessel } from '../types';
 import { $vessels, __test, setVessel, vesselCount } from '../vessels.store';
 
@@ -57,13 +57,40 @@ describe('vessels store setVessel', () => {
     expect(merged.rateOfTurn).toBe(FULL.rateOfTurn);
   });
 
-  it('always promotes non-nullable fields from the inbound frame', () => {
+  it('always promotes messageType and timestampUnix from the inbound frame', () => {
     setVessel(FULL);
     setVessel(STATIC_DATA_NULL);
     const merged = $vessels.get()[FULL.mmsi];
     expect(merged.messageType).toBe(STATIC_DATA_NULL.messageType);
     expect(merged.timestampUnix).toBe(STATIC_DATA_NULL.timestampUnix);
-    expect(merged.flags).toBe(STATIC_DATA_NULL.flags);
+  });
+
+  it('keeps HAS_FIX from the previous frame when the inbound update carries no position (AIS type 5 / 24)', () => {
+    // Server-side computeFlags(mmsi, null, null) emits flags without
+    // HAS_FIX for static-data frames. A naive merge would erase the
+    // HAS_FIX bit set by an earlier position frame and the marker would
+    // disappear from the map until the next type 1/2/3/18 broadcast
+    // restored it. Verify HAS_FIX is carried forward across static-only
+    // updates while non-position bits from the inbound frame still apply.
+    setVessel(FULL);
+    setVessel(STATIC_DATA_NULL);
+    const merged = $vessels.get()[FULL.mmsi];
+    expect(merged.flags & VESSEL_FLAG_HAS_FIX).toBe(VESSEL_FLAG_HAS_FIX);
+  });
+
+  it('uses the inbound flags verbatim when the update carries a fresh position', () => {
+    setVessel(FULL);
+    const newFlags = 0b101;
+    const moved: LiveVessel = {
+      ...FULL,
+      lng: 14.6,
+      lat: 53.5,
+      flags: newFlags,
+      timestampUnix: FULL.timestampUnix + 30,
+    };
+    setVessel(moved);
+    const merged = $vessels.get()[FULL.mmsi];
+    expect(merged.flags).toBe(newFlags);
   });
 
   it('overwrites a non-null inbound value over the previous one', () => {
