@@ -82,8 +82,22 @@ export type { LngLat, LngLatBounds } from './types/geo';
 export type { PositionReport } from './types/vessel';
 export type { StaticData, StaticDimensions, StaticEta } from './types/static-data';
 export { VESSEL_STATIC_FRAME_KIND, type VesselStaticDataFrame } from './types/vessel-static';
-export { SHIP_TYPE_BANDS, type ShipTypeBand, shipTypeLabel } from './enums/ship-type';
+export {
+  SHIP_TYPE_BANDS,
+  SHIP_TYPE_CATEGORIES,
+  shipCategoryLabel,
+  type ShipTypeBand,
+  type ShipTypeCategory,
+  shipTypeCategory,
+  shipTypeLabel,
+} from './enums/ship-type';
 export type { ClassBPositionReport } from './types/class-b-position';
+export {
+  CLASS_B_STATIC_PART_A,
+  CLASS_B_STATIC_PART_B,
+  type ClassBStaticData,
+  type ClassBStaticPart,
+} from './types/class-b-static';
 export type { AisMessage, AisMessageType } from './types/ais-message';
 
 export {

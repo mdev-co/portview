@@ -87,16 +87,19 @@ export const AIS_LNG_UNKNOWN_SENTINEL = 181;
  * of commercial port traffic.
  *
  *   1, 2, 3 : Class A position report (scheduled / assigned /
- *             interrogation response — same payload, different cause).
- *   5       : Static and voyage data (vessel name, IMO, dimensions,
- *             ETA, draught, destination).
+ *             interrogation response - same payload, different cause).
+ *   5       : Class A static and voyage data (vessel name, IMO,
+ *             dimensions, ETA, draught, destination).
  *   18      : Class B position report (smaller vessels, yachts,
- *             fishing boats — sparser fields than Class A).
+ *             fishing boats - sparser fields than Class A).
+ *   24      : Class B static data (vessel name, callSign, ship type,
+ *             dimensions). Two-part message - PartA = name, PartB =
+ *             callSign + shipType + dimensions. Parts are emitted
+ *             independently and merged at the FE store layer by MMSI.
  *
- * Other types in the spec (4 base station, 6-17 binary/safety, 19-24
- * extended Class B) reach the DLQ as `unsupported-message-type`. A
- * future build that needs them adds a parser + validator branch and a
- * literal here.
+ * Other types in the spec (4 base station, 6-17 binary/safety, 19-23,
+ * 25-27) reach the DLQ as `unsupported-message-type`. A future build
+ * that needs them adds a parser + validator branch and a literal here.
  */
-export const SUPPORTED_AIS_MESSAGE_TYPES = [1, 2, 3, 5, 18] as const;
+export const SUPPORTED_AIS_MESSAGE_TYPES = [1, 2, 3, 5, 18, 24] as const;
 export type SupportedAisMessageType = (typeof SUPPORTED_AIS_MESSAGE_TYPES)[number];

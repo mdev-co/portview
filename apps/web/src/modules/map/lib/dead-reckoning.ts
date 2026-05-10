@@ -7,11 +7,18 @@ const MOVING_SOG_THRESHOLD_KN = 0.5;
  * tolerance. Class A reports every 2-10s underway so freezing at 90s
  * still keeps fresh vessels animating; for stale ones we trust the
  * last fix over an extrapolation that has been observed to drift
- * hundreds of meters off-water (Class B sog 7.7 kn, delta 300s, damped
- * extrapolation ~594m, vessel rendered onto land). Industry-standard
- * behavior matches MarineTraffic / VesselFinder for stale-data display.
+ * hundreds of meters off-water. Matches MarineTraffic / VesselFinder.
  */
 const MAX_REASONABLE_DELTA_SEC = 90;
+/**
+ * Hard distance cap on extrapolation within the freshness window.
+ * 90s freeze alone is not enough: at 14 kn × 60s × damping(0.87) the
+ * damped projection still reaches ~376m and observed Class B vessels
+ * near Kolobrzeg / Szczecin shorelines drift onto land between report
+ * cycles. 200m roughly matches the width of a working port basin and
+ * keeps the marker on the navigable side of any river bank we monitor.
+ */
+const MAX_EXTRAPOLATION_METERS = 200;
 const VELOCITY_HALF_LIFE_SEC = 300;
 const KNOTS_TO_M_PER_S = 0.5144;
 const METERS_PER_DEG_LAT = 111_000;
@@ -50,7 +57,8 @@ export function interpolateVesselPosition(
     return { lng: vessel.lng, lat: vessel.lat };
   }
   const damping = velocityDampingFactor(deltaSec);
-  const distanceMeters = vessel.sog * KNOTS_TO_M_PER_S * deltaSec * damping;
+  const dampedDistance = vessel.sog * KNOTS_TO_M_PER_S * deltaSec * damping;
+  const distanceMeters = Math.min(dampedDistance, MAX_EXTRAPOLATION_METERS);
   const courseRad = (courseDeg * Math.PI) / 180;
   const dLat = (distanceMeters * Math.cos(courseRad)) / METERS_PER_DEG_LAT;
   const dLng =

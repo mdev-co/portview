@@ -45,3 +45,71 @@ export function shipTypeLabel(code: number): string | null {
   const band = SHIP_TYPE_BANDS.find(b => code >= b.min && code <= b.max);
   return band?.label ?? null;
 }
+
+/**
+ * Higher-level grouping of the ITU-R ship-type bands. Used to drive
+ * map marker color and sidebar category badges. Six functional groups
+ * + `other` for codes outside the documented bands or unknown:
+ *
+ *   - cargo:     70-79 (general cargo, container, bulk)
+ *   - tanker:    80-89 (oil, chemicals, gas)
+ *   - passenger: 60-69 (cruise, ferry, ro-pax)
+ *   - fishing:   30 (fishing vessels)
+ *   - sailing:   36, 37 (sailing yachts, pleasure craft)
+ *   - service:   31-35, 50-58 (tug, dredger, diving, military, pilot,
+ *                SAR, port tender, anti-pollution, law enforcement,
+ *                medical transport - covers ITU-R "Special craft" 50-58
+ *                plus the towing/dredging/diving/military codes from
+ *                the 30s band; "service" is the operator-friendly name
+ *                that "Special" hides behind in the spec)
+ *   - other:     code 0 ("not available"), 20-29 WIG, 40-49 high-speed,
+ *                90-99 generic "other", or codes outside 0..99
+ */
+export type ShipTypeCategory =
+  | 'cargo'
+  | 'tanker'
+  | 'passenger'
+  | 'fishing'
+  | 'sailing'
+  | 'service'
+  | 'other';
+
+export const SHIP_TYPE_CATEGORIES: readonly ShipTypeCategory[] = [
+  'cargo',
+  'tanker',
+  'passenger',
+  'fishing',
+  'sailing',
+  'service',
+  'other',
+];
+
+const FISHING_CODE = 30;
+const SAILING_CODES: ReadonlySet<number> = new Set([36, 37]);
+const SERVICE_CODES: ReadonlySet<number> = new Set([
+  31, 32, 33, 34, 35, 50, 51, 52, 53, 54, 55, 58,
+]);
+
+export function shipTypeCategory(code: number): ShipTypeCategory {
+  if (code === FISHING_CODE) return 'fishing';
+  if (SAILING_CODES.has(code)) return 'sailing';
+  if (SERVICE_CODES.has(code)) return 'service';
+  if (code >= 60 && code <= 69) return 'passenger';
+  if (code >= 70 && code <= 79) return 'cargo';
+  if (code >= 80 && code <= 89) return 'tanker';
+  return 'other';
+}
+
+const CATEGORY_LABELS: Readonly<Record<ShipTypeCategory, string>> = {
+  cargo: 'Cargo',
+  tanker: 'Tanker',
+  passenger: 'Passenger',
+  fishing: 'Fishing',
+  sailing: 'Sailing',
+  service: 'Service',
+  other: 'Other',
+};
+
+export function shipCategoryLabel(category: ShipTypeCategory): string {
+  return CATEGORY_LABELS[category];
+}

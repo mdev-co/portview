@@ -42,9 +42,10 @@ function computeFlags(
  * that the binary WebSocket gateway broadcasts. Lossy by design: only
  * the fields the codec carries are surfaced, the rest is dropped.
  *
- * Type 5 (StaticData) yields a frame with null position fields; the FE
- * may use it for vessel-name / IMO updates or skip rendering. Position
- * messages (1/2/3/18) yield the full spatial payload.
+ * Type 5 (Class A static) and type 24 (Class B static) yield a frame
+ * with null position fields; the FE uses the parallel JSON text-frame
+ * channel for the readable static-data payload. Position messages
+ * (1/2/3/18) yield the full spatial payload.
  */
 export function buildVesselFrame(input: FrameBuilderInput): VesselUpdateFrame {
   const { message, sourceId, receivedAt } = input;
@@ -92,6 +93,7 @@ export function buildVesselFrame(input: FrameBuilderInput): VesselUpdateFrame {
         flags: computeFlags(message.mmsi, message.speedOverGround, position),
       };
     case 5:
+    case 24:
       return {
         ...base,
         navStatus: null,

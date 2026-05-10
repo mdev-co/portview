@@ -1,0 +1,81 @@
+direction: down
+vars: {
+  d2-config: {
+    theme-id: 8
+    pad: 40
+  }
+}
+
+ais: "AisStream WS - StaticDataReport" {
+  shape: hexagon
+  icon: https://icons.terrastruct.com/dev%2Fnodejs.svg
+}
+
+partA: "PartNumber = 0 (PartA)\nName only" {
+  shape: rectangle
+  style: {
+    fill: "#dbeafe"
+    stroke: "#1e40af"
+  }
+}
+
+partB: "PartNumber = 1 (PartB)\nCallSign + ShipType + Dimensions" {
+  shape: rectangle
+  style: {
+    fill: "#dbeafe"
+    stroke: "#1e40af"
+  }
+}
+
+adapter: "ais-stream.adapter.ts\ndecodeClassBStaticData()" {
+  shape: rectangle
+}
+
+valid: "validateAisMessage()\ncase 24" {
+  shape: rectangle
+}
+
+publish: "IngestService\npublishVesselStatic\nguard: type 5 OR type 24" {
+  shape: rectangle
+}
+
+builder: "static-builder.ts\nbranch on messageType,\nblank fields where part absent" {
+  shape: rectangle
+}
+
+wire: "VesselStaticDataFrame JSON\nshared shape with type 5" {
+  shape: cylinder
+  style: {
+    fill: "#fef3c7"
+    stroke: "#92400e"
+  }
+}
+
+ws: "WebSocket /ws/telemetry\ntext frame" {
+  shape: hexagon
+}
+
+store: "vesselStaticData store\nsetVesselStatic merges by MMSI\nwith null-fallback" {
+  shape: cylinder
+  icon: https://icons.terrastruct.com/dev%2Freact.svg
+  style: {
+    fill: "#fef3c7"
+    stroke: "#92400e"
+  }
+}
+
+ui: "VesselListItem\nrenders name + 7 voyage fields\n(Class B leaves IMO/ETA/dest/draught as -)" {
+  shape: rectangle
+}
+
+ais -> partA
+ais -> partB
+partA -> adapter: "PartA payload"
+partB -> adapter: "PartB payload"
+adapter -> valid: "ClassBStaticData"
+valid -> publish: "validated"
+publish -> builder: "VesselStaticEvent"
+builder -> wire: "partial frame\n(part-specific fields)"
+wire -> ws
+ws -> store: "two text frames\n(one per part)"
+store -> ui: "merged record"

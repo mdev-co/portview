@@ -1,9 +1,11 @@
 import type {
   AisMessage,
   ClassBPositionReport,
+  ClassBStaticData,
   PositionReport,
   StaticData,
 } from '@sps/shared';
+import { CLASS_B_STATIC_PART_A, CLASS_B_STATIC_PART_B } from '@sps/shared';
 import {
   AIS_COG_UNKNOWN_SENTINEL,
   AIS_EPFD_TYPE_DEFAULT,
@@ -176,6 +178,38 @@ function decodeClassBPosition(
   };
 }
 
+function decodeClassBStaticData(
+  payload: Record<string, unknown>,
+  mmsi: number,
+): ClassBStaticData {
+  const partNumber =
+    asInt(payload['PartNumber']) === CLASS_B_STATIC_PART_B
+      ? CLASS_B_STATIC_PART_B
+      : CLASS_B_STATIC_PART_A;
+  const dimensions = asObject(payload['Dimension']);
+  return {
+    messageType: 24,
+    repeatIndicator:
+      asInt(payload['RepeatIndicator']) ?? AIS_REPEAT_INDICATOR_DEFAULT,
+    mmsi,
+    partNumber,
+    vesselName: asString(payload['Name']).trim(),
+    callSign: asString(payload['CallSign']).trim(),
+    shipType: asInt(payload['Type']) ?? AIS_SHIP_TYPE_DEFAULT,
+    dimensions:
+      dimensions === null
+        ? null
+        : {
+            toBow: asInt(dimensions['A']) ?? 0,
+            toStern: asInt(dimensions['B']) ?? 0,
+            toPort: asInt(dimensions['C']) ?? 0,
+            toStarboard: asInt(dimensions['D']) ?? 0,
+          },
+    vendorId: asString(payload['VendorID']).trim(),
+    mothershipMmsi: asInt(payload['MothershipMmsi']),
+  };
+}
+
 function decodeStaticData(
   payload: Record<string, unknown>,
   mmsi: number,
@@ -240,6 +274,7 @@ export function adaptAisStreamMessage(raw: string): AisStreamAdapterResult {
   const positionReport = asObject(message['PositionReport']);
   const classBPosition = asObject(message['StandardClassBPositionReport']);
   const staticData = asObject(message['ShipStaticData']);
+  const classBStatic = asObject(message['StaticDataReport']);
 
   if (positionReport !== null) {
     const mmsi =
@@ -281,6 +316,21 @@ export function adaptAisStreamMessage(raw: string): AisStreamAdapterResult {
       };
     }
     return { kind: 'message', value: decodeStaticData(staticData, mmsi) };
+  }
+
+  if (classBStatic !== null) {
+    const mmsi =
+      asInt(classBStatic['UserID']) ?? (meta ? asInt(meta['MMSI']) : null);
+    if (mmsi === null) {
+      return {
+        kind: 'rejected',
+        reason: { kind: 'invalid-payload', detail: 'missing mmsi' },
+      };
+    }
+    return {
+      kind: 'message',
+      value: decodeClassBStaticData(classBStatic, mmsi),
+    };
   }
 
   const messageType = asString(root['MessageType']);

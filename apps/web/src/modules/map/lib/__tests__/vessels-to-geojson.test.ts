@@ -4,9 +4,28 @@ import {
   VESSEL_FLAG_HAS_FIX,
   VESSEL_FLAG_HAS_IDENTITY,
   VESSEL_FLAG_IS_MOVING,
+  VESSEL_STATIC_FRAME_KIND,
+  type VesselStaticDataFrame,
 } from '@sps/shared';
 import type { LiveVessel } from '../../../telemetry/types';
 import { vesselsToGeoJSON } from '../vessels-to-geojson';
+
+function staticFrame(over: Partial<VesselStaticDataFrame> = {}): VesselStaticDataFrame {
+  return {
+    kind: VESSEL_STATIC_FRAME_KIND,
+    mmsi: 261_345_678,
+    vesselName: 'TEST',
+    callSign: '',
+    shipType: 70,
+    dimensions: null,
+    imo: null,
+    draught: null,
+    destination: '',
+    eta: { month: null, day: null, hour: null, minute: null },
+    receivedAt: 1_715_000_000_000,
+    ...over,
+  };
+}
 
 function vessel(over: Partial<LiveVessel> = {}): LiveVessel {
   return {
@@ -106,5 +125,47 @@ describe('vesselsToGeoJSON', () => {
     const f = collection.features[0] as { properties: { heading: number; hasHeading: boolean } };
     expect(f.properties.hasHeading).toBe(false);
     expect(f.properties.heading).toBe(0);
+  });
+
+  it('emits category=other when no static data is available for the mmsi', () => {
+    const collection = vesselsToGeoJSON({ [261_345_678]: vessel() });
+    const f = collection.features[0] as { properties: { category: string } };
+    expect(f.properties.category).toBe('other');
+  });
+
+  it('classifies a vessel by ship type when matching static data is provided', () => {
+    const collection = vesselsToGeoJSON(
+      { [261_345_678]: vessel() },
+      { [261_345_678]: staticFrame({ shipType: 80 }) },
+    );
+    const f = collection.features[0] as { properties: { category: string } };
+    expect(f.properties.category).toBe('tanker');
+  });
+
+  it('falls back to other when the static record carries the AIS-default ship type 0', () => {
+    const collection = vesselsToGeoJSON(
+      { [261_345_678]: vessel() },
+      { [261_345_678]: staticFrame({ shipType: 0 }) },
+    );
+    const f = collection.features[0] as { properties: { category: string } };
+    expect(f.properties.category).toBe('other');
+  });
+
+  it('emits the vessel name on the feature when static data carries one', () => {
+    const collection = vesselsToGeoJSON(
+      { [261_345_678]: vessel() },
+      { [261_345_678]: staticFrame({ vesselName: 'TRIESTE' }) },
+    );
+    const f = collection.features[0] as { properties: { name?: string } };
+    expect(f.properties.name).toBe('TRIESTE');
+  });
+
+  it('omits the name property when the static name is empty / whitespace', () => {
+    const collection = vesselsToGeoJSON(
+      { [261_345_678]: vessel() },
+      { [261_345_678]: staticFrame({ vesselName: '   ' }) },
+    );
+    const f = collection.features[0] as { properties: Record<string, unknown> };
+    expect('name' in f.properties).toBe(false);
   });
 });

@@ -1,4 +1,5 @@
 import type { AisMessage } from '../types/ais-message';
+import { CLASS_B_STATIC_PART_A, CLASS_B_STATIC_PART_B } from '../types/class-b-static';
 import { validateLatLng } from './coordinates';
 import { parseImo } from './imo';
 import { parseMmsi } from './mmsi';
@@ -34,6 +35,15 @@ export function validateAisMessage(msg: AisMessage): Result<AisMessage> {
       if (msg.imo !== null) {
         const imoResult = parseImo(msg.imo);
         if (!imoResult.ok) return err(imoResult.error);
+      }
+      return ok(msg);
+    }
+    case 24: {
+      if (msg.partNumber !== CLASS_B_STATIC_PART_A && msg.partNumber !== CLASS_B_STATIC_PART_B) {
+        return err({
+          kind: 'unsupported-message-type',
+          messageType: msg.messageType,
+        });
       }
       return ok(msg);
     }

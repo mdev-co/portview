@@ -30,7 +30,7 @@ describe('adaptAisStreamMessage', () => {
     if (result.kind !== 'message') return;
     expect(result.value.messageType).toBe(1);
     expect(result.value.mmsi).toBe(261_345_678);
-    if (result.value.messageType !== 5) {
+    if (result.value.messageType !== 5 && result.value.messageType !== 24) {
       expect(result.value.position).toEqual([14.5528, 53.4285]);
       expect(result.value.speedOverGround).toBe(12.3);
       expect(result.value.courseOverGround).toBe(217.4);
@@ -51,7 +51,11 @@ describe('adaptAisStreamMessage', () => {
       },
     });
     const result = adaptAisStreamMessage(json);
-    if (result.kind !== 'message' || result.value.messageType === 5) {
+    if (
+      result.kind !== 'message' ||
+      result.value.messageType === 5 ||
+      result.value.messageType === 24
+    ) {
       throw new Error('expected position message');
     }
     expect(result.value.speedOverGround).toBeNull();
@@ -71,7 +75,11 @@ describe('adaptAisStreamMessage', () => {
       },
     });
     const result = adaptAisStreamMessage(json);
-    if (result.kind !== 'message' || result.value.messageType === 5) {
+    if (
+      result.kind !== 'message' ||
+      result.value.messageType === 5 ||
+      result.value.messageType === 24
+    ) {
       throw new Error('expected position message');
     }
     expect(result.value.trueHeading).toBeNull();
@@ -90,7 +98,11 @@ describe('adaptAisStreamMessage', () => {
       },
     });
     const result = adaptAisStreamMessage(json);
-    if (result.kind !== 'message' || result.value.messageType === 5) {
+    if (
+      result.kind !== 'message' ||
+      result.value.messageType === 5 ||
+      result.value.messageType === 24
+    ) {
       throw new Error('expected position message');
     }
     expect(result.value.position).toBeNull();
@@ -110,7 +122,11 @@ describe('adaptAisStreamMessage', () => {
     });
     const result = adaptAisStreamMessage(json);
     if (result.kind !== 'message') throw new Error('expected message');
-    if (result.value.messageType === 5 || result.value.messageType === 18)
+    if (
+      result.value.messageType === 5 ||
+      result.value.messageType === 18 ||
+      result.value.messageType === 24
+    )
       throw new Error('expected class A');
     expect(result.value.rateOfTurn).toBeNull();
   });
@@ -168,6 +184,55 @@ describe('adaptAisStreamMessage', () => {
       toStarboard: 10,
     });
     expect(result.value.draught).toBe(8.5);
+  });
+
+  it('decodes a StaticDataReport PartA into AisMessage type 24 with name only', () => {
+    const json = JSON.stringify({
+      Message: {
+        StaticDataReport: {
+          UserID: 261_444_444,
+          PartNumber: 0,
+          Name: 'TRIESTE BREEZE',
+        },
+      },
+    });
+    const result = adaptAisStreamMessage(json);
+    if (result.kind !== 'message') throw new Error('expected message');
+    expect(result.value.messageType).toBe(24);
+    if (result.value.messageType !== 24) return;
+    expect(result.value.partNumber).toBe(0);
+    expect(result.value.vesselName).toBe('TRIESTE BREEZE');
+    expect(result.value.callSign).toBe('');
+    expect(result.value.dimensions).toBeNull();
+  });
+
+  it('decodes a StaticDataReport PartB into AisMessage type 24 with callSign and dimensions', () => {
+    const json = JSON.stringify({
+      Message: {
+        StaticDataReport: {
+          UserID: 261_444_444,
+          PartNumber: 1,
+          CallSign: 'SXBR',
+          Type: 36,
+          Dimension: { A: 8, B: 4, C: 2, D: 2 },
+          VendorID: 'GAR',
+        },
+      },
+    });
+    const result = adaptAisStreamMessage(json);
+    if (result.kind !== 'message') throw new Error('expected message');
+    expect(result.value.messageType).toBe(24);
+    if (result.value.messageType !== 24) return;
+    expect(result.value.partNumber).toBe(1);
+    expect(result.value.callSign).toBe('SXBR');
+    expect(result.value.shipType).toBe(36);
+    expect(result.value.dimensions).toEqual({
+      toBow: 8,
+      toStern: 4,
+      toPort: 2,
+      toStarboard: 2,
+    });
+    expect(result.value.vendorId).toBe('GAR');
   });
 
   it('rejects malformed JSON', () => {
