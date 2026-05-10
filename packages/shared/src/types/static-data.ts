@@ -1,3 +1,5 @@
+import type { Imo, Mmsi, ShipTypeCode } from './brands';
+
 export type StaticDimensions = {
   readonly toBow: number;
   readonly toStern: number;
@@ -15,12 +17,12 @@ export type StaticEta = {
 export type StaticData = {
   readonly messageType: 5;
   readonly repeatIndicator: number;
-  readonly mmsi: number;
+  readonly mmsi: Mmsi;
   readonly aisVersion: number;
-  readonly imo: number | null;
+  readonly imo: Imo | null;
   readonly callSign: string;
   readonly vesselName: string;
-  readonly shipType: number;
+  readonly shipType: ShipTypeCode;
   readonly dimensions: StaticDimensions | null;
   readonly epfdType: number;
   readonly eta: StaticEta;

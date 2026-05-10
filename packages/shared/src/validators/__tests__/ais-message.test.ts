@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
+import type { Imo, Mmsi, ShipTypeCode } from '../../types/brands';
 import type { ClassBPositionReport } from '../../types/class-b-position';
 import type { StaticData } from '../../types/static-data';
 import type { PositionReport } from '../../types/vessel';
 import { validateAisMessage } from '../ais-message';
 
-const VALID_MMSI = 261_345_678;
-const VALID_IMO = 9_074_729;
+const VALID_MMSI = 261_345_678 as Mmsi;
+const VALID_IMO = 9_074_729 as Imo;
+const SHIP_TYPE_DEFAULT = 0 as ShipTypeCode;
 
 const baseType1: PositionReport = {
   messageType: 1,
@@ -32,7 +34,7 @@ const baseType5: StaticData = {
   imo: VALID_IMO,
   callSign: '',
   vesselName: '',
-  shipType: 0,
+  shipType: SHIP_TYPE_DEFAULT,
   dimensions: null,
   epfdType: 0,
   eta: { month: null, day: null, hour: null, minute: null },
@@ -68,7 +70,7 @@ describe('validateAisMessage', () => {
   });
 
   it('rejects a PositionReport with sentinel-zero MMSI', () => {
-    const result = validateAisMessage({ ...baseType1, mmsi: 0 });
+    const result = validateAisMessage({ ...baseType1, mmsi: 0 as Mmsi });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.kind).toBe('invalid-mmsi');
   });
@@ -101,13 +103,13 @@ describe('validateAisMessage', () => {
   });
 
   it('rejects a StaticData with an IMO whose check digit is wrong', () => {
-    const result = validateAisMessage({ ...baseType5, imo: 9_074_720 });
+    const result = validateAisMessage({ ...baseType5, imo: 9_074_720 as Imo });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.kind).toBe('invalid-imo');
   });
 
   it('rejects a StaticData with an out-of-range MMSI', () => {
-    const result = validateAisMessage({ ...baseType5, mmsi: 100_000_000 });
+    const result = validateAisMessage({ ...baseType5, mmsi: 100_000_000 as Mmsi });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.kind).toBe('invalid-mmsi');
   });

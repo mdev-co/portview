@@ -6,6 +6,7 @@
 export type RejectReason =
   | { readonly kind: 'invalid-mmsi'; readonly value: number }
   | { readonly kind: 'invalid-imo'; readonly value: number }
+  | { readonly kind: 'invalid-ship-type'; readonly value: number }
   | { readonly kind: 'out-of-range-lat'; readonly value: number }
   | { readonly kind: 'out-of-range-lng'; readonly value: number }
   | { readonly kind: 'unsupported-message-type'; readonly messageType: number };

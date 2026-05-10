@@ -1,3 +1,4 @@
+import type { Imo, Mmsi, ShipTypeCode } from '../types/brands';
 import type { StaticData, StaticDimensions, StaticEta } from '../types/static-data';
 import { BitReader, payloadToBits } from './ais-bits';
 
@@ -99,12 +100,12 @@ export function decodeStaticData(payload: string): StaticData {
   return {
     messageType: STATIC_DATA_MESSAGE_TYPE,
     repeatIndicator,
-    mmsi,
+    mmsi: mmsi as Mmsi,
     aisVersion,
-    imo,
+    imo: imo as Imo | null,
     callSign,
     vesselName,
-    shipType,
+    shipType: shipType as ShipTypeCode,
     dimensions,
     epfdType,
     eta,

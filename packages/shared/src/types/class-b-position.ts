@@ -1,9 +1,10 @@
+import type { Mmsi } from './brands';
 import type { LngLat } from './geo';
 
 export type ClassBPositionReport = {
   readonly messageType: 18;
   readonly repeatIndicator: number;
-  readonly mmsi: number;
+  readonly mmsi: Mmsi;
   readonly speedOverGround: number | null;
   readonly positionAccuracy: boolean;
   readonly position: LngLat | null;
