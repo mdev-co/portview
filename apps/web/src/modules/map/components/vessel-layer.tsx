@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 import { $selectedMmsi, clearSelection, selectVessel } from '@/modules/selection';
 import { $vesselStaticData, $vessels } from '@/modules/telemetry';
-import { useStore } from '@nanostores/react';
 import type { MapLayerMouseEvent, MapMouseEvent, Map as MaplibreMap } from 'maplibre-gl';
 import { useMapEngine } from '../hooks/use-map-engine';
 import { useMapState } from '../hooks/use-map-state';
@@ -17,8 +16,6 @@ import {
 const VESSEL_INTERACTIVE_LAYERS = [VESSEL_LAYER_ID, VESSEL_ARROW_LAYER_ID, VESSEL_LABEL_LAYER_ID];
 
 const HOVER_CURSOR = 'pointer';
-const SELECTED_STATE = { selected: true };
-const UNSELECTED_STATE = { selected: false };
 
 type LayerClickEvent = MapLayerMouseEvent & {
   __vesselHandled?: boolean;
@@ -27,11 +24,14 @@ type MapClickEvent = MapMouseEvent & {
   __vesselHandled?: boolean;
 };
 
-/** Source-data sync, click/hover wiring and selection feature-state are kept in three separate effects below — they have independent lifecycles. */
+// Selection is encoded as a per-feature property in the rebuilt GeoJSON
+// rather than via map.setFeatureState. Feature-state on a source that is
+// re-set via setData() at RAF cadence is prone to drop or arrive before
+// the matching feature exists, which manifested as occasional invisible
+// markers when a vessel was selected from the sidebar list.
 export function VesselLayer(): null {
   const controller = useMapEngine();
   const { status } = useMapState();
-  const selectedMmsi = useStore($selectedMmsi);
 
   useEffect(() => {
     if (status !== 'ready') return;
@@ -46,7 +46,7 @@ export function VesselLayer(): null {
     const render = (): void => {
       controller.setSourceData(
         VESSEL_SOURCE_ID,
-        vesselsToGeoJSON($vessels.get(), $vesselStaticData.get()),
+        vesselsToGeoJSON($vessels.get(), $vesselStaticData.get(), $selectedMmsi.get()),
       );
     };
 
@@ -61,11 +61,13 @@ export function VesselLayer(): null {
 
     const unsubscribePosition = $vessels.listen(render);
     const unsubscribeStatic = $vesselStaticData.listen(render);
+    const unsubscribeSelection = $selectedMmsi.listen(render);
 
     return () => {
       window.cancelAnimationFrame(rafId);
       unsubscribePosition();
       unsubscribeStatic();
+      unsubscribeSelection();
     };
   }, [controller, status]);
 
@@ -110,22 +112,6 @@ export function VesselLayer(): null {
       map.getCanvas().style.cursor = '';
     };
   }, [controller, status]);
-
-  useEffect(() => {
-    if (status !== 'ready') return;
-    const map = controller.getRawEngine() as MaplibreMap | null;
-    if (!map) return;
-
-    if (selectedMmsi !== null) {
-      map.setFeatureState({ source: VESSEL_SOURCE_ID, id: selectedMmsi }, SELECTED_STATE);
-    }
-
-    return () => {
-      if (selectedMmsi !== null) {
-        map.setFeatureState({ source: VESSEL_SOURCE_ID, id: selectedMmsi }, UNSELECTED_STATE);
-      }
-    };
-  }, [controller, status, selectedMmsi]);
 
   return null;
 }

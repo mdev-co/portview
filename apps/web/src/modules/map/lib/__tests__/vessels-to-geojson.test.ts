@@ -170,4 +170,33 @@ describe('vesselsToGeoJSON', () => {
     const f = collection.features[0] as { properties: Record<string, unknown> };
     expect('name' in f.properties).toBe(false);
   });
+
+  it('marks selected=false on every feature when no mmsi is selected', () => {
+    const collection = vesselsToGeoJSON({
+      [261_111_111]: vessel({ mmsi: 261_111_111 as Mmsi, flags: VESSEL_FLAG_HAS_FIX }),
+      [261_222_222]: vessel({ mmsi: 261_222_222 as Mmsi, flags: VESSEL_FLAG_HAS_FIX }),
+    });
+    for (const f of collection.features) {
+      expect((f as { properties: { selected: boolean } }).properties.selected).toBe(false);
+    }
+  });
+
+  it('marks selected=true only on the matching mmsi feature', () => {
+    const collection = vesselsToGeoJSON(
+      {
+        [261_111_111]: vessel({ mmsi: 261_111_111 as Mmsi, flags: VESSEL_FLAG_HAS_FIX }),
+        [261_222_222]: vessel({ mmsi: 261_222_222 as Mmsi, flags: VESSEL_FLAG_HAS_FIX }),
+      },
+      {},
+      261_222_222,
+    );
+    const a = collection.features.find(f => (f as { id: number }).id === 261_111_111) as {
+      properties: { selected: boolean };
+    };
+    const b = collection.features.find(f => (f as { id: number }).id === 261_222_222) as {
+      properties: { selected: boolean };
+    };
+    expect(a.properties.selected).toBe(false);
+    expect(b.properties.selected).toBe(true);
+  });
 });
