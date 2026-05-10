@@ -2,7 +2,10 @@ import type {
   AisMessage,
   ClassBPositionReport,
   ClassBStaticData,
+  Imo,
+  Mmsi,
   PositionReport,
+  ShipTypeCode,
   StaticData,
 } from '@sps/shared';
 import { CLASS_B_STATIC_PART_A, CLASS_B_STATIC_PART_B } from '@sps/shared';
@@ -114,7 +117,7 @@ function decodeMessageId(payload: Record<string, unknown>): 1 | 2 | 3 {
 
 function decodePositionReport(
   payload: Record<string, unknown>,
-  mmsi: number,
+  mmsi: Mmsi,
 ): PositionReport {
   return {
     messageType: decodeMessageId(payload),
@@ -147,7 +150,7 @@ function decodePositionReport(
 
 function decodeClassBPosition(
   payload: Record<string, unknown>,
-  mmsi: number,
+  mmsi: Mmsi,
 ): ClassBPositionReport {
   return {
     messageType: 18,
@@ -180,7 +183,7 @@ function decodeClassBPosition(
 
 function decodeClassBStaticData(
   payload: Record<string, unknown>,
-  mmsi: number,
+  mmsi: Mmsi,
 ): ClassBStaticData {
   const partNumber =
     asInt(payload['PartNumber']) === CLASS_B_STATIC_PART_B
@@ -195,7 +198,7 @@ function decodeClassBStaticData(
     partNumber,
     vesselName: asString(payload['Name']).trim(),
     callSign: asString(payload['CallSign']).trim(),
-    shipType: asInt(payload['Type']) ?? AIS_SHIP_TYPE_DEFAULT,
+    shipType: (asInt(payload['Type']) ?? AIS_SHIP_TYPE_DEFAULT) as ShipTypeCode,
     dimensions:
       dimensions === null
         ? null
@@ -206,13 +209,13 @@ function decodeClassBStaticData(
             toStarboard: asInt(dimensions['D']) ?? 0,
           },
     vendorId: asString(payload['VendorID']).trim(),
-    mothershipMmsi: asInt(payload['MothershipMmsi']),
+    mothershipMmsi: asInt(payload['MothershipMmsi']) as Mmsi | null,
   };
 }
 
 function decodeStaticData(
   payload: Record<string, unknown>,
-  mmsi: number,
+  mmsi: Mmsi,
 ): StaticData {
   const eta = asObject(payload['Eta']) ?? {};
   const dimensions = asObject(payload['Dimension']);
@@ -222,10 +225,10 @@ function decodeStaticData(
       asInt(payload['RepeatIndicator']) ?? AIS_REPEAT_INDICATOR_DEFAULT,
     mmsi,
     aisVersion: asInt(payload['AisVersion']) ?? AIS_VERSION_DEFAULT,
-    imo: asInt(payload['ImoNumber']),
+    imo: asInt(payload['ImoNumber']) as Imo | null,
     callSign: asString(payload['CallSign']).trim(),
     vesselName: asString(payload['Name']).trim(),
-    shipType: asInt(payload['Type']) ?? AIS_SHIP_TYPE_DEFAULT,
+    shipType: (asInt(payload['Type']) ?? AIS_SHIP_TYPE_DEFAULT) as ShipTypeCode,
     dimensions:
       dimensions === null
         ? null
@@ -287,7 +290,7 @@ export function adaptAisStreamMessage(raw: string): AisStreamAdapterResult {
     }
     return {
       kind: 'message',
-      value: decodePositionReport(positionReport, mmsi),
+      value: decodePositionReport(positionReport, mmsi as Mmsi),
     };
   }
 
@@ -302,7 +305,7 @@ export function adaptAisStreamMessage(raw: string): AisStreamAdapterResult {
     }
     return {
       kind: 'message',
-      value: decodeClassBPosition(classBPosition, mmsi),
+      value: decodeClassBPosition(classBPosition, mmsi as Mmsi),
     };
   }
 
@@ -315,7 +318,10 @@ export function adaptAisStreamMessage(raw: string): AisStreamAdapterResult {
         reason: { kind: 'invalid-payload', detail: 'missing mmsi' },
       };
     }
-    return { kind: 'message', value: decodeStaticData(staticData, mmsi) };
+    return {
+      kind: 'message',
+      value: decodeStaticData(staticData, mmsi as Mmsi),
+    };
   }
 
   if (classBStatic !== null) {
@@ -329,7 +335,7 @@ export function adaptAisStreamMessage(raw: string): AisStreamAdapterResult {
     }
     return {
       kind: 'message',
-      value: decodeClassBStaticData(classBStatic, mmsi),
+      value: decodeClassBStaticData(classBStatic, mmsi as Mmsi),
     };
   }
 

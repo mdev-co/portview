@@ -1,5 +1,8 @@
 import {
   type AisMessage,
+  type Imo,
+  type Mmsi,
+  type ShipTypeCode,
   SourceId,
   VESSEL_FLAG_HAS_FIX,
   VESSEL_FLAG_HAS_IDENTITY,
@@ -15,7 +18,7 @@ const TIMESTAMP_UNIX = Math.floor(RECEIVED_AT / 1000);
 const POSITION_REPORT: AisMessage = {
   messageType: 1,
   repeatIndicator: 0,
-  mmsi: 261_345_678,
+  mmsi: 261_345_678 as Mmsi,
   navigationStatus: 0,
   rateOfTurn: 12,
   speedOverGround: 12.3,
@@ -32,7 +35,7 @@ const POSITION_REPORT: AisMessage = {
 const CLASS_B_POSITION: AisMessage = {
   messageType: 18,
   repeatIndicator: 0,
-  mmsi: 261_111_111,
+  mmsi: 261_111_111 as Mmsi,
   speedOverGround: 5.5,
   positionAccuracy: true,
   position: [14.6, 53.5],
@@ -52,12 +55,12 @@ const CLASS_B_POSITION: AisMessage = {
 const STATIC_DATA: AisMessage = {
   messageType: 5,
   repeatIndicator: 0,
-  mmsi: 261_222_222,
+  mmsi: 261_222_222 as Mmsi,
   aisVersion: 0,
-  imo: 9_074_729,
+  imo: 9_074_729 as Imo,
   callSign: '',
   vesselName: '',
-  shipType: 70,
+  shipType: 70 as ShipTypeCode,
   dimensions: null,
   epfdType: 1,
   eta: { month: null, day: null, hour: null, minute: null },
@@ -92,7 +95,7 @@ describe('buildVesselFrame', () => {
   });
 
   it('clears isMoving when sog is at or below the 0.5 kn threshold', () => {
-    const slow: AisMessage = { ...POSITION_REPORT, speedOverGround: 0.4 };
+    const slow = { ...POSITION_REPORT, speedOverGround: 0.4 } as AisMessage;
     const frame = buildVesselFrame({
       message: slow,
       sourceId: SourceId.LocalUdp,
@@ -103,11 +106,11 @@ describe('buildVesselFrame', () => {
   });
 
   it('clears hasFix and isMoving when position is null', () => {
-    const noFix: AisMessage = {
+    const noFix = {
       ...POSITION_REPORT,
       position: null,
       speedOverGround: 10,
-    };
+    } as AisMessage;
     const frame = buildVesselFrame({
       message: noFix,
       sourceId: SourceId.LocalUdp,
@@ -118,7 +121,10 @@ describe('buildVesselFrame', () => {
   });
 
   it('clears hasIdentity for mmsi outside the 200..799 MID region', () => {
-    const auxiliary: AisMessage = { ...POSITION_REPORT, mmsi: 99_345_678 };
+    const auxiliary = {
+      ...POSITION_REPORT,
+      mmsi: 99_345_678 as Mmsi,
+    } as AisMessage;
     const frame = buildVesselFrame({
       message: auxiliary,
       sourceId: SourceId.LocalUdp,
@@ -178,7 +184,7 @@ describe('buildVesselFrame', () => {
   });
 
   it('returns null position when the message has no fix', () => {
-    const noFix: AisMessage = { ...POSITION_REPORT, position: null };
+    const noFix = { ...POSITION_REPORT, position: null } as AisMessage;
     const frame = buildVesselFrame({
       message: noFix,
       sourceId: SourceId.LocalUdp,

@@ -2,6 +2,7 @@ import {
   AIS_SHIP_TYPE_DEFAULT,
   CLASS_B_STATIC_PART_A,
   type ClassBStaticData,
+  type ShipTypeCode,
   type StaticData,
   type StaticEta,
   VESSEL_STATIC_FRAME_KIND,
@@ -71,7 +72,9 @@ function frameFromClassBStatic(
     vesselName: isPartA ? message.vesselName : '',
     imo: null,
     callSign: isPartA ? '' : message.callSign,
-    shipType: isPartA ? AIS_SHIP_TYPE_DEFAULT : message.shipType,
+    shipType: isPartA
+      ? (AIS_SHIP_TYPE_DEFAULT as ShipTypeCode)
+      : message.shipType,
     dimensions: isPartA ? null : message.dimensions,
     draught: null,
     destination: '',
