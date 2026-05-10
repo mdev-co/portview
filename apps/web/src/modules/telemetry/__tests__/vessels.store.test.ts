@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { type Mmsi, SourceId, VESSEL_FLAG_HAS_FIX } from '@sps/shared';
+import { type Mmsi, SourceId, VESSEL_FLAG_HAS_FIX, VESSEL_FLAG_IS_MOVING } from '@sps/shared';
 import type { LiveVessel } from '../types';
 import { $vessels, __test, setVessel, vesselCount } from '../vessels.store';
 
@@ -118,6 +118,53 @@ describe('vessels store setVessel', () => {
     expect(merged.sog).toBe(0);
     expect(merged.cog).toBe(0);
     expect(merged.rateOfTurn).toBe(0);
+  });
+
+  it('keeps IS_MOVING set when SOG dips into the 0.3 to 0.5 kn dead zone', () => {
+    // Was clearly moving (sog 12.3 > 0.5), now drifting near a pier at 0.4 kn.
+    // The 0.5 kn server threshold alone would strip IS_MOVING and the marker
+    // would flicker between underway green and category colour on every
+    // borderline report. Hysteresis keeps it green until SOG clearly drops.
+    setVessel(FULL);
+    const drifting: LiveVessel = { ...FULL, sog: 0.4, flags: 0 };
+    setVessel(drifting);
+    const merged = $vessels.get()[FULL.mmsi];
+    expect(merged.flags & VESSEL_FLAG_IS_MOVING).toBe(VESSEL_FLAG_IS_MOVING);
+  });
+
+  it('clears IS_MOVING when SOG falls below the 0.3 kn OFF threshold', () => {
+    setVessel(FULL);
+    const stopped: LiveVessel = { ...FULL, sog: 0.2, flags: 0 };
+    setVessel(stopped);
+    const merged = $vessels.get()[FULL.mmsi];
+    expect(merged.flags & VESSEL_FLAG_IS_MOVING).toBe(0);
+  });
+
+  it('does not set IS_MOVING when a stopped vessel only edges into the dead zone', () => {
+    setVessel({ ...FULL, sog: 0, flags: FULL.flags & ~VESSEL_FLAG_IS_MOVING });
+    const edging: LiveVessel = {
+      ...FULL,
+      sog: 0.4,
+      flags: VESSEL_FLAG_IS_MOVING,
+    };
+    setVessel(edging);
+    const merged = $vessels.get()[FULL.mmsi];
+    expect(merged.flags & VESSEL_FLAG_IS_MOVING).toBe(0);
+  });
+
+  it('sets IS_MOVING once SOG clearly exceeds the 0.5 kn ON threshold', () => {
+    setVessel({ ...FULL, sog: 0, flags: FULL.flags & ~VESSEL_FLAG_IS_MOVING });
+    const accel: LiveVessel = { ...FULL, sog: 0.6, flags: 0 };
+    setVessel(accel);
+    const merged = $vessels.get()[FULL.mmsi];
+    expect(merged.flags & VESSEL_FLAG_IS_MOVING).toBe(VESSEL_FLAG_IS_MOVING);
+  });
+
+  it('preserves IS_MOVING across static-only frames that carry no SOG', () => {
+    setVessel(FULL);
+    setVessel(STATIC_DATA_NULL);
+    const merged = $vessels.get()[FULL.mmsi];
+    expect(merged.flags & VESSEL_FLAG_IS_MOVING).toBe(VESSEL_FLAG_IS_MOVING);
   });
 });
 
