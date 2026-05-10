@@ -1,19 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { shipTypeLabel } from '@sps/shared';
 import {
-  formatCallSign,
   formatCog,
-  formatDestination,
-  formatDimensions,
-  formatDraught,
-  formatEta,
   formatHeading,
-  formatImo,
   formatLatLng,
   formatRelativeTime,
-  formatShipType,
   formatSog,
-  formatVesselName,
 } from '../lib/format';
 
 describe('formatSog', () => {
@@ -62,51 +53,5 @@ describe('formatRelativeTime', () => {
   });
   it('clamps negative deltas to 0', () => {
     expect(formatRelativeTime(2_000, 1_000)).toBe('0s ago');
-  });
-});
-
-describe('static-data formatters', () => {
-  it('formatImo shows number or dash', () => {
-    expect(formatImo(9_725_634)).toBe('9725634');
-    expect(formatImo(null)).toBe('—');
-  });
-  it('formatCallSign / formatDestination / formatVesselName fall back to dash for empty strings', () => {
-    expect(formatCallSign('SXFG')).toBe('SXFG');
-    expect(formatCallSign('')).toBe('—');
-    expect(formatDestination('GDYNIA')).toBe('GDYNIA');
-    expect(formatDestination('')).toBe('—');
-    expect(formatVesselName('TRIESTE')).toBe('TRIESTE');
-    expect(formatVesselName('')).toBe('—');
-  });
-  it('formatDraught: null and zero treated as not available', () => {
-    expect(formatDraught(7.4)).toBe('7.4 m');
-    expect(formatDraught(null)).toBe('—');
-    expect(formatDraught(0)).toBe('—');
-  });
-  it('formatDimensions sums bow+stern and port+starboard', () => {
-    expect(formatDimensions({ toBow: 100, toStern: 80, toPort: 14, toStarboard: 14 })).toBe(
-      '180 × 28 m',
-    );
-    expect(formatDimensions(null)).toBe('—');
-    expect(formatDimensions({ toBow: 0, toStern: 0, toPort: 0, toStarboard: 0 })).toBe('—');
-  });
-  it('shipTypeLabel maps spec bands', () => {
-    expect(shipTypeLabel(70)).toBe('Cargo');
-    expect(shipTypeLabel(80)).toBe('Tanker');
-    expect(shipTypeLabel(60)).toBe('Passenger');
-    expect(shipTypeLabel(0)).toBeNull();
-    expect(shipTypeLabel(150)).toBeNull();
-  });
-  it('formatShipType wraps label with code in parens', () => {
-    expect(formatShipType(70)).toBe('Cargo (70)');
-    expect(formatShipType(0)).toBe('—');
-  });
-  it('formatEta combines date and time when both fields valid', () => {
-    expect(formatEta({ month: 5, day: 12, hour: 14, minute: 30 })).toBe('05-12 14:30');
-  });
-  it('formatEta degrades gracefully when fields are not available', () => {
-    expect(formatEta({ month: 0, day: 0, hour: 24, minute: 60 })).toBe('—');
-    expect(formatEta({ month: 5, day: 12, hour: 24, minute: 60 })).toBe('05-12');
-    expect(formatEta({ month: 0, day: 0, hour: 14, minute: 30 })).toBe('14:30');
   });
 });

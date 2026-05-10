@@ -81,8 +81,6 @@ export { BitReader, aisCharFromBits, payloadToBits, sixbitFromChar } from './par
 export type { LngLat, LngLatBounds } from './types/geo';
 export type { PositionReport } from './types/vessel';
 export type { StaticData, StaticDimensions, StaticEta } from './types/static-data';
-export { VESSEL_STATIC_FRAME_KIND, type VesselStaticDataFrame } from './types/vessel-static';
-export { SHIP_TYPE_BANDS, type ShipTypeBand, shipTypeLabel } from './enums/ship-type';
 export type { ClassBPositionReport } from './types/class-b-position';
 export type { AisMessage, AisMessageType } from './types/ais-message';
 

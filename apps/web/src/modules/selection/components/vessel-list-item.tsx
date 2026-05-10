@@ -5,40 +5,25 @@ import { useMapEngine } from '@/modules/map/hooks/use-map-engine';
 import { VESSEL_PALETTE } from '@/modules/map/styles/vessel-palette';
 import type { LiveVessel } from '@/modules/telemetry';
 import {
-  Anchor,
-  CalendarClock,
   ChevronDown,
   ChevronRight,
   Compass,
   Crosshair,
   Gauge,
   Hash,
-  IdCard,
   type LucideIcon,
   MapPin,
   Navigation,
   Radio,
-  Ruler,
-  Ship,
-  Waypoints,
 } from 'lucide-react';
-import { type VesselStaticDataFrame, sourceIdName } from '@sps/shared';
-import { useVesselStatic } from '../hooks/use-vessel-static';
+import { sourceIdName } from '@sps/shared';
 import { STATUS_LABEL, deriveVesselStatus } from '../lib/derive-status';
 import {
-  formatCallSign,
   formatCog,
-  formatDestination,
-  formatDimensions,
-  formatDraught,
-  formatEta,
   formatHeading,
-  formatImo,
   formatLatLng,
   formatRelativeTime,
-  formatShipType,
   formatSog,
-  formatVesselName,
 } from '../lib/format';
 
 const FLY_TO_ZOOM = 13.5;
@@ -75,13 +60,7 @@ type DetailField = {
   readonly read: (vessel: LiveVessel) => string;
 };
 
-type StaticField = {
-  readonly icon: LucideIcon;
-  readonly label: string;
-  readonly read: (frame: VesselStaticDataFrame) => string;
-};
-
-const LIVE_DETAIL_FIELDS: readonly DetailField[] = [
+const DETAIL_FIELDS: readonly DetailField[] = [
   { icon: MapPin, label: 'Latitude', read: vessel => formatLatLng(vessel.lat, 'lat') },
   { icon: MapPin, label: 'Longitude', read: vessel => formatLatLng(vessel.lng, 'lng') },
   { icon: Gauge, label: 'Speed', read: vessel => formatSog(vessel.sog) },
@@ -93,16 +72,6 @@ const LIVE_DETAIL_FIELDS: readonly DetailField[] = [
   },
   { icon: Hash, label: 'AIS type', read: vessel => String(vessel.messageType) },
   { icon: Radio, label: 'Source', read: vessel => sourceIdName(vessel.sourceId) },
-];
-
-const STATIC_DETAIL_FIELDS: readonly StaticField[] = [
-  { icon: Ship, label: 'Ship type', read: frame => formatShipType(frame.shipType) },
-  { icon: IdCard, label: 'IMO', read: frame => formatImo(frame.imo) },
-  { icon: Radio, label: 'Call sign', read: frame => formatCallSign(frame.callSign) },
-  { icon: Ruler, label: 'Length × beam', read: frame => formatDimensions(frame.dimensions) },
-  { icon: Anchor, label: 'Draught', read: frame => formatDraught(frame.draught) },
-  { icon: Waypoints, label: 'Destination', read: frame => formatDestination(frame.destination) },
-  { icon: CalendarClock, label: 'ETA', read: frame => formatEta(frame.eta) },
 ];
 
 type RowContextValue = {
@@ -181,16 +150,12 @@ const TIME_TICK_INTERVAL_MS = 1_000;
 
 function Label() {
   const { vessel } = useRow();
-  const staticFrame = useVesselStatic(vessel.mmsi);
   const timeRef = useRef<HTMLSpanElement | null>(null);
   const status = deriveVesselStatus(vessel);
   const speedSuffix =
     status === 'underway' && vessel.sog !== null ? ` · ${formatSog(vessel.sog)}` : '';
   const courseSuffix =
     status === 'underway' && vessel.cog !== null ? ` · ${formatCog(vessel.cog)}` : '';
-  const hasName = staticFrame !== null && staticFrame.vesselName.length > 0;
-  const title = hasName ? formatVesselName(staticFrame.vesselName) : String(vessel.mmsi);
-  const subtitle = hasName ? String(vessel.mmsi) : null;
 
   useEffect(() => {
     const node = timeRef.current;
@@ -207,13 +172,10 @@ function Label() {
   return (
     <span className={styles.body}>
       <span className={styles.titleRow}>
-        <span className={cn(styles.mmsi, hasName && 'font-sans tracking-normal')}>{title}</span>
+        <span className={styles.mmsi}>{vessel.mmsi}</span>
         <span ref={timeRef} className={styles.time} />
       </span>
       <span className={styles.statusLine}>
-        {subtitle !== null && (
-          <span className="text-muted-foreground/70 mr-1.5 font-mono text-xs">{subtitle}</span>
-        )}
         {STATUS_LABEL[status]}
         {speedSuffix}
         {courseSuffix}
@@ -259,22 +221,12 @@ function Actions() {
 
 function Details() {
   const { vessel, selected } = useRow();
-  const staticFrame = useVesselStatic(vessel.mmsi);
   if (!selected) return null;
   return (
     <div className={styles.detailGrid}>
-      {LIVE_DETAIL_FIELDS.map(field => (
+      {DETAIL_FIELDS.map(field => (
         <Field key={field.label} icon={field.icon} label={field.label} value={field.read(vessel)} />
       ))}
-      {staticFrame !== null &&
-        STATIC_DETAIL_FIELDS.map(field => (
-          <Field
-            key={field.label}
-            icon={field.icon}
-            label={field.label}
-            value={field.read(staticFrame)}
-          />
-        ))}
     </div>
   );
 }
