@@ -90,17 +90,17 @@ describe('smoothedDisplayPosition', () => {
   });
 
   it('keeps the original transition start when a new report arrives mid-lerp so burst updates do not stall the animation', () => {
-    const v1 = vessel({ mmsi: 7, lng: 14, lat: 53, timestampUnix: 1_000 });
+    const v1 = vessel({ lng: 14, lat: 53, timestampUnix: 1_000 });
     smoothedDisplayPosition(v1, 1_000, 0);
 
-    const v2 = vessel({ mmsi: 7, lng: 15, lat: 53, timestampUnix: 1_010, sog: 0 });
+    const v2 = vessel({ lng: 15, lat: 53, timestampUnix: 1_010, sog: 0 });
     smoothedDisplayPosition(v2, 1_010, 0);
 
-    const v3 = vessel({ mmsi: 7, lng: 16, lat: 53, timestampUnix: 1_011, sog: 0 });
+    const v3 = vessel({ lng: 16, lat: 53, timestampUnix: 1_011, sog: 0 });
     smoothedDisplayPosition(v3, 1_011, 500);
 
     // 1500ms after the FIRST transition started, displayed must reach the
-    // freshest target (16) — not a partially-lerped value caused by a
+    // freshest target (16), not a partially-lerped value caused by a
     // restart-from-stale-start that the previous implementation produced.
     const settled = smoothedDisplayPosition(v3, 1_011, 1_500);
     expect(settled?.lng).toBeCloseTo(16, 2);
