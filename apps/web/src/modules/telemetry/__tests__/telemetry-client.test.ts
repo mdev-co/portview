@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  type Imo,
+  type Mmsi,
+  type ShipTypeCode,
   SourceId,
   VESSEL_FLAG_HAS_FIX,
   VESSEL_FLAG_HAS_IDENTITY,
@@ -15,7 +18,7 @@ import { $vessels } from '../vessels.store';
 
 const POSITION_FRAME: VesselUpdateFrame = {
   messageType: 1,
-  mmsi: 261_345_678,
+  mmsi: 261_345_678 as Mmsi,
   sourceId: SourceId.AisStream,
   navStatus: 0,
   rateOfTurn: null,
@@ -31,11 +34,11 @@ const POSITION_FRAME: VesselUpdateFrame = {
 
 const VALID_STATIC: VesselStaticDataFrame = {
   kind: VESSEL_STATIC_FRAME_KIND,
-  mmsi: 261_345_678,
+  mmsi: 261_345_678 as Mmsi,
   vesselName: 'TRIESTE',
-  imo: 9_725_634,
+  imo: 9_725_634 as Imo,
   callSign: 'SXFG',
-  shipType: 70,
+  shipType: 70 as ShipTypeCode,
   dimensions: { toBow: 100, toStern: 80, toPort: 14, toStarboard: 14 },
   draught: 7.4,
   destination: 'GDYNIA',

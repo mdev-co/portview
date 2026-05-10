@@ -1,5 +1,12 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { SourceId, VESSEL_STATIC_FRAME_KIND, type VesselStaticDataFrame } from '@sps/shared';
+import {
+  type Imo,
+  type Mmsi,
+  type ShipTypeCode,
+  SourceId,
+  VESSEL_STATIC_FRAME_KIND,
+  type VesselStaticDataFrame,
+} from '@sps/shared';
 import type { LiveVessel } from '../types';
 import {
   $vesselStaticData,
@@ -11,11 +18,11 @@ import { $vessels, setVessel } from '../vessels.store';
 
 const FRAME: VesselStaticDataFrame = {
   kind: VESSEL_STATIC_FRAME_KIND,
-  mmsi: 261_345_678,
+  mmsi: 261_345_678 as Mmsi,
   vesselName: 'TRIESTE',
-  imo: 9_725_634,
+  imo: 9_725_634 as Imo,
   callSign: 'SXFG',
-  shipType: 70,
+  shipType: 70 as ShipTypeCode,
   dimensions: { toBow: 100, toStern: 80, toPort: 14, toStarboard: 14 },
   draught: 7.4,
   destination: 'GDYNIA',
@@ -44,13 +51,13 @@ describe('vessel-static store', () => {
   });
 
   it('merges Class B PartA followed by PartB into a complete record', () => {
-    const mmsi = 261_999_999;
+    const mmsi = 261_999_999 as Mmsi;
     const partA: VesselStaticDataFrame = {
       kind: 'vessel.static',
       mmsi,
       vesselName: 'WIATR PD',
       callSign: '',
-      shipType: 0,
+      shipType: 0 as ShipTypeCode,
       dimensions: null,
       imo: null,
       draught: null,
@@ -63,7 +70,7 @@ describe('vessel-static store', () => {
       mmsi,
       vesselName: '',
       callSign: 'SQABCD',
-      shipType: 36,
+      shipType: 36 as ShipTypeCode,
       dimensions: { toBow: 6, toStern: 3, toPort: 1, toStarboard: 1 },
       imo: null,
       draught: null,
@@ -83,13 +90,13 @@ describe('vessel-static store', () => {
   });
 
   it('merge order does not matter: PartB before PartA still yields the full record', () => {
-    const mmsi = 261_888_888;
+    const mmsi = 261_888_888 as Mmsi;
     const partA: VesselStaticDataFrame = {
       kind: 'vessel.static',
       mmsi,
       vesselName: 'NIETOPERZ',
       callSign: '',
-      shipType: 0,
+      shipType: 0 as ShipTypeCode,
       dimensions: null,
       imo: null,
       draught: null,
@@ -102,7 +109,7 @@ describe('vessel-static store', () => {
       mmsi,
       vesselName: '',
       callSign: 'SQXY',
-      shipType: 37,
+      shipType: 37 as ShipTypeCode,
       dimensions: { toBow: 4, toStern: 2, toPort: 1, toStarboard: 1 },
       imo: null,
       draught: null,
@@ -122,15 +129,15 @@ describe('vessel-static store', () => {
   });
 
   it('a full Class A type 5 frame replaces blank fields without dropping non-blank prev fields', () => {
-    const mmsi = 261_777_777;
+    const mmsi = 261_777_777 as Mmsi;
     setVesselStatic({
       kind: 'vessel.static',
       mmsi,
       vesselName: 'OLD NAME',
       callSign: 'OLDCS',
-      shipType: 70,
+      shipType: 70 as ShipTypeCode,
       dimensions: { toBow: 100, toStern: 80, toPort: 14, toStarboard: 14 },
-      imo: 9_111_111,
+      imo: 9_111_111 as Imo,
       draught: 7.4,
       destination: 'GDYNIA',
       eta: { month: 5, day: 12, hour: 14, minute: 30 },
@@ -141,9 +148,9 @@ describe('vessel-static store', () => {
       mmsi,
       vesselName: 'NEW NAME',
       callSign: 'NEWCS',
-      shipType: 80,
+      shipType: 80 as ShipTypeCode,
       dimensions: { toBow: 110, toStern: 90, toPort: 16, toStarboard: 16 },
-      imo: 9_222_222,
+      imo: 9_222_222 as Imo,
       draught: 8.0,
       destination: 'HAMBURG',
       eta: { month: 6, day: 1, hour: 8, minute: 0 },

@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { SourceId } from '@sps/shared';
+import { type Mmsi, SourceId } from '@sps/shared';
 import type { LiveVessel } from '../../../telemetry/types';
 import { interpolateVesselPosition } from '../dead-reckoning';
 
 function vessel(over: Partial<LiveVessel> = {}): LiveVessel {
   return {
-    mmsi: 261_000_000,
+    mmsi: 261_000_000 as Mmsi,
     messageType: 1,
     navStatus: 0,
     sourceId: SourceId.AisStream,

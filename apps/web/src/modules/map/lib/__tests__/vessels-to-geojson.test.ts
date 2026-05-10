@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  type Mmsi,
+  type ShipTypeCode,
   SourceId,
   VESSEL_FLAG_HAS_FIX,
   VESSEL_FLAG_HAS_IDENTITY,
@@ -13,10 +15,10 @@ import { vesselsToGeoJSON } from '../vessels-to-geojson';
 function staticFrame(over: Partial<VesselStaticDataFrame> = {}): VesselStaticDataFrame {
   return {
     kind: VESSEL_STATIC_FRAME_KIND,
-    mmsi: 261_345_678,
+    mmsi: 261_345_678 as Mmsi,
     vesselName: 'TEST',
     callSign: '',
-    shipType: 70,
+    shipType: 70 as ShipTypeCode,
     dimensions: null,
     imo: null,
     draught: null,
@@ -29,7 +31,7 @@ function staticFrame(over: Partial<VesselStaticDataFrame> = {}): VesselStaticDat
 
 function vessel(over: Partial<LiveVessel> = {}): LiveVessel {
   return {
-    mmsi: 261_345_678,
+    mmsi: 261_345_678 as Mmsi,
     messageType: 1,
     navStatus: 0,
     sourceId: SourceId.AisStream,
@@ -80,10 +82,10 @@ describe('vesselsToGeoJSON', () => {
   it('marks isMoving=true when IS_MOVING bit is set', () => {
     const collection = vesselsToGeoJSON({
       [261_111_111]: vessel({
-        mmsi: 261_111_111,
+        mmsi: 261_111_111 as Mmsi,
         flags: VESSEL_FLAG_HAS_FIX | VESSEL_FLAG_IS_MOVING,
       }),
-      [261_222_222]: vessel({ mmsi: 261_222_222, flags: VESSEL_FLAG_HAS_FIX }),
+      [261_222_222]: vessel({ mmsi: 261_222_222 as Mmsi, flags: VESSEL_FLAG_HAS_FIX }),
     });
     const a = collection.features.find(f => (f as { id: number }).id === 261_111_111) as {
       properties: { isMoving: boolean };
@@ -136,7 +138,7 @@ describe('vesselsToGeoJSON', () => {
   it('classifies a vessel by ship type when matching static data is provided', () => {
     const collection = vesselsToGeoJSON(
       { [261_345_678]: vessel() },
-      { [261_345_678]: staticFrame({ shipType: 80 }) },
+      { [261_345_678]: staticFrame({ shipType: 80 as ShipTypeCode }) },
     );
     const f = collection.features[0] as { properties: { category: string } };
     expect(f.properties.category).toBe('tanker');
@@ -145,7 +147,7 @@ describe('vesselsToGeoJSON', () => {
   it('falls back to other when the static record carries the AIS-default ship type 0', () => {
     const collection = vesselsToGeoJSON(
       { [261_345_678]: vessel() },
-      { [261_345_678]: staticFrame({ shipType: 0 }) },
+      { [261_345_678]: staticFrame({ shipType: 0 as ShipTypeCode }) },
     );
     const f = collection.features[0] as { properties: { category: string } };
     expect(f.properties.category).toBe('other');

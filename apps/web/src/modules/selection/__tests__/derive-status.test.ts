@@ -5,13 +5,14 @@ import {
   AIS_NAV_STATUS_MOORED,
   AIS_NAV_STATUS_NOT_UNDER_COMMAND,
   AIS_NAV_STATUS_UNDER_WAY_USING_ENGINE,
+  type Mmsi,
   SourceId,
 } from '@sps/shared';
 import { deriveVesselStatus } from '../lib/derive-status';
 
 function vessel(over: Partial<LiveVessel> = {}): LiveVessel {
   return {
-    mmsi: 261_000_000,
+    mmsi: 261_000_000 as Mmsi,
     messageType: 1,
     navStatus: AIS_NAV_STATUS_UNDER_WAY_USING_ENGINE,
     sourceId: SourceId.AisStream,
