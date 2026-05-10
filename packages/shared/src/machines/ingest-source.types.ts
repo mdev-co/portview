@@ -37,6 +37,7 @@ export type FrameRejectionReason =
   | 'unsupported-message-type'
   | 'invalid-mmsi'
   | 'invalid-imo'
+  | 'invalid-ship-type'
   | 'out-of-range-lat'
   | 'out-of-range-lng'
   | 'malformed-json'

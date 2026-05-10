@@ -19,6 +19,16 @@ export type Mmsi = Brand<number, 'Mmsi'>;
 export type Imo = Brand<number, 'Imo'>;
 
 /**
+ * AIS ITU-R M.1371-5 §3.3.8.3.5 ship type code. The wire field is 8
+ * bits, so any integer in 0..255 is valid at the protocol level even
+ * if the spec only assigns meaning to 0..99. Values 100..255 are
+ * upstream-reserved; we accept them at the parser boundary and let
+ * `shipTypeCategory` map them to `other`. The brand stops a raw
+ * `number` from flowing into APIs that expect a validated ship type.
+ */
+export type ShipTypeCode = Brand<number, 'ShipTypeCode'>;
+
+/**
  * Numeric identifier for the upstream source of an AIS frame. Numeric
  * values fit a single byte in binary WS frames, sort naturally as priority,
  * and provide stable column values for ML feature stores. Member order

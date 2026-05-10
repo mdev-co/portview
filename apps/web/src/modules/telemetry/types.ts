@@ -1,4 +1,4 @@
-import type { SourceId } from '@sps/shared';
+import type { Mmsi, SourceId } from '@sps/shared';
 
 /**
  * Live vessel as held in the Nano Stores hot-path map. Mirrors the
@@ -6,7 +6,7 @@ import type { SourceId } from '@sps/shared';
  * raw frame.
  */
 export type LiveVessel = {
-  readonly mmsi: number;
+  readonly mmsi: Mmsi;
   readonly messageType: number;
   readonly navStatus: number | null;
   readonly sourceId: SourceId;

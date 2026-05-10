@@ -23,6 +23,14 @@ export default tseslint.config(
   ...tseslint.configs.recommended,
   prettier,
   {
+    languageOptions: {
+      parserOptions: {
+        // Needed when multiple tsconfig roots exist (workspace + apps/*).
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+  },
+  {
     // Node globals for build/tooling files (scripts, config files)
     files: ['scripts/**/*.{js,mjs,cjs}', '*.config.{js,mjs,cjs}', '*.config.{ts,mts}'],
     languageOptions: { globals: globals.node },

@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { SourceId } from '@sps/shared';
+import { type Mmsi, SourceId } from '@sps/shared';
 import type { LiveVessel } from '../types';
 import { $vessels, __test, setVessel, vesselCount } from '../vessels.store';
 
 const FULL: LiveVessel = {
-  mmsi: 261_345_678,
+  mmsi: 261_345_678 as Mmsi,
   messageType: 1,
   navStatus: 0,
   sourceId: SourceId.AisStream,
@@ -19,7 +19,7 @@ const FULL: LiveVessel = {
 };
 
 const STATIC_DATA_NULL: LiveVessel = {
-  mmsi: 261_345_678,
+  mmsi: 261_345_678 as Mmsi,
   messageType: 5,
   navStatus: null,
   sourceId: SourceId.AisStream,
@@ -101,10 +101,10 @@ describe('vessels store sweepStale', () => {
 
   it('drops vessels older than the staleness threshold', () => {
     const now = 1_715_000_000;
-    const fresh: LiveVessel = { ...FULL, mmsi: 100, timestampUnix: now - 30 };
+    const fresh: LiveVessel = { ...FULL, mmsi: 100 as Mmsi, timestampUnix: now - 30 };
     const stale: LiveVessel = {
       ...FULL,
-      mmsi: 200,
+      mmsi: 200 as Mmsi,
       timestampUnix: now - __test.STALE_THRESHOLD_SECONDS - 5,
     };
     setVessel(fresh);
@@ -122,7 +122,7 @@ describe('vessels store sweepStale', () => {
     const now = 1_715_000_000;
     const onEdge: LiveVessel = {
       ...FULL,
-      mmsi: 300,
+      mmsi: 300 as Mmsi,
       timestampUnix: now - __test.STALE_THRESHOLD_SECONDS,
     };
     setVessel(onEdge);
@@ -132,7 +132,7 @@ describe('vessels store sweepStale', () => {
 
   it('is a no-op when no vessels are stale', () => {
     const now = 1_715_000_000;
-    setVessel({ ...FULL, mmsi: 400, timestampUnix: now - 10 });
+    setVessel({ ...FULL, mmsi: 400 as Mmsi, timestampUnix: now - 10 });
     const before = $vessels.get();
     __test.sweepStale(now);
     expect($vessels.get()).toBe(before);

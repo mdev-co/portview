@@ -1,0 +1,56 @@
+direction: down
+vars: {
+  d2-config: {
+    theme-id: 8
+    pad: 40
+  }
+}
+
+raw: "Raw upstream input\nNMEA bytes / AisStream JSON\n(unknown numeric values)" {
+  shape: hexagon
+}
+
+parsers: "@sps/shared/parsers + adapter\ndecodeStaticData / decodePositionReport / etc.\ncast: number as Mmsi / Imo / ShipTypeCode" {
+  shape: rectangle
+  style: {
+    fill: "#dbeafe"
+    stroke: "#1e40af"
+  }
+}
+
+ais_message: "AisMessage union\nmmsi: Mmsi  imo: Imo | null  shipType: ShipTypeCode" {
+  shape: cylinder
+  style: {
+    fill: "#fef3c7"
+    stroke: "#92400e"
+  }
+}
+
+validator: "validateAisMessage\nparseMmsi / parseImo\nrejects on invalid → DLQ" {
+  shape: rectangle
+  style: {
+    fill: "#dcfce7"
+    stroke: "#166534"
+  }
+}
+
+frame_builders: "frame-builder + static-builder\naccept branded fields\nproduce VesselUpdateFrame / VesselStaticDataFrame" {
+  shape: rectangle
+}
+
+wire: "Wire frames\nVesselUpdateFrame.mmsi: Mmsi\nVesselStaticDataFrame.{mmsi, imo, shipType}" {
+  shape: cylinder
+}
+
+fe: "FE consumers\nLiveVessel.mmsi: Mmsi\ntelemetry-client / vessel-static.store" {
+  shape: rectangle
+  icon: https://icons.terrastruct.com/dev%2Freact.svg
+}
+
+raw -> parsers: "raw bytes / unknown JSON"
+parsers -> ais_message: "branded at parser boundary"
+ais_message -> validator
+validator -> ais_message: "validated branded value\n(or DLQ rejection)"
+ais_message -> frame_builders
+frame_builders -> wire
+wire -> fe

@@ -1,3 +1,4 @@
+import type { Mmsi } from '../types/brands';
 import type { LngLat } from '../types/geo';
 import type { PositionReport } from '../types/vessel';
 import { BitReader, payloadToBits } from './ais-bits';
@@ -83,7 +84,7 @@ export function decodePositionReport(payload: string): PositionReport {
   return {
     messageType: messageType as 1 | 2 | 3,
     repeatIndicator,
-    mmsi,
+    mmsi: mmsi as Mmsi,
     navigationStatus,
     rateOfTurn,
     speedOverGround,

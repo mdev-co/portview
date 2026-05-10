@@ -1,3 +1,4 @@
+import type { Imo, Mmsi, ShipTypeCode } from './brands';
 import type { StaticDimensions, StaticEta } from './static-data';
 
 /**
@@ -18,11 +19,11 @@ export const VESSEL_STATIC_FRAME_KIND = 'vessel.static' as const;
  */
 export type VesselStaticDataFrame = {
   readonly kind: typeof VESSEL_STATIC_FRAME_KIND;
-  readonly mmsi: number;
+  readonly mmsi: Mmsi;
   readonly vesselName: string;
-  readonly imo: number | null;
+  readonly imo: Imo | null;
   readonly callSign: string;
-  readonly shipType: number;
+  readonly shipType: ShipTypeCode;
   readonly dimensions: StaticDimensions | null;
   readonly draught: number | null;
   readonly destination: string;
