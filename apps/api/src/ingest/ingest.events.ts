@@ -1,5 +1,10 @@
 import type { EventEmitter2 } from '@nestjs/event-emitter';
-import type { AisMessage, SourceId, StaticData } from '@sps/shared';
+import type {
+  AisMessage,
+  ClassBStaticData,
+  SourceId,
+  StaticData,
+} from '@sps/shared';
 
 /**
  * Event names published on the in-process EventEmitter2 bus by
@@ -19,12 +24,15 @@ export type VesselUpdateEvent = {
 };
 
 /**
- * Payload for static-data updates (AIS type 5). Carried on a separate
- * event because the binary 40-byte frame codec cannot represent strings;
- * the gateway serialises this to a JSON text frame instead.
+ * Payload for static-data updates - AIS type 5 (Class A) or type 24
+ * (Class B PartA / PartB). Carried on a separate event because the
+ * binary 40-byte frame codec cannot represent strings; the gateway
+ * serialises this to a JSON text frame instead. The wire frame is the
+ * same `VesselStaticDataFrame` shape for both types - Class B leaves
+ * imo, eta, destination, draught as null/empty.
  */
 export type VesselStaticEvent = {
-  readonly message: StaticData;
+  readonly message: StaticData | ClassBStaticData;
   readonly sourceId: SourceId;
   readonly receivedAt: number;
 };

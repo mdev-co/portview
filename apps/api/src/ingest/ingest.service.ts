@@ -231,7 +231,10 @@ export class IngestService implements OnModuleInit, OnModuleDestroy {
             sourceId: source.id,
             receivedAt: frame.receivedAt,
           });
-          if (outcome.value.messageType === 5) {
+          if (
+            outcome.value.messageType === 5 ||
+            outcome.value.messageType === 24
+          ) {
             publishVesselStatic(this.eventBus, {
               message: outcome.value,
               sourceId: source.id,
@@ -326,7 +329,10 @@ export class IngestService implements OnModuleInit, OnModuleDestroy {
       sourceId: source.id,
       receivedAt,
     });
-    if (validation.value.messageType === 5) {
+    if (
+      validation.value.messageType === 5 ||
+      validation.value.messageType === 24
+    ) {
       publishVesselStatic(this.eventBus, {
         message: validation.value,
         sourceId: source.id,

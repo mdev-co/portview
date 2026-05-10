@@ -1,4 +1,5 @@
 import {
+  type ClassBStaticData,
   SourceId,
   VESSEL_STATIC_FRAME_KIND,
   type StaticData,
@@ -72,5 +73,101 @@ describe('buildVesselStaticFrame', () => {
     );
     expect(frame.draught).toBeNull();
     expect(frame.imo).toBeNull();
+  });
+});
+
+const CLASS_B_PART_A: ClassBStaticData = {
+  messageType: 24,
+  repeatIndicator: 0,
+  mmsi: 261_999_999,
+  partNumber: 0,
+  vesselName: 'WIATR PD',
+  callSign: '',
+  shipType: 0,
+  dimensions: null,
+  vendorId: '',
+  mothershipMmsi: null,
+};
+
+const CLASS_B_PART_B: ClassBStaticData = {
+  messageType: 24,
+  repeatIndicator: 0,
+  mmsi: 261_999_999,
+  partNumber: 1,
+  vesselName: '',
+  callSign: 'SQABCD',
+  shipType: 36,
+  dimensions: { toBow: 6, toStern: 3, toPort: 1, toStarboard: 1 },
+  vendorId: 'GAR',
+  mothershipMmsi: null,
+};
+
+describe('buildVesselStaticFrame for Class B (type 24)', () => {
+  it('PartA produces a frame with vesselName populated and Class A fields nulled out', () => {
+    const frame = buildVesselStaticFrame({
+      message: CLASS_B_PART_A,
+      sourceId: SourceId.AisStream,
+      receivedAt: RECEIVED_AT,
+    });
+
+    expect(frame.vesselName).toBe('WIATR PD');
+    expect(frame.callSign).toBe('');
+    expect(frame.shipType).toBe(0);
+    expect(frame.dimensions).toBeNull();
+    expect(frame.imo).toBeNull();
+    expect(frame.draught).toBeNull();
+    expect(frame.destination).toBe('');
+    expect(frame.eta).toEqual({
+      month: null,
+      day: null,
+      hour: null,
+      minute: null,
+    });
+    expect(frame.kind).toBe(VESSEL_STATIC_FRAME_KIND);
+  });
+
+  it('PartB produces a frame with callSign and dimensions populated and name empty', () => {
+    const frame = buildVesselStaticFrame({
+      message: CLASS_B_PART_B,
+      sourceId: SourceId.AisStream,
+      receivedAt: RECEIVED_AT,
+    });
+
+    expect(frame.vesselName).toBe('');
+    expect(frame.callSign).toBe('SQABCD');
+    expect(frame.shipType).toBe(36);
+    expect(frame.dimensions).toEqual({
+      toBow: 6,
+      toStern: 3,
+      toPort: 1,
+      toStarboard: 1,
+    });
+    expect(frame.imo).toBeNull();
+    expect(frame.draught).toBeNull();
+    expect(frame.destination).toBe('');
+  });
+
+  it('Class B always leaves IMO, draught, destination and eta unset (Class B has no voyage data)', () => {
+    const partA = buildVesselStaticFrame({
+      message: CLASS_B_PART_A,
+      sourceId: SourceId.AisStream,
+      receivedAt: RECEIVED_AT,
+    });
+    const partB = buildVesselStaticFrame({
+      message: CLASS_B_PART_B,
+      sourceId: SourceId.AisStream,
+      receivedAt: RECEIVED_AT,
+    });
+    for (const frame of [partA, partB]) {
+      expect(frame.imo).toBeNull();
+      expect(frame.draught).toBeNull();
+      expect(frame.destination).toBe('');
+      expect(frame.eta).toEqual({
+        month: null,
+        day: null,
+        hour: null,
+        minute: null,
+      });
+    }
   });
 });
