@@ -332,16 +332,24 @@ export class IngestService implements OnModuleInit, OnModuleDestroy {
       sourceId: source.id,
       frameAt: receivedAt,
     });
-    publishVesselUpdate(this.eventBus, {
-      message: validation.value,
-      sourceId: source.id,
-      receivedAt,
-    });
+    // Static-only AIS messages (type 5 / 24) carry no position and
+    // would build a binary VesselUpdateFrame with flags=0 (no
+    // HAS_FIX). On the FE that frame would either drop the marker
+    // (no prior record) or strip HAS_FIX off an existing one
+    // (prior position frame); the static payload is already
+    // delivered separately via VESSEL_STATIC_EVENT, so the binary
+    // channel publishes only position-bearing message types.
     if (
       validation.value.messageType === 5 ||
       validation.value.messageType === 24
     ) {
       publishVesselStatic(this.eventBus, {
+        message: validation.value,
+        sourceId: source.id,
+        receivedAt,
+      });
+    } else {
+      publishVesselUpdate(this.eventBus, {
         message: validation.value,
         sourceId: source.id,
         receivedAt,
