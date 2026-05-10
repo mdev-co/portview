@@ -1,6 +1,6 @@
 export { createLogger, type AppLogger, type CreateLoggerOptions } from './logger';
 
-export { type Mmsi, type Imo, SourceId, sourceIdName } from './types/brands';
+export { type Mmsi, type Imo, type ShipTypeCode, SourceId, sourceIdName } from './types/brands';
 
 export {
   AIS_NAV_STATUS_UNDER_WAY_USING_ENGINE,
@@ -53,6 +53,8 @@ export {
   parseMmsi,
   isValidImo,
   parseImo,
+  isValidShipType,
+  parseShipType,
   isValidLatLng,
   validateLatLng,
   validateAisMessage,
@@ -117,6 +119,12 @@ export {
   NotClassBPositionError,
   ClassBPositionTooShortError,
 } from './parsers/ais-class-b-position';
+
+export {
+  decodeClassBStaticData,
+  NotClassBStaticError,
+  ClassBStaticTooShortError,
+} from './parsers/ais-class-b-static';
 
 export { type AivdmEnvelope, AivdmParseError, parseAivdmEnvelope } from './parsers/aivdm-envelope';
 

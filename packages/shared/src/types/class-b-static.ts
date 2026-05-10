@@ -1,3 +1,4 @@
+import type { Mmsi, ShipTypeCode } from './brands';
 import type { StaticDimensions } from './static-data';
 
 /**
@@ -33,12 +34,12 @@ export type ClassBStaticPart = typeof CLASS_B_STATIC_PART_A | typeof CLASS_B_STA
 export type ClassBStaticData = {
   readonly messageType: 24;
   readonly repeatIndicator: number;
-  readonly mmsi: number;
+  readonly mmsi: Mmsi;
   readonly partNumber: ClassBStaticPart;
   readonly vesselName: string;
   readonly callSign: string;
-  readonly shipType: number;
+  readonly shipType: ShipTypeCode;
   readonly dimensions: StaticDimensions | null;
   readonly vendorId: string;
-  readonly mothershipMmsi: number | null;
+  readonly mothershipMmsi: Mmsi | null;
 };

@@ -7,6 +7,7 @@ import {
   BitReader,
   type RejectReason,
   decodeClassBPositionReport,
+  decodeClassBStaticData,
   decodePositionReport,
   decodeStaticData,
   parseAivdmEnvelope,
@@ -124,6 +125,9 @@ export class Decoder {
           break;
         case 18:
           message = decodeClassBPositionReport(assembled.payload);
+          break;
+        case 24:
+          message = decodeClassBStaticData(assembled.payload);
           break;
         default:
           return {

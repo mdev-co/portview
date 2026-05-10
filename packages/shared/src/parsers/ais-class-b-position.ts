@@ -1,3 +1,4 @@
+import type { Mmsi } from '../types/brands';
 import type { ClassBPositionReport } from '../types/class-b-position';
 import type { LngLat } from '../types/geo';
 import { BitReader, payloadToBits } from './ais-bits';
@@ -87,7 +88,7 @@ export function decodeClassBPositionReport(payload: string): ClassBPositionRepor
   return {
     messageType: CLASS_B_MESSAGE_TYPE,
     repeatIndicator,
-    mmsi,
+    mmsi: mmsi as Mmsi,
     speedOverGround,
     positionAccuracy,
     position,

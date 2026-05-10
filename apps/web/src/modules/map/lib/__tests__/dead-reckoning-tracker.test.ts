@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { SourceId } from '@sps/shared';
+import { type Mmsi, SourceId } from '@sps/shared';
 import type { LiveVessel } from '../../../telemetry/types';
 import {
   __resetTrackerForTests,
@@ -9,7 +9,7 @@ import {
 
 function vessel(over: Partial<LiveVessel> = {}): LiveVessel {
   return {
-    mmsi: 261_000_000,
+    mmsi: 261_000_000 as Mmsi,
     messageType: 1,
     navStatus: 0,
     sourceId: SourceId.AisStream,
@@ -36,10 +36,10 @@ describe('smoothedDisplayPosition', () => {
   });
 
   it('lerps from previous displayed to new target across the transition window', () => {
-    const v1 = vessel({ mmsi: 1, lng: 14, lat: 53, timestampUnix: 1_000 });
+    const v1 = vessel({ mmsi: 1 as Mmsi, lng: 14, lat: 53, timestampUnix: 1_000 });
     smoothedDisplayPosition(v1, 1_000, 0);
 
-    const v2 = vessel({ mmsi: 1, lng: 15, lat: 53, timestampUnix: 1_010, sog: 0 });
+    const v2 = vessel({ mmsi: 1 as Mmsi, lng: 15, lat: 53, timestampUnix: 1_010, sog: 0 });
     smoothedDisplayPosition(v2, 1_010, 0);
 
     const halfway = smoothedDisplayPosition(v2, 1_010, 750);
@@ -51,7 +51,7 @@ describe('smoothedDisplayPosition', () => {
 
   it('keeps following dead-reckoning target after transition ends', () => {
     const v1 = vessel({
-      mmsi: 2,
+      mmsi: 2 as Mmsi,
       lng: 14,
       lat: 53,
       sog: 10,
@@ -70,7 +70,7 @@ describe('smoothedDisplayPosition', () => {
 
   it('snaps displayed position to current target after a long tick gap (paused frame loop)', () => {
     const v1 = vessel({
-      mmsi: 9,
+      mmsi: 9 as Mmsi,
       lng: 14,
       lat: 53,
       sog: 10,
@@ -90,11 +90,15 @@ describe('smoothedDisplayPosition', () => {
   });
 
   it('pruneTrackerState drops state for MMSIs not in the active set', () => {
-    smoothedDisplayPosition(vessel({ mmsi: 100 }), 1_000, 0);
-    smoothedDisplayPosition(vessel({ mmsi: 200 }), 1_000, 0);
+    smoothedDisplayPosition(vessel({ mmsi: 100 as Mmsi }), 1_000, 0);
+    smoothedDisplayPosition(vessel({ mmsi: 200 as Mmsi }), 1_000, 0);
     pruneTrackerState(new Set([200]));
-    smoothedDisplayPosition(vessel({ mmsi: 100, lng: 99, lat: 99 }), 1_000, 0);
-    const result = smoothedDisplayPosition(vessel({ mmsi: 100, lng: 99, lat: 99 }), 1_000, 0);
+    smoothedDisplayPosition(vessel({ mmsi: 100 as Mmsi, lng: 99, lat: 99 }), 1_000, 0);
+    const result = smoothedDisplayPosition(
+      vessel({ mmsi: 100 as Mmsi, lng: 99, lat: 99 }),
+      1_000,
+      0,
+    );
     expect(result).toEqual({ lng: 99, lat: 99 });
   });
 });

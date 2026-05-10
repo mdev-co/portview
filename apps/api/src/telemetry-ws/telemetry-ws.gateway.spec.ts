@@ -1,5 +1,8 @@
 import {
   type AisMessage,
+  type Imo,
+  type Mmsi,
+  type ShipTypeCode,
   SourceId,
   type StaticData,
   VESSEL_FRAME_BYTES,
@@ -35,7 +38,7 @@ function makeClient(overrides: Partial<FakeClient> = {}): FakeClient {
 const POSITION: AisMessage = {
   messageType: 1,
   repeatIndicator: 0,
-  mmsi: 261_345_678,
+  mmsi: 261_345_678 as Mmsi,
   navigationStatus: 0,
   rateOfTurn: null,
   speedOverGround: 10,
@@ -131,12 +134,12 @@ describe('TelemetryWsGateway.onVesselUpdate', () => {
 const STATIC_MESSAGE: StaticData = {
   messageType: 5,
   repeatIndicator: 0,
-  mmsi: 261_345_678,
+  mmsi: 261_345_678 as Mmsi,
   aisVersion: 0,
-  imo: 9_725_634,
+  imo: 9_725_634 as Imo,
   callSign: 'SXFG',
   vesselName: 'TRIESTE',
-  shipType: 70,
+  shipType: 70 as ShipTypeCode,
   dimensions: { toBow: 100, toStern: 80, toPort: 14, toStarboard: 14 },
   epfdType: 0,
   eta: { month: 5, day: 12, hour: 14, minute: 30 },

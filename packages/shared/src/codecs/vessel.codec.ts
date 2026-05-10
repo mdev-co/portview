@@ -1,4 +1,4 @@
-import type { SourceId } from '../types/brands';
+import type { Mmsi, SourceId } from '../types/brands';
 import { LeDataView } from './le-data-view';
 
 /**
@@ -58,7 +58,7 @@ const HEADING_UNKNOWN = 0xffff;
 
 export type VesselUpdateFrame = {
   readonly messageType: number;
-  readonly mmsi: number;
+  readonly mmsi: Mmsi;
   readonly navStatus: number | null;
   readonly sourceId: SourceId;
   readonly rateOfTurn: number | null;
@@ -114,7 +114,7 @@ export function decodeVesselFrame(bytes: Uint8Array): VesselUpdateFrame {
     navStatus: navStatusRaw === NAV_STATUS_UNKNOWN ? null : navStatusRaw,
     sourceId: view.getU8(OFFSET_SOURCE_ID) as SourceId,
     rateOfTurn: rateOfTurnRaw === RATE_OF_TURN_UNKNOWN ? null : rateOfTurnRaw,
-    mmsi: view.getU32(OFFSET_MMSI),
+    mmsi: view.getU32(OFFSET_MMSI) as Mmsi,
     lng: Number.isNaN(lngRaw) ? null : lngRaw,
     lat: Number.isNaN(latRaw) ? null : latRaw,
     sog: Number.isNaN(sogRaw) ? null : sogRaw,

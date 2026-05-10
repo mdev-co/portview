@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SourceId } from '../../types/brands';
+import { type Mmsi, SourceId } from '../../types/brands';
 import { LeDataView } from '../le-data-view';
 import {
   VESSEL_FLAG_HAS_FIX,
@@ -13,7 +13,7 @@ import {
 
 const FULL: VesselUpdateFrame = {
   messageType: 1,
-  mmsi: 261_345_678,
+  mmsi: 261_345_678 as Mmsi,
   navStatus: 0,
   sourceId: SourceId.LocalUdp,
   rateOfTurn: 12,
