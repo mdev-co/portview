@@ -17,7 +17,7 @@ import { type Actor, createActor } from 'xstate';
 import { adaptAisStreamMessage } from './adapters/ais-stream.adapter';
 import { Decoder } from './decoder';
 import { DeadLetterWriter } from './dlq';
-import { publishVesselUpdate } from './ingest.events';
+import { publishVesselStatic, publishVesselUpdate } from './ingest.events';
 import { AisStreamSource } from './sources/ais-stream.source';
 import { LocalUdpSource } from './sources/local-udp.source';
 import { WebSdrSource } from './sources/web-sdr.source';
@@ -231,6 +231,13 @@ export class IngestService implements OnModuleInit, OnModuleDestroy {
             sourceId: source.id,
             receivedAt: frame.receivedAt,
           });
+          if (outcome.value.messageType === 5) {
+            publishVesselStatic(this.eventBus, {
+              message: outcome.value,
+              sourceId: source.id,
+              receivedAt: frame.receivedAt,
+            });
+          }
           break;
         case 'pending':
           break;
@@ -319,6 +326,13 @@ export class IngestService implements OnModuleInit, OnModuleDestroy {
       sourceId: source.id,
       receivedAt,
     });
+    if (validation.value.messageType === 5) {
+      publishVesselStatic(this.eventBus, {
+        message: validation.value,
+        sourceId: source.id,
+        receivedAt,
+      });
+    }
   }
 
   private logStateTransition(state: string, sourceId: SourceId | null): void {
