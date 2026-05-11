@@ -10,6 +10,7 @@ import {
   type VesselUpdateEvent,
 } from '../ingest/ingest.events';
 import { buildVesselFrame } from './frame-builder';
+import { SnapshotBuilder } from './snapshot-builder';
 import { buildVesselStaticFrame } from './static-builder';
 
 /** 1 MB - drop the slowest clients before the kernel buffer grows unbounded. */
@@ -40,6 +41,8 @@ export class TelemetryWsGateway {
 
   @WebSocketServer() server!: WsServer;
 
+  constructor(private readonly snapshotBuilder: SnapshotBuilder) {}
+
   handleConnection(client: WebSocket): void {
     client.binaryType = 'arraybuffer';
     client.on('message', () => {
@@ -50,6 +53,19 @@ export class TelemetryWsGateway {
       this.log.warn(`client error: ${err.message}`);
     });
     this.log.log('client connected');
+    // Send the cold-start snapshot before live events start flowing.
+    // Failures are logged but never close the connection - the client
+    // will simply receive only live frames and rebuild state over time.
+    void this.sendSnapshot(client).catch((err) => {
+      this.log.warn(`snapshot send failed: ${String(err)}`);
+    });
+  }
+
+  private async sendSnapshot(client: WebSocket): Promise<void> {
+    if (client.readyState !== WebSocket.OPEN) return;
+    const frame = await this.snapshotBuilder.build();
+    if (client.readyState !== WebSocket.OPEN) return;
+    client.send(JSON.stringify(frame), { binary: false });
   }
 
   handleDisconnect(): void {

@@ -5,6 +5,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { IngestModule } from './ingest/ingest.module';
+import { PersistenceModule } from './persistence/persistence.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { TelemetryWsModule } from './telemetry-ws/telemetry-ws.module';
 
@@ -24,6 +25,7 @@ import { TelemetryWsModule } from './telemetry-ws/telemetry-ws.module';
     }),
     PrismaModule,
     IngestModule,
+    PersistenceModule,
     TelemetryWsModule,
   ],
   controllers: [AppController],

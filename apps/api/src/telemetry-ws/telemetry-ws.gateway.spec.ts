@@ -68,7 +68,14 @@ describe('TelemetryWsGateway.onVesselUpdate', () => {
   let clients: Set<FakeClient>;
 
   beforeEach(() => {
-    gateway = new TelemetryWsGateway();
+    gateway = new TelemetryWsGateway({
+      build: () =>
+        Promise.resolve({
+          kind: 'vessel.snapshot',
+          serverTimeUnix: 0,
+          vessels: [],
+        }),
+    } as unknown as ConstructorParameters<typeof TelemetryWsGateway>[0]);
     clients = new Set();
     // server is `WebSocketServer` which exposes a `clients` Set; we
     // only read that Set in the handler so a minimal stand-in is enough.
@@ -164,7 +171,14 @@ describe('TelemetryWsGateway.onVesselStatic', () => {
   let clients: Set<FakeClient>;
 
   beforeEach(() => {
-    gateway = new TelemetryWsGateway();
+    gateway = new TelemetryWsGateway({
+      build: () =>
+        Promise.resolve({
+          kind: 'vessel.snapshot',
+          serverTimeUnix: 0,
+          vessels: [],
+        }),
+    } as unknown as ConstructorParameters<typeof TelemetryWsGateway>[0]);
     clients = new Set();
     (gateway as unknown as { server: { clients: Set<FakeClient> } }).server = {
       clients,
