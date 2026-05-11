@@ -2,12 +2,14 @@ import {
   type ShipTypeCategory,
   VESSEL_FLAG_HAS_FIX,
   VESSEL_FLAG_IS_MOVING,
+  type VesselKalmanState,
   type VesselStaticDataFrame,
   shipTypeCategory,
 } from '@sps/shared';
 import type { LiveVessel } from '../../telemetry/types';
 import type { GeoJSONFeatureCollection } from '../core/map-engine.types';
-import { pruneTrackerState, smoothedDisplayPosition } from './dead-reckoning-tracker';
+import { pruneTrackerState } from './dead-reckoning-tracker';
+import { getVesselDisplayPosition } from './vessel-display-position';
 
 type VesselFeatureProperties = {
   readonly mmsi: number;
@@ -58,6 +60,7 @@ export function vesselsToGeoJSON(
   staticData: Readonly<Record<number, VesselStaticDataFrame>> = {},
   selectedMmsi: number | null = null,
   nowSeconds: number = Math.floor(Date.now() / 1_000),
+  kalmanStates: Readonly<Record<number, VesselKalmanState>> = {},
 ): GeoJSONFeatureCollection {
   const features: VesselFeature[] = [];
   const activeMmsis = new Set<number>();
@@ -66,7 +69,9 @@ export function vesselsToGeoJSON(
     if (vessel === undefined) continue;
     const hasFix = (vessel.flags & VESSEL_FLAG_HAS_FIX) !== 0;
     if (!hasFix) continue;
-    const position = smoothedDisplayPosition(vessel, nowSeconds);
+    // Single source of truth for the marker position so the sidebar
+    // zoom button and the render path cannot disagree.
+    const position = getVesselDisplayPosition(vessel, kalmanStates[vessel.mmsi], nowSeconds);
     if (position === null) continue;
     activeMmsis.add(vessel.mmsi);
     const isMoving = (vessel.flags & VESSEL_FLAG_IS_MOVING) !== 0;

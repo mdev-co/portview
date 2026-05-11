@@ -1,16 +1,24 @@
 import { useEffect } from 'react';
 import { $selectedMmsi, clearSelection, selectVessel } from '@/modules/selection';
-import { $vesselStaticData, $vessels } from '@/modules/telemetry';
+import {
+  $vesselKalmanState,
+  $vesselPositionHistory,
+  $vesselStaticData,
+  $vessels,
+} from '@/modules/telemetry';
 import type { MapLayerMouseEvent, MapMouseEvent, Map as MaplibreMap } from 'maplibre-gl';
 import { useMapEngine } from '../hooks/use-map-engine';
 import { useMapState } from '../hooks/use-map-state';
+import { trailsToGeoJSON } from '../lib/trails-to-geojson';
 import { ensureVesselArrowIcon } from '../lib/vessel-arrow-icon';
 import { vesselsToGeoJSON } from '../lib/vessels-to-geojson';
+import { $trailVisibilityPredicate } from '../state/trail-visibility';
 import {
   VESSEL_ARROW_LAYER_ID,
   VESSEL_LABEL_LAYER_ID,
   VESSEL_LAYER_ID,
   VESSEL_SOURCE_ID,
+  VESSEL_TRAIL_SOURCE_ID,
 } from '../styles/osm-raster-style';
 
 const VESSEL_INTERACTIVE_LAYERS = [VESSEL_LAYER_ID, VESSEL_ARROW_LAYER_ID, VESSEL_LABEL_LAYER_ID];
@@ -44,9 +52,27 @@ export function VesselLayer(): null {
     }
 
     const render = (): void => {
+      const vessels = $vessels.get();
+      const staticData = $vesselStaticData.get();
+      const selectedMmsi = $selectedMmsi.get();
+      const kalmanStates = $vesselKalmanState.get();
+      const nowSeconds = Math.floor(Date.now() / 1_000);
       controller.setSourceData(
         VESSEL_SOURCE_ID,
-        vesselsToGeoJSON($vessels.get(), $vesselStaticData.get(), $selectedMmsi.get()),
+        vesselsToGeoJSON(vessels, staticData, selectedMmsi, nowSeconds, kalmanStates),
+      );
+      // Trails source is rebuilt at the same cadence so live position
+      // appends and selection changes show up on the polyline without
+      // a separate tick. Visibility predicate combines selection,
+      // global show-all toggle and the per-vessel disable set.
+      controller.setSourceData(
+        VESSEL_TRAIL_SOURCE_ID,
+        trailsToGeoJSON(
+          $vesselPositionHistory.get(),
+          staticData,
+          selectedMmsi,
+          $trailVisibilityPredicate.get(),
+        ),
       );
     };
 
@@ -62,12 +88,16 @@ export function VesselLayer(): null {
     const unsubscribePosition = $vessels.listen(render);
     const unsubscribeStatic = $vesselStaticData.listen(render);
     const unsubscribeSelection = $selectedMmsi.listen(render);
+    const unsubscribeHistory = $vesselPositionHistory.listen(render);
+    const unsubscribeTrailVisibility = $trailVisibilityPredicate.listen(render);
 
     return () => {
       window.cancelAnimationFrame(rafId);
       unsubscribePosition();
       unsubscribeStatic();
       unsubscribeSelection();
+      unsubscribeHistory();
+      unsubscribeTrailVisibility();
     };
   }, [controller, status]);
 

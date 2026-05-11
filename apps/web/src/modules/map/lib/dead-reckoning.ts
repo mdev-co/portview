@@ -1,25 +1,29 @@
 import type { LiveVessel } from '../../telemetry/types';
 
 const MOVING_SOG_THRESHOLD_KN = 0.5;
+
 /**
- * Beyond this staleness, the marker freezes at the exact last reported
- * position. 90s = one Class B reporting cycle (~30s underway) plus 30s
- * tolerance. Class A reports every 2-10s underway so freezing at 90s
- * still keeps fresh vessels animating; for stale ones we trust the
- * last fix over an extrapolation that has been observed to drift
- * hundreds of meters off-water. Matches MarineTraffic / VesselFinder.
+ * Conservative dead-reckoning window. After this many seconds without
+ * a new report the marker freezes on the last raw fix; the operator
+ * sees a stale-fix indicator instead of a synthesised path.
  */
-const MAX_REASONABLE_DELTA_SEC = 90;
+const MAX_REASONABLE_DELTA_SEC = 60;
+
 /**
- * Hard distance cap on extrapolation within the freshness window.
- * 90s freeze alone is not enough: at 14 kn × 60s × damping(0.87) the
- * damped projection still reaches ~376m and observed Class B vessels
- * near Kolobrzeg / Szczecin shorelines drift onto land between report
- * cycles. 200m roughly matches the width of a working port basin and
- * keeps the marker on the navigable side of any river bank we monitor.
+ * Hard distance cap on projected displacement. 30 m comfortably fits
+ * inside Szczecin port channels (~100 m+ wide) so a vessel cannot be
+ * pushed onto land by extrapolation even at full speed. A previous
+ * 200 m cap was wide enough to clear narrow channels by mistake.
  */
-const MAX_EXTRAPOLATION_METERS = 200;
-const VELOCITY_HALF_LIFE_SEC = 300;
+const MAX_EXTRAPOLATION_METERS = 30;
+
+/**
+ * Velocity damping half-life. After 30 s the projected speed is half
+ * the reported SOG; the filter rapidly converges to the raw fix
+ * rather than racing the vessel forward.
+ */
+const VELOCITY_HALF_LIFE_SEC = 30;
+
 const KNOTS_TO_M_PER_S = 0.5144;
 const METERS_PER_DEG_LAT = 111_000;
 
@@ -28,18 +32,21 @@ export type InterpolatedPosition = {
   readonly lat: number;
 };
 
-/**
- * Confidence factor applied within the freshness window
- * (delta < MAX_REASONABLE_DELTA_SEC). Half-life 300s, so within the
- * 90s window damping varies smoothly from 1.0 (fresh) to ~0.81 (90s).
- * Beyond the window we freeze at the last fix, so the half-life
- * matters only for in-window animation, not for the stale tail.
- */
 function velocityDampingFactor(deltaSec: number): number {
   if (deltaSec <= 0) return 1;
   return Math.pow(0.5, deltaSec / VELOCITY_HALF_LIFE_SEC);
 }
 
+/**
+ * Conservative dead-reckoning. Between AIS reports the marker drifts
+ * forward by `sog * dt * damping`, capped at MAX_EXTRAPOLATION_METERS.
+ * Outside the freshness window the marker holds at the last raw fix.
+ *
+ * The cap is the safety net: even a 20 kn vessel cannot project more
+ * than 30 m off its last fix, well within the width of any port
+ * channel the map shows. The freshness window is short (60 s) so a
+ * stale fix becomes a frozen marker quickly, not a wandering one.
+ */
 export function interpolateVesselPosition(
   vessel: LiveVessel,
   nowSeconds: number,

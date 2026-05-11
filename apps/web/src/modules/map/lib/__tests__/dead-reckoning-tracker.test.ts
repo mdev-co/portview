@@ -49,7 +49,7 @@ describe('smoothedDisplayPosition', () => {
     expect(settled?.lng).toBeCloseTo(15, 2);
   });
 
-  it('keeps following dead-reckoning target after transition ends', () => {
+  it('projects a small displacement forward through the freshness window', () => {
     const v1 = vessel({
       mmsi: 2 as Mmsi,
       lng: 14,
@@ -60,7 +60,12 @@ describe('smoothedDisplayPosition', () => {
     });
     smoothedDisplayPosition(v1, 1_000, 0);
     const later = smoothedDisplayPosition(v1, 1_005, 5_000);
-    expect(later?.lng).toBeGreaterThan(14);
+    if (!later) throw new Error('expected position');
+    // Conservative extrapolation (30 m cap, 30 s half life): some
+    // forward displacement, but well within port-channel widths.
+    expect(later.lng).toBeGreaterThan(14);
+    const lngDeltaMeters = (later.lng - 14) * 111_000 * Math.cos((53 * Math.PI) / 180);
+    expect(lngDeltaMeters).toBeLessThanOrEqual(30.5);
   });
 
   it('returns null when interpolated position is null', () => {
@@ -68,7 +73,7 @@ describe('smoothedDisplayPosition', () => {
     expect(result).toBeNull();
   });
 
-  it('snaps displayed position to current target after a long tick gap (paused frame loop)', () => {
+  it('snaps to current target after a long tick gap (paused frame loop)', () => {
     const v1 = vessel({
       mmsi: 9 as Mmsi,
       lng: 14,
@@ -79,14 +84,14 @@ describe('smoothedDisplayPosition', () => {
     });
     smoothedDisplayPosition(v1, 1_000, 0);
     smoothedDisplayPosition(v1, 1_001, 100);
-    // Simulate a 2-second pause (tab background, map pan, GC)
+    // Simulate a 2-second pause (tab background, map pan, GC).
     const afterPause = smoothedDisplayPosition(v1, 1_003, 2_100);
     if (!afterPause) throw new Error('expected position');
-    // Should match the dead-reckoning target at t=3, not torpedo forward
-    // by 2 seconds of accumulated frame work.
-    const stillFollowing = smoothedDisplayPosition(v1, 1_004, 2_120);
-    expect(stillFollowing).not.toBeNull();
+    // Marker should sit at the (small) projected position for the
+    // current time, not torpedo forward by the accumulated frame gap.
     expect(afterPause.lng).toBeGreaterThan(14);
+    const lngDeltaMeters = (afterPause.lng - 14) * 111_000 * Math.cos((53 * Math.PI) / 180);
+    expect(lngDeltaMeters).toBeLessThanOrEqual(30.5);
   });
 
   it('keeps the original transition start when a new report arrives mid-lerp so burst updates do not stall the animation', () => {

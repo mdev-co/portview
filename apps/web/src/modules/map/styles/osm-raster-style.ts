@@ -7,6 +7,8 @@ export const VESSEL_LAYER_ID = 'vessels-circles';
 export const VESSEL_ARROW_LAYER_ID = 'vessels-arrows';
 export const VESSEL_LABEL_LAYER_ID = 'vessels-labels';
 export const VESSEL_ARROW_ICON_ID = 'vessel-arrow';
+export const VESSEL_TRAIL_SOURCE_ID = 'vessel-trails';
+export const VESSEL_TRAIL_LAYER_ID = 'vessels-trails';
 
 const categoryMatchPairs: string[] = SHIP_TYPE_CATEGORIES.flatMap(c => [
   c,
@@ -102,12 +104,33 @@ export const osmRasterStyle: StyleSpecification = {
       type: 'geojson',
       data: { type: 'FeatureCollection', features: [] },
     },
+    [VESSEL_TRAIL_SOURCE_ID]: {
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: [] },
+    },
   },
   layers: [
     {
       id: 'osm-tiles',
       type: 'raster',
       source: 'osm',
+    },
+    // Trail layer renders the last N positions per vessel as a fading
+    // polyline. Drawn before vessel markers so the marker sits on top
+    // of its own track.
+    {
+      id: VESSEL_TRAIL_LAYER_ID,
+      type: 'line',
+      source: VESSEL_TRAIL_SOURCE_ID,
+      layout: {
+        'line-cap': 'round',
+        'line-join': 'round',
+      },
+      paint: {
+        'line-color': fillColorByMovementAndCategory,
+        'line-width': ['interpolate', ['linear'], ['zoom'], 8, 1.2, 14, 1.8, 18, 2.4],
+        'line-opacity': ['case', isSelected, 0.85, 0.45],
+      },
     },
     {
       id: VESSEL_LAYER_ID,
@@ -155,10 +178,14 @@ export const osmRasterStyle: StyleSpecification = {
       id: VESSEL_LABEL_LAYER_ID,
       type: 'symbol',
       source: VESSEL_SOURCE_ID,
-      filter: ['has', 'name'],
-      minzoom: 12,
+      minzoom: 10,
       layout: {
-        'text-field': ['get', 'name'],
+        // Show the vessel name when available, otherwise the MMSI as a
+        // fallback. Class B vessels often arrive without a name until
+        // a type 24 PartA frame lands, and AisStream's sub-sampling can
+        // mean PartA never reaches us; a numeric MMSI badge is more
+        // useful than an unlabelled marker.
+        'text-field': ['case', ['has', 'name'], ['get', 'name'], ['to-string', ['get', 'mmsi']]],
         'text-size': ['interpolate', ['linear'], ['zoom'], 12, 10, 16, 13, 18, 14],
         'text-offset': [0, 1.4],
         'text-anchor': 'top',
