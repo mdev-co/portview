@@ -49,8 +49,16 @@ RUN pnpm --filter @sps/shared build \
 # api: workspace symlinks resolved to real folders, only production
 # dependencies present, no dev tooling. Output lands in /prod which
 # the runtime stage then copies verbatim.
+#
+# After deploy, regenerate the Prisma client INSIDE /prod. The build
+# stage's `prisma generate` writes into /repo's pnpm virtual store,
+# but pnpm deploy rebuilds /prod's node_modules from the pnpm-store
+# (which never saw the generated artefacts), so the runtime stage
+# would otherwise see the @prisma/client stub and throw
+# "did not initialize yet".
 RUN pnpm --filter @sps/api deploy --prod /prod \
-  && cp -R apps/api/dist /prod/dist
+  && cp -R apps/api/dist /prod/dist \
+  && (cd /prod && ./node_modules/.bin/prisma generate)
 
 FROM node:22-alpine AS runtime
 # Pull Alpine security fixes in the runtime stage too. tini handles
