@@ -1,0 +1,79 @@
+# Root .dockerignore. Trims the build context so Docker can hash it
+# quickly and so no secret or private artefact can land in an image
+# by accident. Anything below is excluded from every COPY in every
+# Dockerfile in the repo.
+
+# Git metadata
+.git
+.github
+.gitattributes
+.gitmessage
+
+# Local tooling (never ship to prod)
+.claude
+.husky
+.vscode
+.idea
+.editorconfig
+
+# Build artefacts and dependency caches
+node_modules
+**/node_modules
+**/dist
+**/build
+**/.turbo
+**/.next
+**/.cache
+.pnpm-store
+
+# Test / coverage
+coverage
+**/coverage
+.nyc_output
+**/__tests__
+**/*.spec.ts
+**/*.test.ts
+
+# Environment / secrets - NEVER COPY any .env into an image
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+secrets
+.netrc
+.npmrc
+
+# Private documentation (paired ADR: public adr/ vs private docs/adr/)
+docs
+
+# Editor / OS scratch
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+
+# Personal project notes / backups outside repo flow
+CLAUDE*.md
+AGENTS.md
+sps-opsec-backup-*
+*.backup
+*.bak
+
+# Markdown (except the ones we want exposed)
+*.md
+!apps/api/README.md
+!README.md
+
+# CI artefacts
+.codecov.yml
+
+# Generated Prisma client lands inside node_modules - not via context.
+# Keep the schema dir which we explicitly COPY in the api Dockerfile.

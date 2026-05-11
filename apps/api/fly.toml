@@ -1,0 +1,43 @@
+# Fly.io app configuration for the SPS api.
+#
+# Build context is the repo root; the Dockerfile path is relative to
+# that. `fly launch` (run from the repo root) writes this file and
+# subsequent `fly deploy` reads it.
+#
+# Region waw (Warsaw) is the closest Fly.io point of presence to
+# Szczecin (Fly does not have a Szczecin region). Round trip latency
+# from Niebuszewo on residential fibre is ~25-40 ms.
+
+app = "sps-api"
+primary_region = "waw"
+
+[build]
+  dockerfile = "apps/api/Dockerfile"
+
+[env]
+  # Application-level config that is not a secret.
+  NODE_ENV = "production"
+  PORT = "3000"
+  # AisStream subscription bounding box defaults to the Szczecin port
+  # area; ingest source falls back to LocalUdp when rtl_ais is wired.
+  EXTERNAL_FEED_ENDPOINT = "wss://stream.aisstream.io/v0/stream"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+  [[http_service.checks]]
+    grace_period = "20s"
+    interval = "30s"
+    method = "GET"
+    timeout = "5s"
+    path = "/"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 512
