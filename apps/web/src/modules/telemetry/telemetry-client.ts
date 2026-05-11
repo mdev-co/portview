@@ -1,10 +1,19 @@
 import {
+  type Mmsi,
+  SourceId,
+  VESSEL_FLAG_HAS_FIX,
+  VESSEL_FLAG_HAS_IDENTITY,
+  VESSEL_FLAG_IS_MOVING,
   VESSEL_FRAME_BYTES,
+  VESSEL_SNAPSHOT_FRAME_KIND,
   VESSEL_STATIC_FRAME_KIND,
+  type VesselHistoryPoint,
+  type VesselSnapshotFrame,
   type VesselStaticDataFrame,
   decodeVesselFrame,
 } from '@sps/shared';
 import type { LiveVessel } from './types';
+import { appendHistoryPoint, setHistoryFromSnapshot, setKalmanState } from './vessel-history.store';
 import { setVesselStatic } from './vessel-static.store';
 import { setVessel } from './vessels.store';
 
@@ -15,6 +24,7 @@ export type TelemetryClientOptions = {
   readonly url?: string;
   readonly onVessel?: (vessel: LiveVessel) => void;
   readonly onStatic?: (frame: VesselStaticDataFrame) => void;
+  readonly onSnapshot?: (frame: VesselSnapshotFrame) => void;
 };
 
 function isStaticFrame(candidate: unknown): candidate is VesselStaticDataFrame {
@@ -62,10 +72,75 @@ function isNullableNumber(candidate: unknown): boolean {
   return candidate === null || typeof candidate === 'number';
 }
 
+function isSnapshotFrame(candidate: unknown): candidate is VesselSnapshotFrame {
+  if (typeof candidate !== 'object' || candidate === null) return false;
+  const frame = candidate as Record<string, unknown>;
+  if (frame.kind !== VESSEL_SNAPSHOT_FRAME_KIND) return false;
+  if (typeof frame.serverTimeUnix !== 'number') return false;
+  if (!Array.isArray(frame.vessels)) return false;
+  // Trust the shape per-entry; the gateway is the only producer and a
+  // malformed entry merely loses one vessel from the cold-start view.
+  return true;
+}
+
 export type DispatchHandlers = {
   readonly onVessel?: (vessel: LiveVessel) => void;
   readonly onStatic?: (frame: VesselStaticDataFrame) => void;
+  readonly onSnapshot?: (frame: VesselSnapshotFrame) => void;
 };
+
+/**
+ * Apply a snapshot frame to the local stores. For each entry: seed the
+ * static-data cache, replace the history buffer, install the Kalman
+ * state, and synthesise a LiveVessel from the last history point so
+ * the sidebar and map render immediately, before any live AIS report.
+ */
+function applySnapshot(frame: VesselSnapshotFrame): void {
+  for (const entry of frame.vessels) {
+    if (entry.staticData !== null) {
+      setVesselStatic({
+        kind: VESSEL_STATIC_FRAME_KIND,
+        ...entry.staticData,
+      });
+    }
+    setHistoryFromSnapshot(entry.mmsi, entry.history);
+    if (entry.kalman !== null) {
+      setKalmanState(entry.mmsi, entry.kalman);
+    }
+    const latest = entry.history[entry.history.length - 1];
+    if (latest !== undefined) {
+      setVessel(synthesiseLiveVesselFromHistory(entry.mmsi, latest));
+    }
+  }
+}
+
+function synthesiseLiveVesselFromHistory(mmsi: Mmsi, point: VesselHistoryPoint): LiveVessel {
+  // Snapshots originate from the same server that emits live frames,
+  // so we know the vessel had a position fix at the recorded time.
+  // Approximate the flags the next live frame would carry: HAS_FIX
+  // always, IS_MOVING if SOG above the 0.5 kn threshold, HAS_IDENTITY
+  // pessimistically off (the next live frame or static refresh will
+  // refine).
+  let flags = VESSEL_FLAG_HAS_FIX;
+  if (point.sog !== null && point.sog > 0.5) {
+    flags |= VESSEL_FLAG_IS_MOVING;
+  }
+  flags |= VESSEL_FLAG_HAS_IDENTITY;
+  return {
+    mmsi,
+    messageType: 1,
+    navStatus: null,
+    sourceId: SourceId.AisStream,
+    rateOfTurn: null,
+    lng: point.lng,
+    lat: point.lat,
+    sog: point.sog,
+    cog: point.cog,
+    trueHeading: point.trueHeading,
+    timestampUnix: point.timestampUnix,
+    flags,
+  };
+}
 
 /**
  * Pure dispatch over the WebSocket message payload. Extracted so the
@@ -98,6 +173,19 @@ export function dispatchTelemetryMessage(data: unknown, handlers: DispatchHandle
       flags: frame.flags,
     };
     setVessel(vessel);
+    // Live position frames append to the rolling history buffer used
+    // for trail rendering and smoothed dead-reckoning. Static-only
+    // frames (handled below) have no position to append.
+    if (vessel.lng !== null && vessel.lat !== null) {
+      appendHistoryPoint(vessel.mmsi, {
+        lng: vessel.lng,
+        lat: vessel.lat,
+        sog: vessel.sog,
+        cog: vessel.cog,
+        trueHeading: vessel.trueHeading,
+        timestampUnix: vessel.timestampUnix,
+      });
+    }
     handlers.onVessel?.(vessel);
     return;
   }
@@ -107,6 +195,11 @@ export function dispatchTelemetryMessage(data: unknown, handlers: DispatchHandle
       parsed = JSON.parse(data);
     } catch (err) {
       console.warn('[telemetry] malformed JSON text frame', err);
+      return;
+    }
+    if (isSnapshotFrame(parsed)) {
+      applySnapshot(parsed);
+      handlers.onSnapshot?.(parsed);
       return;
     }
     if (!isStaticFrame(parsed)) {
@@ -176,6 +269,7 @@ export function createTelemetryClient(options: TelemetryClientOptions = {}): Tel
       dispatchTelemetryMessage(evt.data, {
         onVessel: options.onVessel,
         onStatic: options.onStatic,
+        onSnapshot: options.onSnapshot,
       });
     });
 

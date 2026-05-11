@@ -2,8 +2,11 @@
 import { type ReactNode, createContext, memo, useContext, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { useMapEngine } from '@/modules/map/hooks/use-map-engine';
+import { getVesselDisplayPosition } from '@/modules/map/lib/vessel-display-position';
+import { $disabledTrailMmsis, toggleTrailForVessel } from '@/modules/map/state/trail-visibility';
 import { VESSEL_CATEGORY_PALETTE, VESSEL_PALETTE } from '@/modules/map/styles/vessel-palette';
-import type { LiveVessel } from '@/modules/telemetry';
+import { $vesselKalmanState, type LiveVessel } from '@/modules/telemetry';
+import { useStore } from '@nanostores/react';
 import {
   Anchor,
   CalendarClock,
@@ -73,6 +76,10 @@ const styles = {
   fieldIcon: 'text-muted-foreground/80 mt-0.5 size-4 shrink-0',
   fieldLabel: 'text-muted-foreground text-[0.7rem] font-semibold uppercase tracking-wider',
   fieldValue: 'text-foreground mt-0.5 font-mono text-sm font-medium tabular-nums',
+  trailToggle:
+    'flex items-center gap-2 border-t border-primary/15 bg-muted/40 px-4 py-3 text-sm text-foreground cursor-pointer',
+  staleBadge:
+    'inline-flex items-center rounded px-1.5 py-0.5 text-[0.6rem] font-bold uppercase tracking-wider border border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-300',
   illustrationFrame:
     'border-primary/20 bg-muted/40 border-y-2 border-y-primary/15 px-4 py-3 flex items-center justify-center',
   illustrationSvg: 'text-foreground/80 h-24 w-full max-w-[420px]',
@@ -154,8 +161,19 @@ const Root = memo(RootImpl);
 function Row({ children }: { readonly children: ReactNode }) {
   const { vessel, selected, onSelect } = useRow();
   const handleSelect = (): void => onSelect(vessel.mmsi);
+  const rowRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    // When selection lands on a vessel via the map click handler, the
+    // sidebar might have the row scrolled off-screen or inside a
+    // collapsed parent. Scrolling it into view turns "click a marker"
+    // into "see its detail panel without hunting".
+    if (selected && rowRef.current) {
+      rowRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [selected]);
   return (
     <div
+      ref={rowRef}
       role="button"
       tabIndex={0}
       aria-selected={selected}
@@ -209,10 +227,14 @@ function CategoryBadge() {
 
 const TIME_TICK_INTERVAL_MS = 1_000;
 
+/** Show the STALE badge once a vessel has been silent this many seconds. */
+const STALE_BADGE_SECONDS = 180;
+
 function Label() {
   const { vessel } = useRow();
   const staticFrame = useVesselStatic(vessel.mmsi);
   const timeRef = useRef<HTMLSpanElement | null>(null);
+  const staleRef = useRef<HTMLSpanElement | null>(null);
   const status = deriveVesselStatus(vessel);
   const speedSuffix =
     status === 'underway' && vessel.sog !== null ? ` · ${formatSog(vessel.sog)}` : '';
@@ -223,11 +245,16 @@ function Label() {
   const subtitle = hasName ? String(vessel.mmsi) : null;
 
   useEffect(() => {
-    const node = timeRef.current;
-    if (!node) return;
+    const time = timeRef.current;
+    const stale = staleRef.current;
+    if (!time) return;
     const tick = (): void => {
       const nowSec = Math.floor(Date.now() / 1_000);
-      node.textContent = formatRelativeTime(vessel.timestampUnix, nowSec);
+      time.textContent = formatRelativeTime(vessel.timestampUnix, nowSec);
+      if (stale) {
+        const isStale = nowSec - vessel.timestampUnix >= STALE_BADGE_SECONDS;
+        stale.style.display = isStale ? '' : 'none';
+      }
     };
     tick();
     const id = setInterval(tick, TIME_TICK_INTERVAL_MS);
@@ -239,6 +266,13 @@ function Label() {
       <span className={styles.titleRow}>
         <span className={cn(styles.mmsi, hasName && 'font-sans tracking-normal')}>{title}</span>
         <CategoryBadge />
+        <span
+          ref={staleRef}
+          className={styles.staleBadge}
+          aria-label="No fresh AIS frame in over 3 minutes"
+        >
+          STALE
+        </span>
         <span ref={timeRef} className={styles.time} />
       </span>
       <span className={styles.statusLine}>
@@ -256,6 +290,7 @@ function Label() {
 function Actions() {
   const { vessel, selected } = useRow();
   const controller = useMapEngine();
+  const kalmanStates = useStore($vesselKalmanState);
   const canFly = vessel.lng !== null && vessel.lat !== null;
   return (
     <span className={styles.actions} onClick={e => e.stopPropagation()}>
@@ -266,7 +301,15 @@ function Actions() {
           event.preventDefault();
           event.stopPropagation();
           if (!canFly) return;
-          controller.flyTo([vessel.lng!, vessel.lat!], FLY_TO_ZOOM);
+          // Resolve the same display position the marker uses on the map
+          // so the camera lands exactly on the visible shape, not on the
+          // raw last fix that may be 60 s behind the Kalman projection.
+          const now = Math.floor(Date.now() / 1_000);
+          const display = getVesselDisplayPosition(vessel, kalmanStates[vessel.mmsi], now);
+          const target: [number, number] = display
+            ? [display.lng, display.lat]
+            : [vessel.lng!, vessel.lat!];
+          controller.flyTo(target, FLY_TO_ZOOM);
         }}
         aria-label={`Zoom to vessel ${vessel.mmsi}`}
         className={cn(
@@ -291,7 +334,9 @@ function Actions() {
 function Details() {
   const { vessel, selected } = useRow();
   const staticFrame = useVesselStatic(vessel.mmsi);
+  const disabledTrails = useStore($disabledTrailMmsis);
   if (!selected) return null;
+  const trailShown = !disabledTrails.has(vessel.mmsi);
   return (
     <>
       <div className={styles.illustrationFrame}>
@@ -316,6 +361,15 @@ function Details() {
             />
           ))}
       </div>
+      <label className={styles.trailToggle}>
+        <input
+          type="checkbox"
+          checked={trailShown}
+          onChange={() => toggleTrailForVessel(vessel.mmsi)}
+          aria-label="Show trail for this vessel"
+        />
+        <span>Show trail for this vessel</span>
+      </label>
     </>
   );
 }
