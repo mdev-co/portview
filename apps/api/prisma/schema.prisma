@@ -36,6 +36,19 @@ model Vessel {
   createdAt   DateTime  @default(now())  @map("created_at")
   updatedAt   DateTime  @updatedAt        @map("updated_at")
 
+  // Persisted Kalman filter state (constant-velocity 2D model).
+  // State vector [lng, lat, vlng, vlat] kept in dedicated columns for
+  // simple typed reads; the 4x4 covariance is stored as JSON row-major
+  // (16 floats) because Postgres lacks a native fixed-size float array
+  // that round-trips cleanly through Prisma. All fields nullable: a
+  // vessel with no position fix yet has no filter state.
+  kalmanLng        Float?    @map("kalman_lng")
+  kalmanLat        Float?    @map("kalman_lat")
+  kalmanVlng       Float?    @map("kalman_vlng")
+  kalmanVlat       Float?    @map("kalman_vlat")
+  kalmanCovariance Json?     @map("kalman_covariance")
+  kalmanUpdatedAt  DateTime? @map("kalman_updated_at")
+
   positions VesselPosition[]
 
   @@map("vessels")

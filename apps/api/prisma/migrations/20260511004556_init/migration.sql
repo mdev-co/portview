@@ -18,6 +18,12 @@ CREATE TABLE "vessels" (
     "last_seen_at" TIMESTAMP(3),
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
+    "kalman_lng" DOUBLE PRECISION,
+    "kalman_lat" DOUBLE PRECISION,
+    "kalman_vlng" DOUBLE PRECISION,
+    "kalman_vlat" DOUBLE PRECISION,
+    "kalman_covariance" JSONB,
+    "kalman_updated_at" TIMESTAMP(3),
 
     CONSTRAINT "vessels_pkey" PRIMARY KEY ("mmsi")
 );
@@ -35,6 +41,10 @@ CREATE TABLE "vessel_positions" (
     "nav_status" INTEGER,
     "broadcast_timestamp" TIMESTAMP(3),
     "ingest_timestamp" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    -- Spatial column derived from (lng, lat) at write time. STORED so
+    -- GiST can index it; geography uses true great-circle math and
+    -- ST_DWithin treats radius as meters.
+    "position" geography(Point, 4326) GENERATED ALWAYS AS (ST_SetSRID(ST_MakePoint("lng", "lat"), 4326)::geography) STORED,
 
     CONSTRAINT "vessel_positions_pkey" PRIMARY KEY ("id")
 );
@@ -45,16 +55,8 @@ CREATE UNIQUE INDEX "vessels_imo_key" ON "vessels"("imo");
 -- CreateIndex
 CREATE INDEX "vessel_positions_vessel_mmsi_ingest_timestamp_idx" ON "vessel_positions"("vessel_mmsi", "ingest_timestamp" DESC);
 
+-- CreateIndex
+CREATE INDEX "vessel_positions_position_gist_idx" ON "vessel_positions" USING GIST ("position");
+
 -- AddForeignKey
 ALTER TABLE "vessel_positions" ADD CONSTRAINT "vessel_positions_vessel_mmsi_fkey" FOREIGN KEY ("vessel_mmsi") REFERENCES "vessels"("mmsi") ON DELETE CASCADE ON UPDATE CASCADE;
-
--- Spatial column derived from (lng, lat) at write time. Stored, not virtual,
--- so GiST can index it. geography uses true great-circle math; ST_DWithin
--- treats radius as meters, no unit confusion at query sites.
-ALTER TABLE "vessel_positions"
-ADD COLUMN "position" geography(Point, 4326)
-GENERATED ALWAYS AS (ST_SetSRID(ST_MakePoint("lng", "lat"), 4326)::geography) STORED;
-
--- GiST index for ST_DWithin / ST_Within radius and bbox queries.
-CREATE INDEX "vessel_positions_position_gist_idx"
-ON "vessel_positions" USING GIST ("position");
