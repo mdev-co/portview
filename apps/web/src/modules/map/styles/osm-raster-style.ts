@@ -152,7 +152,8 @@ export const osmRasterStyle: StyleSpecification = {
         'circle-color': fillColorByMovementAndCategory,
         'circle-stroke-width': ['case', isSelected, 3, 2],
         'circle-stroke-color': strokeColorBySelection,
-        'circle-opacity': opacityByAge,
+        'circle-opacity': ['case', isSelected, 1, opacityByAge],
+        'circle-stroke-opacity': ['case', isSelected, 1, opacityByAge],
       },
     },
     {
@@ -171,7 +172,7 @@ export const osmRasterStyle: StyleSpecification = {
         'icon-color': fillColorByMovementAndCategory,
         'icon-halo-color': strokeColorBySelection,
         'icon-halo-width': ['case', isSelected, 4, 1.6],
-        'icon-opacity': opacityByAge,
+        'icon-opacity': ['case', isSelected, 1, opacityByAge],
       },
     },
     {
@@ -199,7 +200,7 @@ export const osmRasterStyle: StyleSpecification = {
         'text-color': VESSEL_PALETTE.stroke.hex,
         'text-halo-color': '#ffffff',
         'text-halo-width': 1.6,
-        'text-opacity': opacityByAge,
+        'text-opacity': ['case', isSelected, 1, opacityByAge],
       },
     },
   ],

@@ -161,8 +161,19 @@ const Root = memo(RootImpl);
 function Row({ children }: { readonly children: ReactNode }) {
   const { vessel, selected, onSelect } = useRow();
   const handleSelect = (): void => onSelect(vessel.mmsi);
+  const rowRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    // When selection lands on a vessel via the map click handler, the
+    // sidebar might have the row scrolled off-screen or inside a
+    // collapsed parent. Scrolling it into view turns "click a marker"
+    // into "see its detail panel without hunting".
+    if (selected && rowRef.current) {
+      rowRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [selected]);
   return (
     <div
+      ref={rowRef}
       role="button"
       tabIndex={0}
       aria-selected={selected}
