@@ -4,12 +4,13 @@
 # that. `fly launch` (run from the repo root) writes this file and
 # subsequent `fly deploy` reads it.
 #
-# Region waw (Warsaw) is the closest Fly.io point of presence to
-# Szczecin (Fly does not have a Szczecin region). Round trip latency
-# from Niebuszewo on residential fibre is ~25-40 ms.
+# Region fra (Frankfurt) is the closest Fly.io point of presence to
+# Szczecin still accepting new resources (waw was deprecated and
+# rejects new machines as of 2026-05). Round trip latency from
+# Niebuszewo on residential fibre is ~35-50 ms.
 
 app = "sps-api"
-primary_region = "waw"
+primary_region = "fra"
 
 [build]
   dockerfile = "apps/api/Dockerfile"
@@ -18,9 +19,10 @@ primary_region = "waw"
   # Application-level config that is not a secret.
   NODE_ENV = "production"
   PORT = "3000"
-  # AisStream subscription bounding box defaults to the Szczecin port
-  # area; ingest source falls back to LocalUdp when rtl_ais is wired.
-  EXTERNAL_FEED_ENDPOINT = "wss://stream.aisstream.io/v0/stream"
+  # EXTERNAL_FEED_ENDPOINT and EXTERNAL_FEED_TOKEN are intentionally
+  # NOT in [env]. Both reveal the upstream vendor and are injected at
+  # deploy time via `fly secrets set` to keep the tracked config free
+  # of vendor identifiers. See .env.example.
 
 [http_service]
   internal_port = 3000
