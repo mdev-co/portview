@@ -1,0 +1,42 @@
+# Fly.io app configuration for the SPS Postgres + PostGIS database.
+#
+# Custom Postgres deployment - not Fly's managed Postgres. We deploy
+# the upstream postgis/postgis image directly because Fly's stock
+# postgres-flex image does not preinstall PostGIS and runtime
+# apt-install does not persist across machine recreation.
+#
+# Co-located with sps-api in fra (Frankfurt) - cross-region calls
+# would add 30-50 ms to every query.
+#
+# Persistence: a Fly volume mounted at /var/lib/postgresql/data with
+# PGDATA pointed at a subdir so the volume mount point can carry the
+# usual filesystem metadata without confusing postgres init.
+#
+# Network: no [[services]] block - the database is only reachable
+# inside the org via 6PN private network (sps-postgres.internal:5432).
+# Public internet has no path to port 5432.
+#
+# Required Fly secret (set BEFORE first deploy):
+#   fly secrets set --app sps-postgres POSTGRES_PASSWORD=<generated>
+# Without it the postgis container fails initdb on first boot.
+
+app = "sps-postgres"
+primary_region = "fra"
+
+[build]
+  image = "postgis/postgis:17-3.5-alpine"
+
+[env]
+  POSTGRES_USER = "sps"
+  POSTGRES_DB = "sps"
+  PGDATA = "/var/lib/postgresql/data/pgdata"
+
+[mounts]
+  source = "pg_data"
+  destination = "/var/lib/postgresql/data"
+  initial_size = "1gb"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 512
