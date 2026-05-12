@@ -6,7 +6,7 @@
  * OpenAPI spec version: 1.0.0
  */
 
-export type ListVesselsParams = {
+export type GetVesselsParams = {
   /**
    * Maximum number of vessels to return.
    * @minimum 1

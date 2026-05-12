@@ -1,199 +1,116 @@
 {
-  "openapi": "3.0.0",
-  "paths": {
-    "/": {
-      "get": {
-        "operationId": "AppController_getHello",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "tags": ["App"]
-      }
-    },
-    "/api/vessels": {
-      "get": {
-        "description": "Returns vessels ordered by lastSeenAt desc. Each row carries the static record plus the latest position via a Prisma nested select.",
-        "operationId": "listVessels",
-        "parameters": [
-          {
-            "name": "limit",
-            "required": false,
-            "in": "query",
-            "description": "Page size, 1-500. Defaults to 100.",
-            "schema": {
-              "example": 100,
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/VesselListResponse"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid query parameters (e.g. limit out of range)."
-          }
-        },
-        "summary": "List recently seen vessels",
-        "tags": ["vessels"]
-      }
-    },
-    "/api/vessels/{mmsi}": {
-      "get": {
-        "description": "Returns the vessel and its latest position. Responds with 404 when the MMSI is not in the database.",
-        "operationId": "getVesselByMmsi",
-        "parameters": [
-          {
-            "name": "mmsi",
-            "required": true,
-            "in": "path",
-            "description": "9-digit MMSI identifier.",
-            "schema": {
-              "example": 261000001,
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/VesselSummary"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "MMSI not a positive integer."
-          },
-          "404": {
-            "description": "No vessel found for this MMSI."
-          }
-        },
-        "summary": "Get a single vessel by MMSI",
-        "tags": ["vessels"]
-      }
+  "openapi": "3.1.0",
+  "servers": [
+    {
+      "url": "http://localhost:3000/api",
+      "description": "Local dev api"
     }
-  },
+  ],
   "info": {
     "title": "SPS API",
     "description": "REST surface for the AIS vessel tracking project. The frontend consumes this spec via Orval to generate a typed client.",
     "version": "1.0.0",
-    "contact": {}
-  },
-  "tags": [
-    {
-      "name": "vessels",
-      "description": "Read-only access to the vessel catalogue."
+    "license": {
+      "name": "UNLICENSED"
     }
-  ],
-  "servers": [],
+  },
   "components": {
     "schemas": {
-      "VesselPositionSummary": {
+      "VesselListResponse": {
         "type": "object",
         "properties": {
-          "lat": {
-            "type": "number",
-            "example": 53.4267
-          },
-          "lng": {
-            "type": "number",
-            "example": 14.565
-          },
-          "speedOverGround": {
-            "type": "number",
-            "nullable": true,
-            "example": 5.3
-          },
-          "courseOverGround": {
-            "type": "number",
-            "nullable": true,
-            "example": 90
-          },
-          "trueHeading": {
-            "type": "integer",
-            "nullable": true,
-            "example": 91
-          },
-          "navStatus": {
-            "type": "integer",
-            "nullable": true,
-            "example": 5
-          },
-          "updatedAt": {
-            "type": "string",
-            "format": "date-time"
+          "vessels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VesselSummary"
+            }
           }
         },
-        "required": [
-          "lat",
-          "lng",
-          "speedOverGround",
-          "courseOverGround",
-          "trueHeading",
-          "navStatus",
-          "updatedAt"
-        ]
+        "required": ["vessels"]
       },
       "VesselSummary": {
         "type": "object",
         "properties": {
           "mmsi": {
-            "type": "integer",
-            "example": 261000001
+            "type": "integer"
           },
           "imo": {
-            "type": "integer",
-            "nullable": true,
-            "example": 9876543
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "integer"
+              }
+            ]
           },
           "name": {
-            "type": "string",
-            "nullable": true,
-            "example": "POMERANIA TRADER"
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string"
+              }
+            ]
           },
           "callSign": {
-            "type": "string",
-            "nullable": true,
-            "example": "SPPT1"
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string"
+              }
+            ]
           },
           "shipType": {
-            "type": "integer",
-            "nullable": true,
-            "example": 70
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "integer"
+              }
+            ]
           },
           "destination": {
-            "type": "string",
-            "nullable": true,
-            "example": "GDYNIA"
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string"
+              }
+            ]
           },
           "eta": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "format": "date-time"
+              }
+            ]
           },
           "lastSeenAt": {
-            "type": "string",
-            "format": "date-time",
-            "nullable": true
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "format": "date-time"
+              }
+            ]
           },
           "position": {
-            "nullable": true,
-            "type": "object",
-            "allOf": [
+            "oneOf": [
+              {
+                "type": "null"
+              },
               {
                 "$ref": "#/components/schemas/VesselPositionSummary"
               }
@@ -212,18 +129,171 @@
           "position"
         ]
       },
-      "VesselListResponse": {
+      "VesselPositionSummary": {
         "type": "object",
         "properties": {
-          "vessels": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/VesselSummary"
+          "lat": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90
+          },
+          "lng": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180
+          },
+          "speedOverGround": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "number"
+              }
+            ]
+          },
+          "courseOverGround": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "number"
+              }
+            ]
+          },
+          "trueHeading": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "integer"
+              }
+            ]
+          },
+          "navStatus": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "integer"
+              }
+            ]
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "ISO 8601 timestamp of the most recent position report."
+          }
+        },
+        "required": [
+          "lat",
+          "lng",
+          "speedOverGround",
+          "courseOverGround",
+          "trueHeading",
+          "navStatus",
+          "updatedAt"
+        ]
+      },
+      "ListVesselsQuery": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 500,
+            "description": "Maximum number of vessels to return."
+          }
+        },
+        "required": []
+      }
+    }
+  },
+  "paths": {
+    "/": {
+      "get": {
+        "tags": [],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "string"
+                }
+              }
             }
           }
         },
-        "required": ["vessels"]
+        "x-samchon-accessor": ["getHello"],
+        "x-samchon-controller": "AppController"
+      }
+    },
+    "/vessels": {
+      "get": {
+        "tags": [],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            },
+            "required": false,
+            "description": "Maximum number of vessels to return."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VesselListResponse"
+                }
+              }
+            }
+          }
+        },
+        "x-samchon-accessor": ["vessels", "list"],
+        "x-samchon-controller": "VesselsController"
+      }
+    },
+    "/vessels/{mmsi}": {
+      "get": {
+        "tags": [],
+        "parameters": [
+          {
+            "name": "mmsi",
+            "in": "path",
+            "schema": {
+              "type": "number"
+            },
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VesselSummary"
+                }
+              }
+            }
+          }
+        },
+        "x-samchon-accessor": ["vessels", "byMmsi"],
+        "x-samchon-controller": "VesselsController"
       }
     }
-  }
+  },
+  "tags": []
 }

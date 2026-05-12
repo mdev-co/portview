@@ -7,15 +7,20 @@
  */
 
 export interface VesselPositionSummary {
+  /**
+   * @minimum -90
+   * @maximum 90
+   */
   lat: number;
+  /**
+   * @minimum -180
+   * @maximum 180
+   */
   lng: number;
-  /** @nullable */
-  speedOverGround: number | null;
-  /** @nullable */
-  courseOverGround: number | null;
-  /** @nullable */
-  trueHeading: number | null;
-  /** @nullable */
-  navStatus: number | null;
+  speedOverGround: null | number;
+  courseOverGround: null | number;
+  trueHeading: null | number;
+  navStatus: null | number;
+  /** ISO 8601 timestamp of the most recent position report. */
   updatedAt: string;
 }
