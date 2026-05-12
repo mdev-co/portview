@@ -15,6 +15,16 @@ import { PrismaService } from '../prisma/prisma.service';
 const SNAPSHOT_FRESHNESS_WINDOW_MS = 10 * 60 * 1_000;
 
 /**
+ * Hard cap on vessels returned in a single snapshot. Bounds the JSON
+ * payload size and the per-snapshot memory footprint so a flood of
+ * unique MMSIs that slips past the ingest guards still cannot blow
+ * the api machine RAM or push a multi-megabyte frame to every
+ * connected WebSocket client. Ordered by lastSeenAt desc, so when
+ * the cap is reached the freshest vessels are kept.
+ */
+const SNAPSHOT_MAX_VESSELS = 500;
+
+/**
  * Builds the catalog JSON frame that the telemetry gateway sends to a
  * freshly connected client. One DB round trip per snapshot: a single
  * findMany on `vessel` with a `_count`-like include for the recent
@@ -36,6 +46,7 @@ export class SnapshotBuilder {
     const vessels = await this.prisma.vessel.findMany({
       where: { lastSeenAt: { gte: cutoff } },
       orderBy: { lastSeenAt: 'desc' },
+      take: SNAPSHOT_MAX_VESSELS,
       include: {
         positions: {
           take: VESSEL_HISTORY_MAX_POINTS,

@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -24,6 +26,17 @@ import { VesselsModule } from './vessels/vessels.module';
       maxListeners: 10,
       verboseMemoryLeak: true,
     }),
+    // HTTP throttling at the controller layer. The global guard
+    // registered below applies these limits to every public REST
+    // route unless individually overridden. The WebSocket gateway
+    // is unaffected; it has its own connection cap and backpressure
+    // in TelemetryWsGateway.
+    ThrottlerModule.forRoot([
+      // Short window: catches burst floods (e.g. scripted scrape).
+      { name: 'short', ttl: 1_000, limit: 10 },
+      // Long window: catches sustained abuse (rolling minute).
+      { name: 'long', ttl: 60_000, limit: 100 },
+    ]),
     PrismaModule,
     IngestModule,
     PersistenceModule,
@@ -31,6 +44,6 @@ import { VesselsModule } from './vessels/vessels.module';
     VesselsModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}
