@@ -103,20 +103,13 @@ export class VesselPersistenceService {
     const nowSeconds = Math.floor(receivedAt / 1000);
     const nextKalman = advanceKalman(existing, lng, lat, nowSeconds);
 
+    // Order matters: vessel upsert must run before vesselPosition.create
+    // because vesselPosition.vessel_mmsi is a foreign key to vessels.mmsi.
+    // For a previously-unseen MMSI (common when an upstream feed reports a
+    // new vessel) the parent row does not exist yet; running the position
+    // insert first triggers a foreign-key violation that rolls back the
+    // whole transaction, dropping the frame.
     await this.prisma.$transaction([
-      this.prisma.vesselPosition.create({
-        data: {
-          vesselMmsi: mmsi,
-          lng,
-          lat,
-          speedOverGround: sog,
-          courseOverGround: cog,
-          trueHeading: heading,
-          rateOfTurn: rot,
-          navStatus,
-          broadcastTimestamp,
-        },
-      }),
       this.prisma.vessel.upsert({
         where: { mmsi },
         update: {
@@ -137,6 +130,19 @@ export class VesselPersistenceService {
           kalmanVlat: nextKalman.vlat,
           kalmanCovariance: nextKalman.covariance,
           kalmanUpdatedAt: broadcastTimestamp,
+        },
+      }),
+      this.prisma.vesselPosition.create({
+        data: {
+          vesselMmsi: mmsi,
+          lng,
+          lat,
+          speedOverGround: sog,
+          courseOverGround: cog,
+          trueHeading: heading,
+          rateOfTurn: rot,
+          navStatus,
+          broadcastTimestamp,
         },
       }),
     ]);
