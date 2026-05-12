@@ -69,6 +69,23 @@ else
   FAILED=1
 fi
 
+# 4b. OpenAPI / Orval sync. When any api source file is staged we
+# re-dump the OpenAPI spec and regenerate the typed web client, then
+# stage the refreshed artefacts onto the same commit. Drift between
+# api decoratory and Orval-generated types becomes impossible - the
+# commit cannot land with stale generated files.
+API_SRC_STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E '^apps/api/src/.*\.ts$' || true)
+if [ -n "$API_SRC_STAGED" ]; then
+  if pnpm --filter @sps/api openapi:dump > /dev/null 2>&1 \
+    && pnpm --filter @sps/web apigen > /dev/null 2>&1; then
+    git add apps/web/src/api/openapi-spec.json apps/web/src/api/generated
+    add_result "OpenAPI sync" "PASS" "Regenerated client artefacts"
+  else
+    add_result "OpenAPI sync" "FAIL" "Run: pnpm --filter @sps/api openapi:dump && pnpm --filter @sps/web apigen"
+    FAILED=1
+  fi
+fi
+
 # 4. console.log/debugger count - warning only (lint-staged blocks already)
 if [ -n "$STAGED_TS" ]; then
   CONSOLE_COUNT=$(echo "$STAGED_TS" | xargs grep -cE 'console\.(log|info|debug)|debugger' 2>/dev/null | awk -F: '{s+=$2} END{print s+0}')
