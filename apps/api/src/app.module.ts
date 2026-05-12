@@ -1,3 +1,5 @@
+import * as path from 'node:path';
+
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { EventEmitterModule } from '@nestjs/event-emitter';
@@ -14,11 +16,17 @@ import { VesselsModule } from './vessels/vessels.module';
 
 @Module({
   imports: [
-    // env is preloaded via dotenv-cli in package.json scripts (start*,
-    // db:*); ConfigModule reads the already-populated process.env.
+    // ConfigModule loads the repo-root .env directly so `nest start
+    // --watch` rebuilds keep env across child-process respawns (the
+    // dotenv-cli wrapper in package.json runs once per pnpm script
+    // invocation; nest's internal restart on file-change does not
+    // re-run it, so values disappear from the child env). Loading
+    // here makes start:dev, openapi:dump and tests all read the
+    // same source regardless of how they were spawned.
     ConfigModule.forRoot({
       isGlobal: true,
       cache: true,
+      envFilePath: path.resolve(__dirname, '..', '..', '..', '.env'),
     }),
     EventEmitterModule.forRoot({
       wildcard: false,

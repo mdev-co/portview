@@ -1,0 +1,229 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/": {
+      "get": {
+        "operationId": "AppController_getHello",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": ["App"]
+      }
+    },
+    "/api/vessels": {
+      "get": {
+        "description": "Returns vessels ordered by lastSeenAt desc. Each row carries the static record plus the latest position via a Prisma nested select.",
+        "operationId": "listVessels",
+        "parameters": [
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Page size, 1-500. Defaults to 100.",
+            "schema": {
+              "example": 100,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VesselListResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters (e.g. limit out of range)."
+          }
+        },
+        "summary": "List recently seen vessels",
+        "tags": ["vessels"]
+      }
+    },
+    "/api/vessels/{mmsi}": {
+      "get": {
+        "description": "Returns the vessel and its latest position. Responds with 404 when the MMSI is not in the database.",
+        "operationId": "getVesselByMmsi",
+        "parameters": [
+          {
+            "name": "mmsi",
+            "required": true,
+            "in": "path",
+            "description": "9-digit MMSI identifier.",
+            "schema": {
+              "example": 261000001,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VesselSummary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "MMSI not a positive integer."
+          },
+          "404": {
+            "description": "No vessel found for this MMSI."
+          }
+        },
+        "summary": "Get a single vessel by MMSI",
+        "tags": ["vessels"]
+      }
+    }
+  },
+  "info": {
+    "title": "SPS API",
+    "description": "REST surface for the AIS vessel tracking project. The frontend consumes this spec via Orval to generate a typed client.",
+    "version": "1.0.0",
+    "contact": {}
+  },
+  "tags": [
+    {
+      "name": "vessels",
+      "description": "Read-only access to the vessel catalogue."
+    }
+  ],
+  "servers": [],
+  "components": {
+    "schemas": {
+      "VesselPositionSummary": {
+        "type": "object",
+        "properties": {
+          "lat": {
+            "type": "number",
+            "example": 53.4267
+          },
+          "lng": {
+            "type": "number",
+            "example": 14.565
+          },
+          "speedOverGround": {
+            "type": "number",
+            "nullable": true,
+            "example": 5.3
+          },
+          "courseOverGround": {
+            "type": "number",
+            "nullable": true,
+            "example": 90
+          },
+          "trueHeading": {
+            "type": "integer",
+            "nullable": true,
+            "example": 91
+          },
+          "navStatus": {
+            "type": "integer",
+            "nullable": true,
+            "example": 5
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "lat",
+          "lng",
+          "speedOverGround",
+          "courseOverGround",
+          "trueHeading",
+          "navStatus",
+          "updatedAt"
+        ]
+      },
+      "VesselSummary": {
+        "type": "object",
+        "properties": {
+          "mmsi": {
+            "type": "integer",
+            "example": 261000001
+          },
+          "imo": {
+            "type": "integer",
+            "nullable": true,
+            "example": 9876543
+          },
+          "name": {
+            "type": "string",
+            "nullable": true,
+            "example": "POMERANIA TRADER"
+          },
+          "callSign": {
+            "type": "string",
+            "nullable": true,
+            "example": "SPPT1"
+          },
+          "shipType": {
+            "type": "integer",
+            "nullable": true,
+            "example": 70
+          },
+          "destination": {
+            "type": "string",
+            "nullable": true,
+            "example": "GDYNIA"
+          },
+          "eta": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "lastSeenAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "position": {
+            "nullable": true,
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/VesselPositionSummary"
+              }
+            ]
+          }
+        },
+        "required": [
+          "mmsi",
+          "imo",
+          "name",
+          "callSign",
+          "shipType",
+          "destination",
+          "eta",
+          "lastSeenAt",
+          "position"
+        ]
+      },
+      "VesselListResponse": {
+        "type": "object",
+        "properties": {
+          "vessels": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/VesselSummary"
+            }
+          }
+        },
+        "required": ["vessels"]
+      }
+    }
+  }
+}
