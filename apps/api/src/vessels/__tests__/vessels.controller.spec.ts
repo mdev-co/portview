@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 
 import { VesselsController } from '../vessels.controller';
@@ -40,12 +40,22 @@ describe('VesselsController', () => {
       expect(service.listVessels).toHaveBeenCalledWith(50);
     });
 
-    it('rejects limit above 500', async () => {
-      await expect(controller.list({ limit: '999' })).rejects.toThrow();
+    it('rejects limit above 500 with HTTP 400', async () => {
+      await expect(controller.list({ limit: '999' })).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
-    it('rejects limit below 1', async () => {
-      await expect(controller.list({ limit: '0' })).rejects.toThrow();
+    it('rejects limit below 1 with HTTP 400', async () => {
+      await expect(controller.list({ limit: '0' })).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('rejects non-numeric limit with HTTP 400', async () => {
+      await expect(controller.list({ limit: 'abc' })).rejects.toThrow(
+        BadRequestException,
+      );
     });
 
     it('wraps result in { vessels: [...] }', async () => {
@@ -107,9 +117,19 @@ describe('VesselsController', () => {
       );
     });
 
-    it('rejects non-positive mmsi', async () => {
-      await expect(controller.byMmsi({ mmsi: '-1' })).rejects.toThrow();
-      await expect(controller.byMmsi({ mmsi: '0' })).rejects.toThrow();
+    it('rejects non-positive mmsi with HTTP 400', async () => {
+      await expect(controller.byMmsi({ mmsi: '-1' })).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(controller.byMmsi({ mmsi: '0' })).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+
+    it('rejects non-numeric mmsi with HTTP 400', async () => {
+      await expect(controller.byMmsi({ mmsi: 'abc' })).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 });

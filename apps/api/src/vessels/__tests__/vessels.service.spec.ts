@@ -44,6 +44,10 @@ describe('VesselsService', () => {
             {
               lat: 53.4267,
               lng: 14.565,
+              speedOverGround: 0.2,
+              courseOverGround: 90,
+              trueHeading: 91,
+              navStatus: 5,
               broadcastTimestamp: new Date('2026-05-11T18:00:00Z'),
               ingestTimestamp: new Date('2026-05-11T18:00:01Z'),
             },
@@ -66,6 +70,10 @@ describe('VesselsService', () => {
           position: {
             lat: 53.4267,
             lng: 14.565,
+            speedOverGround: 0.2,
+            courseOverGround: 90,
+            trueHeading: 91,
+            navStatus: 5,
             updatedAt: '2026-05-11T18:00:00.000Z',
           },
         },
@@ -87,6 +95,10 @@ describe('VesselsService', () => {
             {
               lat: 53,
               lng: 14,
+              speedOverGround: null,
+              courseOverGround: null,
+              trueHeading: null,
+              navStatus: null,
               broadcastTimestamp: null,
               ingestTimestamp: new Date('2026-05-11T18:00:00Z'),
             },
@@ -115,6 +127,44 @@ describe('VesselsService', () => {
 
       const [row] = await service.listVessels(1);
       expect(row.position).toBeNull();
+    });
+
+    it('propagates null kinematics through the response shape', async () => {
+      vessel.findMany.mockResolvedValue([
+        {
+          mmsi: 3,
+          imo: null,
+          name: null,
+          callSign: null,
+          shipType: null,
+          destination: null,
+          eta: null,
+          lastSeenAt: null,
+          positions: [
+            {
+              lat: 54,
+              lng: 14.5,
+              speedOverGround: null,
+              courseOverGround: null,
+              trueHeading: null,
+              navStatus: null,
+              broadcastTimestamp: new Date('2026-05-11T18:00:00Z'),
+              ingestTimestamp: new Date('2026-05-11T18:00:01Z'),
+            },
+          ],
+        },
+      ]);
+
+      const [row] = await service.listVessels(1);
+      expect(row.position).toEqual({
+        lat: 54,
+        lng: 14.5,
+        speedOverGround: null,
+        courseOverGround: null,
+        trueHeading: null,
+        navStatus: null,
+        updatedAt: '2026-05-11T18:00:00.000Z',
+      });
     });
 
     it('passes limit through to Prisma orderBy and take', async () => {

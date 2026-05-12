@@ -9,6 +9,7 @@ import {
 import {
   ListVesselsQuerySchema,
   MmsiParamSchema,
+  safeParse,
   type VesselListResponse,
   type VesselSummary,
 } from './vessels.dto';
@@ -20,14 +21,14 @@ export class VesselsController {
 
   @Get()
   async list(@Query() query: unknown): Promise<VesselListResponse> {
-    const { limit } = ListVesselsQuerySchema.parse(query);
+    const { limit } = safeParse(ListVesselsQuerySchema, query);
     const vessels = await this.vessels.listVessels(limit);
     return { vessels };
   }
 
   @Get(':mmsi')
   async byMmsi(@Param() params: unknown): Promise<VesselSummary> {
-    const { mmsi } = MmsiParamSchema.parse(params);
+    const { mmsi } = safeParse(MmsiParamSchema, params);
     const vessel = await this.vessels.getVessel(mmsi);
     if (vessel === null) {
       throw new NotFoundException(`vessel mmsi=${String(mmsi)} not found`);

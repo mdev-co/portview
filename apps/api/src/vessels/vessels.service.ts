@@ -18,6 +18,10 @@ const VESSEL_SELECT = {
     select: {
       lat: true,
       lng: true,
+      speedOverGround: true,
+      courseOverGround: true,
+      trueHeading: true,
+      navStatus: true,
       broadcastTimestamp: true,
       ingestTimestamp: true,
     },
@@ -36,6 +40,10 @@ type VesselRow = {
   positions: Array<{
     lat: number;
     lng: number;
+    speedOverGround: number | null;
+    courseOverGround: number | null;
+    trueHeading: number | null;
+    navStatus: number | null;
     broadcastTimestamp: Date | null;
     ingestTimestamp: Date;
   }>;
@@ -80,6 +88,10 @@ function toSummary(row: VesselRow): VesselSummary {
         : {
             lat: latest.lat,
             lng: latest.lng,
+            speedOverGround: latest.speedOverGround,
+            courseOverGround: latest.courseOverGround,
+            trueHeading: latest.trueHeading,
+            navStatus: latest.navStatus,
             updatedAt: (
               latest.broadcastTimestamp ?? latest.ingestTimestamp
             ).toISOString(),
