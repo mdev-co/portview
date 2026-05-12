@@ -1,0 +1,92 @@
+direction: down
+vars: {
+  d2-config: {
+    theme-id: 8
+    pad: 40
+  }
+}
+
+types: "TypeScript types\nvessels.dto.ts\nplain declarations + tags.*" {
+  shape: rectangle
+  style: {
+    fill: "#fef3c7"
+    stroke: "#92400e"
+  }
+}
+
+controller: "Controller signature\n@TypedRoute.Get / @TypedQuery / @TypedParam\nvessels.controller.ts" {
+  shape: rectangle
+  style: {
+    fill: "#fef3c7"
+    stroke: "#92400e"
+  }
+}
+
+ts_patch: "ts-patch\npatches local tsc + jest compiler" {
+  shape: rectangle
+  style: {
+    fill: "#dbeafe"
+    stroke: "#1e40af"
+  }
+}
+
+typia_t: "typia/lib/transform\nAOT compile-time transformer" {
+  shape: rectangle
+  style: {
+    fill: "#dbeafe"
+    stroke: "#1e40af"
+  }
+}
+
+nestia_t: "@nestia/core/lib/transform\nAOT compile-time transformer" {
+  shape: rectangle
+  style: {
+    fill: "#dbeafe"
+    stroke: "#1e40af"
+  }
+}
+
+validator: "Runtime validator\ntypia.assert<T>\nfield-level error on bad input" {
+  shape: hexagon
+  style: {
+    fill: "#dcfce7"
+    stroke: "#166534"
+  }
+}
+
+schema: "OpenAPI schema\nemitted by nestia swagger\nopenapi-spec.json" {
+  shape: cylinder
+  style: {
+    fill: "#ede9fe"
+    stroke: "#5b21b6"
+  }
+}
+
+orval: "Orval CLI\nreads spec, emits client" {
+  shape: rectangle
+  icon: https://icons.terrastruct.com/dev%2Ftypescript.svg
+}
+
+client: "Typed web client\napps/web/src/api/generated" {
+  shape: cylinder
+  style: {
+    fill: "#ede9fe"
+    stroke: "#5b21b6"
+  }
+}
+
+web: "Web app consumers" {
+  shape: rectangle
+  icon: https://icons.terrastruct.com/dev%2Freact.svg
+}
+
+types -> typia_t: "tsc reads"
+controller -> nestia_t: "tsc reads"
+ts_patch -> typia_t: "enables"
+ts_patch -> nestia_t: "enables"
+typia_t -> validator: "AOT emits"
+nestia_t -> schema: "AOT emits"
+nestia_t -> validator: "wires validator into route"
+schema -> orval
+orval -> client
+client -> web
