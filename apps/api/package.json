@@ -26,7 +26,8 @@
     "db:seed": "dotenv -e ../../.env -- prisma db seed",
     "db:reset": "dotenv -e ../../.env -- prisma migrate reset --force",
     "db:studio": "dotenv -e ../../.env -- prisma studio",
-    "db:smoke": "docker exec -i sps-postgres psql -U sps -d sps -c \"SELECT v.name, ROUND(ST_Distance(p.position, ST_SetSRID(ST_MakePoint(14.565, 53.4267), 4326)::geography)::numeric, 0) AS m_from_waly FROM vessels v JOIN vessel_positions p ON p.vessel_mmsi = v.mmsi ORDER BY m_from_waly;\""
+    "db:smoke": "docker exec -i sps-postgres psql -U sps -d sps -c \"SELECT v.name, ROUND(ST_Distance(p.position, ST_SetSRID(ST_MakePoint(14.565, 53.4267), 4326)::geography)::numeric, 0) AS m_from_waly FROM vessels v JOIN vessel_positions p ON p.vessel_mmsi = v.mmsi ORDER BY m_from_waly;\"",
+    "openapi:dump": "dotenv -e ../../.env -- tsx scripts/dump-openapi.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
@@ -35,6 +36,7 @@
     "@nestjs/event-emitter": "^3.1.0",
     "@nestjs/platform-express": "^11.0.1",
     "@nestjs/platform-ws": "^11.1.19",
+    "@nestjs/swagger": "^11.4.2",
     "@nestjs/throttler": "^6.5.0",
     "@nestjs/websockets": "^11.1.19",
     "@prisma/client": "^6",
