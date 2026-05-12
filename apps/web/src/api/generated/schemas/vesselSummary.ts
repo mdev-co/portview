@@ -9,20 +9,12 @@ import type { VesselPositionSummary } from './vesselPositionSummary';
 
 export interface VesselSummary {
   mmsi: number;
-  /** @nullable */
-  imo: number | null;
-  /** @nullable */
-  name: string | null;
-  /** @nullable */
-  callSign: string | null;
-  /** @nullable */
-  shipType: number | null;
-  /** @nullable */
-  destination: string | null;
-  /** @nullable */
-  eta: string | null;
-  /** @nullable */
-  lastSeenAt: string | null;
-  /** @nullable */
-  position: VesselPositionSummary | null;
+  imo: null | number;
+  name: null | string;
+  callSign: null | string;
+  shipType: null | number;
+  destination: null | string;
+  eta: null | string;
+  lastSeenAt: null | string;
+  position: null | VesselPositionSummary;
 }

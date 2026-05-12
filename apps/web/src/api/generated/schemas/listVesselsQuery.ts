@@ -6,11 +6,11 @@
  * OpenAPI spec version: 1.0.0
  */
 
-export type ListVesselsParams = {
+export interface ListVesselsQuery {
   /**
    * Maximum number of vessels to return.
    * @minimum 1
    * @maximum 500
    */
   limit?: number;
-};
+}

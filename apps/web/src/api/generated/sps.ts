@@ -6,51 +6,40 @@
  * OpenAPI spec version: 1.0.0
  */
 import { orvalFetcher } from '../../lib/orval-fetcher';
-import type { ListVesselsParams, VesselListResponse, VesselSummary } from './schemas';
+import type { GetVesselsParams, VesselListResponse, VesselSummary } from './schemas';
 
-export type appControllerGetHelloResponse200 = {
-  data: void;
+export type getResponse200 = {
+  data: string;
   status: 200;
 };
 
-export type appControllerGetHelloResponseSuccess = appControllerGetHelloResponse200 & {
+export type getResponseSuccess = getResponse200 & {
   headers: Headers;
 };
-export type appControllerGetHelloResponse = appControllerGetHelloResponseSuccess;
+export type getResponse = getResponseSuccess;
 
-export const getAppControllerGetHelloUrl = () => {
+export const getGetUrl = () => {
   return `/`;
 };
 
-export const appControllerGetHello = async (
-  options?: RequestInit,
-): Promise<appControllerGetHelloResponse> => {
-  return orvalFetcher<appControllerGetHelloResponse>(getAppControllerGetHelloUrl(), {
+export const get = async (options?: RequestInit): Promise<getResponse> => {
+  return orvalFetcher<getResponse>(getGetUrl(), {
     ...options,
     method: 'GET',
   });
 };
 
-export type listVesselsResponse200 = {
+export type getVesselsResponse200 = {
   data: VesselListResponse;
   status: 200;
 };
 
-export type listVesselsResponse400 = {
-  data: void;
-  status: 400;
-};
-
-export type listVesselsResponseSuccess = listVesselsResponse200 & {
+export type getVesselsResponseSuccess = getVesselsResponse200 & {
   headers: Headers;
 };
-export type listVesselsResponseError = listVesselsResponse400 & {
-  headers: Headers;
-};
+export type getVesselsResponse = getVesselsResponseSuccess;
 
-export type listVesselsResponse = listVesselsResponseSuccess | listVesselsResponseError;
-
-export const getListVesselsUrl = (params?: ListVesselsParams) => {
+export const getGetVesselsUrl = (params?: GetVesselsParams) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -61,63 +50,38 @@ export const getListVesselsUrl = (params?: ListVesselsParams) => {
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/api/vessels?${stringifiedParams}` : `/api/vessels`;
+  return stringifiedParams.length > 0 ? `/vessels?${stringifiedParams}` : `/vessels`;
 };
 
-/**
- * Returns vessels ordered by lastSeenAt desc. Each row carries the static record plus the latest position via a Prisma nested select.
- * @summary List recently seen vessels
- */
-export const listVessels = async (
-  params?: ListVesselsParams,
+export const getVessels = async (
+  params?: GetVesselsParams,
   options?: RequestInit,
-): Promise<listVesselsResponse> => {
-  return orvalFetcher<listVesselsResponse>(getListVesselsUrl(params), {
+): Promise<getVesselsResponse> => {
+  return orvalFetcher<getVesselsResponse>(getGetVesselsUrl(params), {
     ...options,
     method: 'GET',
   });
 };
 
-export type getVesselByMmsiResponse200 = {
+export type getVesselsMmsiResponse200 = {
   data: VesselSummary;
   status: 200;
 };
 
-export type getVesselByMmsiResponse400 = {
-  data: void;
-  status: 400;
-};
-
-export type getVesselByMmsiResponse404 = {
-  data: void;
-  status: 404;
-};
-
-export type getVesselByMmsiResponseSuccess = getVesselByMmsiResponse200 & {
+export type getVesselsMmsiResponseSuccess = getVesselsMmsiResponse200 & {
   headers: Headers;
 };
-export type getVesselByMmsiResponseError = (
-  | getVesselByMmsiResponse400
-  | getVesselByMmsiResponse404
-) & {
-  headers: Headers;
+export type getVesselsMmsiResponse = getVesselsMmsiResponseSuccess;
+
+export const getGetVesselsMmsiUrl = (mmsi: number) => {
+  return `/vessels/${mmsi}`;
 };
 
-export type getVesselByMmsiResponse = getVesselByMmsiResponseSuccess | getVesselByMmsiResponseError;
-
-export const getGetVesselByMmsiUrl = (mmsi: number) => {
-  return `/api/vessels/${mmsi}`;
-};
-
-/**
- * Returns the vessel and its latest position. Responds with 404 when the MMSI is not in the database.
- * @summary Get a single vessel by MMSI
- */
-export const getVesselByMmsi = async (
+export const getVesselsMmsi = async (
   mmsi: number,
   options?: RequestInit,
-): Promise<getVesselByMmsiResponse> => {
-  return orvalFetcher<getVesselByMmsiResponse>(getGetVesselByMmsiUrl(mmsi), {
+): Promise<getVesselsMmsiResponse> => {
+  return orvalFetcher<getVesselsMmsiResponse>(getGetVesselsMmsiUrl(mmsi), {
     ...options,
     method: 'GET',
   });

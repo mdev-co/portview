@@ -6,7 +6,8 @@
  * OpenAPI spec version: 1.0.0
  */
 
-export * from './listVesselsParams';
+export * from './getVesselsParams';
+export * from './listVesselsQuery';
 export * from './vesselListResponse';
 export * from './vesselPositionSummary';
 export * from './vesselSummary';

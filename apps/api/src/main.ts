@@ -5,7 +5,7 @@ import { SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { getPort, shouldExposeOpenApi } from './env';
 import {
-  buildOpenApiDocument,
+  loadOpenApiDocument,
   OPENAPI_UI_PATH,
   SWAGGER_CUSTOM_OPTIONS,
 } from './openapi-config';
@@ -20,12 +20,19 @@ async function bootstrap() {
   // exposed by accident. Two-condition guard: NODE_ENV !== production
   // AND SPS_EXPOSE_OPENAPI === 'true'.
   if (shouldExposeOpenApi()) {
-    const document = buildOpenApiDocument(app);
-    // useGlobalPrefix: true is what makes the docs UI and JSON
-    // appear under /api/docs and /api/docs-json instead of /docs
-    // and /docs-json. Without it SwaggerModule registers paths
-    // verbatim and skips the prefix set on the app.
-    SwaggerModule.setup(OPENAPI_UI_PATH, app, document, SWAGGER_CUSTOM_OPTIONS);
+    const document = loadOpenApiDocument();
+    if (document !== null) {
+      SwaggerModule.setup(
+        OPENAPI_UI_PATH,
+        app,
+        document,
+        SWAGGER_CUSTOM_OPTIONS,
+      );
+    } else {
+      console.warn(
+        '[openapi] spec file missing - run `pnpm --filter @sps/api openapi:dump` to expose /api/docs.',
+      );
+    }
   }
 
   await app.listen(getPort());

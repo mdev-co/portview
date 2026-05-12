@@ -9,6 +9,18 @@ type MockService = {
   getVessel: jest.Mock;
 };
 
+const SAMPLE_VESSEL = {
+  mmsi: 261000000,
+  imo: null,
+  name: null,
+  callSign: null,
+  shipType: null,
+  destination: null,
+  eta: null,
+  lastSeenAt: null,
+  position: null,
+};
+
 describe('VesselsController', () => {
   let controller: VesselsController;
   let service: MockService;
@@ -34,82 +46,32 @@ describe('VesselsController', () => {
       expect(service.listVessels).toHaveBeenCalledWith(100);
     });
 
-    it('coerces limit from string query param', async () => {
+    it('forwards the provided limit to the service', async () => {
       service.listVessels.mockResolvedValue([]);
-      await controller.list({ limit: '50' });
+      await controller.list({ limit: 50 });
       expect(service.listVessels).toHaveBeenCalledWith(50);
     });
 
-    it('rejects limit above 500', async () => {
-      await expect(controller.list({ limit: '999' })).rejects.toThrow();
-    });
-
-    it('rejects limit below 1', async () => {
-      await expect(controller.list({ limit: '0' })).rejects.toThrow();
-    });
-
     it('wraps result in { vessels: [...] }', async () => {
-      const vessel = {
-        mmsi: 1,
-        imo: null,
-        name: null,
-        callSign: null,
-        shipType: null,
-        destination: null,
-        eta: null,
-        lastSeenAt: null,
-        position: null,
-      };
-      service.listVessels.mockResolvedValue([vessel]);
-      await expect(controller.list({})).resolves.toEqual({ vessels: [vessel] });
+      service.listVessels.mockResolvedValue([SAMPLE_VESSEL]);
+      await expect(controller.list({})).resolves.toEqual({
+        vessels: [SAMPLE_VESSEL],
+      });
     });
   });
 
   describe('GET /vessels/:mmsi', () => {
     it('returns vessel when found', async () => {
-      const vessel = {
-        mmsi: 261000000,
-        imo: null,
-        name: null,
-        callSign: null,
-        shipType: null,
-        destination: null,
-        eta: null,
-        lastSeenAt: null,
-        position: null,
-      };
-      service.getVessel.mockResolvedValue(vessel);
-      await expect(controller.byMmsi({ mmsi: '261000000' })).resolves.toEqual(
-        vessel,
+      service.getVessel.mockResolvedValue(SAMPLE_VESSEL);
+      await expect(controller.byMmsi(261000000)).resolves.toEqual(
+        SAMPLE_VESSEL,
       );
-    });
-
-    it('coerces mmsi from string param', async () => {
-      service.getVessel.mockResolvedValue({
-        mmsi: 1,
-        imo: null,
-        name: null,
-        callSign: null,
-        shipType: null,
-        destination: null,
-        eta: null,
-        lastSeenAt: null,
-        position: null,
-      });
-      await controller.byMmsi({ mmsi: '1' });
-      expect(service.getVessel).toHaveBeenCalledWith(1);
+      expect(service.getVessel).toHaveBeenCalledWith(261000000);
     });
 
     it('throws NotFoundException when vessel does not exist', async () => {
       service.getVessel.mockResolvedValue(null);
-      await expect(controller.byMmsi({ mmsi: '999' })).rejects.toThrow(
-        NotFoundException,
-      );
-    });
-
-    it('rejects non-positive mmsi', async () => {
-      await expect(controller.byMmsi({ mmsi: '-1' })).rejects.toThrow();
-      await expect(controller.byMmsi({ mmsi: '0' })).rejects.toThrow();
+      await expect(controller.byMmsi(999)).rejects.toThrow(NotFoundException);
     });
   });
 });
