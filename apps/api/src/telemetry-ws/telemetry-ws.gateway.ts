@@ -16,6 +16,16 @@ import { buildVesselStaticFrame } from './static-builder';
 /** 1 MB - drop the slowest clients before the kernel buffer grows unbounded. */
 const BACKPRESSURE_LIMIT_BYTES = 1_000_000;
 const PROTOCOL_VIOLATION = 1003;
+/**
+ * Hard cap on simultaneously connected WebSocket clients. Bounds the
+ * cost of fan-out (each broadcast walks every client) and limits the
+ * blast radius of a Slowloris-style attack that opens connections,
+ * never reads, and waits for the kernel to refuse the next accept.
+ * Excess connections are closed immediately with a "try again later"
+ * code rather than allocating a slow read buffer per client.
+ */
+const MAX_CLIENTS = 50;
+const TRY_AGAIN_LATER = 1013;
 
 /**
  * Push-only WebSocket gateway at /ws/telemetry.
@@ -44,6 +54,13 @@ export class TelemetryWsGateway {
   constructor(private readonly snapshotBuilder: SnapshotBuilder) {}
 
   handleConnection(client: WebSocket): void {
+    if (this.server.clients.size > MAX_CLIENTS) {
+      this.log.warn(
+        `client refused: connection cap ${MAX_CLIENTS} reached (current=${this.server.clients.size})`,
+      );
+      client.close(TRY_AGAIN_LATER, 'server at capacity');
+      return;
+    }
     client.binaryType = 'arraybuffer';
     client.on('message', () => {
       this.log.warn('client sent frame on push-only channel; closing');

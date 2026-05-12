@@ -7,6 +7,8 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import {
+  type AisMessage,
+  type FrameRejectionReason,
   type ISource,
   SourceId,
   ingestSourceMachine,
@@ -16,11 +18,40 @@ import {
 import { type Actor, createActor } from 'xstate';
 import { adaptAisStreamMessage } from './adapters/ais-stream.adapter';
 import { Decoder } from './decoder';
-import { DeadLetterWriter } from './dlq';
+import { DeadLetterWriter, type SecurityRejection } from './dlq';
 import { publishVesselStatic, publishVesselUpdate } from './ingest.events';
+import { NewMmsiBouncer } from './limiters/new-mmsi-bouncer';
+import { PerMmsiRateLimiter } from './limiters/per-mmsi-rate-limiter';
 import { AisStreamSource } from './sources/ais-stream.source';
 import { LocalUdpSource } from './sources/local-udp.source';
 import { WebSdrSource } from './sources/web-sdr.source';
+import {
+  classifyMmsiRejection,
+  isValidMmsi,
+} from './validators/mmsi-validator';
+import { validatePosition } from './validators/position-validator';
+
+function securityKindToFsmReason(
+  kind: SecurityRejection['kind'],
+): FrameRejectionReason {
+  switch (kind) {
+    case 'mmsi-not-integer':
+    case 'mmsi-out-of-range':
+    case 'mmsi-unknown-mid':
+      return 'invalid-mmsi';
+    case 'lat-out-of-range':
+      return 'out-of-range-lat';
+    case 'lng-out-of-range':
+      return 'out-of-range-lng';
+    case 'sog-out-of-range':
+    case 'cog-out-of-range':
+    case 'heading-out-of-range':
+      return 'invalid-payload';
+    case 'mmsi-flooding':
+    case 'new-mmsi-cap':
+      return 'rate-limit';
+  }
+}
 
 const STATS_INTERVAL_MS = 30_000;
 
@@ -49,6 +80,8 @@ export class IngestService implements OnModuleInit, OnModuleDestroy {
   private readonly decoder = new Decoder();
   private readonly dlq = new DeadLetterWriter();
   private readonly sources = new Map<SourceId, ISource>();
+  private readonly mmsiLimiter = new PerMmsiRateLimiter();
+  private readonly newMmsiBouncer = new NewMmsiBouncer();
 
   private actor: Actor<typeof ingestSourceMachine> | null = null;
   private activeSource: ISource | null = null;
@@ -221,34 +254,12 @@ export class IngestService implements OnModuleInit, OnModuleDestroy {
       const outcome = this.decoder.decode(frame.raw);
       switch (outcome.kind) {
         case 'message':
-          this.actor?.send({
-            type: 'FRAME_RECEIVED',
-            sourceId: source.id,
-            frameAt: frame.receivedAt,
-          });
-          // Static-only AIS messages (type 5 / 24) carry no position and
-          // would build a binary VesselUpdateFrame with flags=0 (no
-          // HAS_FIX). On the FE that frame would either drop the marker
-          // (no prior record) or strip HAS_FIX off an existing one
-          // (prior position frame); the static payload is already
-          // delivered separately via VESSEL_STATIC_EVENT, so the binary
-          // channel publishes only position-bearing message types.
-          if (
-            outcome.value.messageType === 5 ||
-            outcome.value.messageType === 24
-          ) {
-            publishVesselStatic(this.eventBus, {
-              message: outcome.value,
-              sourceId: source.id,
-              receivedAt: frame.receivedAt,
-            });
-          } else {
-            publishVesselUpdate(this.eventBus, {
-              message: outcome.value,
-              sourceId: source.id,
-              receivedAt: frame.receivedAt,
-            });
-          }
+          this.publishValidatedMessage(
+            outcome.value,
+            frame.raw,
+            source.id,
+            frame.receivedAt,
+          );
           break;
         case 'pending':
           break;
@@ -327,33 +338,132 @@ export class IngestService implements OnModuleInit, OnModuleDestroy {
       });
       return;
     }
+    this.publishValidatedMessage(validation.value, raw, source.id, receivedAt);
+  }
+
+  /**
+   * Boundary checkpoint between decoded-AIS and the in-process event
+   * bus. Decoded messages can still be malicious or malformed in ways
+   * the parser does not catch (spoofed MMSIs, garbage positions, flood
+   * traffic). This method funnels every position-bearing and static
+   * message through four guards before fan-out:
+   *
+   *   1. MMSI sanity (ITU-R M.585 range and known MID prefix).
+   *   2. Position range (lat / lng / SOG / COG / heading bounds).
+   *   3. New-MMSI bouncer (caps unique-MMSI introduction rate).
+   *   4. Per-MMSI token bucket (caps per-vessel broadcast rate).
+   *
+   * Anything that fails a guard goes to the DLQ with a typed reason
+   * and a FRAME_REJECTED event on the FSM. Anything that passes is
+   * counted as FRAME_RECEIVED and emitted on the typed event bus.
+   */
+  private publishValidatedMessage(
+    message: AisMessage,
+    raw: string,
+    sourceId: SourceId,
+    receivedAt: number,
+  ): void {
+    const mmsi = Number(message.mmsi);
+
+    if (!isValidMmsi(mmsi)) {
+      const kind = classifyMmsiRejection(mmsi);
+      this.dlq.write({
+        raw,
+        sourceId,
+        receivedAt,
+        reason: { kind, detail: `mmsi=${String(mmsi)}` },
+      });
+      this.actor?.send({
+        type: 'FRAME_REJECTED',
+        sourceId,
+        reason: securityKindToFsmReason(kind),
+      });
+      return;
+    }
+
+    if (
+      message.messageType === 1 ||
+      message.messageType === 2 ||
+      message.messageType === 3 ||
+      message.messageType === 18
+    ) {
+      const position = message.position;
+      if (position !== null) {
+        const [lng, lat] = position;
+        const positionCheck = validatePosition({
+          lat,
+          lng,
+          speedOverGround: message.speedOverGround,
+          courseOverGround: message.courseOverGround,
+          trueHeading: 'trueHeading' in message ? message.trueHeading : null,
+        });
+        if (!positionCheck.ok) {
+          this.dlq.write({
+            raw,
+            sourceId,
+            receivedAt,
+            reason: {
+              kind: positionCheck.reason,
+              detail: `lat=${String(lat)} lng=${String(lng)}`,
+            },
+          });
+          this.actor?.send({
+            type: 'FRAME_REJECTED',
+            sourceId,
+            reason: securityKindToFsmReason(positionCheck.reason),
+          });
+          return;
+        }
+      }
+    }
+
+    const admit = this.newMmsiBouncer.admit(mmsi);
+    if (admit === 'rejected-new-cap') {
+      this.dlq.write({
+        raw,
+        sourceId,
+        receivedAt,
+        reason: {
+          kind: 'new-mmsi-cap',
+          detail: `mmsi=${String(mmsi)} introductions-per-min cap reached`,
+        },
+      });
+      this.actor?.send({
+        type: 'FRAME_REJECTED',
+        sourceId,
+        reason: securityKindToFsmReason('new-mmsi-cap'),
+      });
+      return;
+    }
+
+    if (!this.mmsiLimiter.tryConsume(mmsi)) {
+      this.dlq.write({
+        raw,
+        sourceId,
+        receivedAt,
+        reason: {
+          kind: 'mmsi-flooding',
+          detail: `mmsi=${String(mmsi)} per-mmsi rate exceeded`,
+        },
+      });
+      this.actor?.send({
+        type: 'FRAME_REJECTED',
+        sourceId,
+        reason: securityKindToFsmReason('mmsi-flooding'),
+      });
+      return;
+    }
+
     this.actor?.send({
       type: 'FRAME_RECEIVED',
-      sourceId: source.id,
+      sourceId,
       frameAt: receivedAt,
     });
-    // Static-only AIS messages (type 5 / 24) carry no position and
-    // would build a binary VesselUpdateFrame with flags=0 (no
-    // HAS_FIX). On the FE that frame would either drop the marker
-    // (no prior record) or strip HAS_FIX off an existing one
-    // (prior position frame); the static payload is already
-    // delivered separately via VESSEL_STATIC_EVENT, so the binary
-    // channel publishes only position-bearing message types.
-    if (
-      validation.value.messageType === 5 ||
-      validation.value.messageType === 24
-    ) {
-      publishVesselStatic(this.eventBus, {
-        message: validation.value,
-        sourceId: source.id,
-        receivedAt,
-      });
+
+    if (message.messageType === 5 || message.messageType === 24) {
+      publishVesselStatic(this.eventBus, { message, sourceId, receivedAt });
     } else {
-      publishVesselUpdate(this.eventBus, {
-        message: validation.value,
-        sourceId: source.id,
-        receivedAt,
-      });
+      publishVesselUpdate(this.eventBus, { message, sourceId, receivedAt });
     }
   }
 

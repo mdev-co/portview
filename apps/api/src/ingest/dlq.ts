@@ -4,8 +4,19 @@ import path from 'node:path';
 import { type SourceId, sourceIdName } from '@sps/shared';
 import type { AisStreamAdapterRejection } from './adapters/ais-stream.adapter';
 import type { DecodeRejection } from './decoder';
+import type { MmsiRejectionReason } from './validators/mmsi-validator';
+import type { PositionRejectionReason } from './validators/position-validator';
 
-export type DlqReason = DecodeRejection | AisStreamAdapterRejection;
+export type SecurityRejection =
+  | { readonly kind: MmsiRejectionReason; readonly detail: string }
+  | { readonly kind: PositionRejectionReason; readonly detail: string }
+  | { readonly kind: 'mmsi-flooding'; readonly detail: string }
+  | { readonly kind: 'new-mmsi-cap'; readonly detail: string };
+
+export type DlqReason =
+  | DecodeRejection
+  | AisStreamAdapterRejection
+  | SecurityRejection;
 
 export type DlqRow = {
   readonly ts: string;

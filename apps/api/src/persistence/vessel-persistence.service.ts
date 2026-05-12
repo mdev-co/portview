@@ -300,6 +300,15 @@ function rehydrateKalman(stored: StoredKalman | null): KalmanState2D | null {
   };
 }
 
+/**
+ * Hard ceiling on any element of the covariance matrix. The filter is
+ * supposed to settle to small values during normal operation; runaway
+ * growth signals adversarial inputs (poisoned positions) or a stuck
+ * sensor. When detected the state is reset to a fresh initialisation
+ * around the latest measurement, dropping accumulated bad history.
+ */
+const KALMAN_COVARIANCE_HARD_CAP = 1_000;
+
 function advanceKalman(
   stored: StoredKalman | null,
   measurementLng: number,
@@ -312,5 +321,11 @@ function advanceKalman(
   }
   const prevSeconds = Math.floor(stored.kalmanUpdatedAt.getTime() / 1000);
   const dt = Math.max(0, nowSeconds - prevSeconds);
-  return stepKalman2D(prev, dt, measurementLng, measurementLat);
+  const next = stepKalman2D(prev, dt, measurementLng, measurementLat);
+  for (const c of next.covariance) {
+    if (!Number.isFinite(c) || Math.abs(c) > KALMAN_COVARIANCE_HARD_CAP) {
+      return initKalmanState2D(measurementLng, measurementLat);
+    }
+  }
+  return next;
 }
