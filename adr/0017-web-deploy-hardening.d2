@@ -1,0 +1,91 @@
+direction: down
+vars: {
+  d2-config: {
+    theme-id: 8
+    pad: 40
+  }
+}
+
+user: "Browser\nsps-mdev.vercel.app" {
+  shape: oval
+  style: {
+    fill: "#d1fae5"
+    stroke: "#065f46"
+  }
+}
+
+vercel: "Vercel static CDN\nedge cache + headers" {
+  shape: rectangle
+  style: {
+    fill: "#fef3c7"
+    stroke: "#92400e"
+  }
+}
+
+headers: "Security headers\nHSTS + CSP + X-Frame-Options DENY\nReferrer-Policy + Permissions-Policy\nCOOP/CORP + Origin-Agent-Cluster\nX-Content-Type-Options nosniff" {
+  shape: rectangle
+  style: {
+    fill: "#dbeafe"
+    stroke: "#1e40af"
+  }
+}
+
+csp_block: "CSP blocks\ninline JS, third-party fetch,\nframe ancestors, eval,\nobject embeds" {
+  shape: hexagon
+  style: {
+    fill: "#fee2e2"
+    stroke: "#991b1b"
+  }
+}
+
+bundle: "Minified SPA bundle\nesbuild minify + Rollup tree-shake\nindex.html + assets" {
+  shape: rectangle
+  style: {
+    fill: "#ede9fe"
+    stroke: "#5b21b6"
+  }
+}
+
+api: "Fly api\nsps-api.fly.dev\nthrottler + helmet + CORS" {
+  shape: rectangle
+  style: {
+    fill: "#fef3c7"
+    stroke: "#92400e"
+  }
+}
+
+ws: "Fly WebSocket\nwss://sps-api.fly.dev/ws/telemetry\nbinary + JSON frames" {
+  shape: rectangle
+  style: {
+    fill: "#fef3c7"
+    stroke: "#92400e"
+  }
+}
+
+osm: "OSM tile servers\nhttps://tile.openstreetmap.org\nallowlisted in CSP img-src" {
+  shape: cylinder
+  style: {
+    fill: "#dcfce7"
+    stroke: "#166534"
+  }
+}
+
+attacker: "Hostile origin\ne.g. evil.com" {
+  shape: oval
+  style: {
+    fill: "#fee2e2"
+    stroke: "#991b1b"
+  }
+}
+
+user -> vercel: "GET /"
+vercel -> headers: "applies"
+vercel -> bundle: "serves"
+bundle -> user: "loads"
+user -> api: "fetch /api/vessels via VITE_API_URL"
+user -> ws: "WebSocket via VITE_WS_URL"
+user -> osm: "MapLibre tile fetch"
+attacker -> vercel: "iframe embed"
+vercel -> attacker: "X-Frame-Options DENY"
+attacker -> bundle: "injected inline script"
+bundle -> csp_block: "blocked"

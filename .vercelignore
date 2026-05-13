@@ -1,0 +1,30 @@
+# Files Vercel should not consider for the deploy bundle. Vercel
+# already respects .gitignore, so this list catches paths that are
+# tracked (and therefore visible) but irrelevant to the web build.
+
+# Backend - Vercel does not deploy the api side.
+apps/api
+apps/ingest
+
+# Workspace package not bundled into the web (Vite bundles it from source).
+# packages/shared stays because the web build imports it.
+
+# Documentation, ADRs, GitHub configuration.
+docs
+adr
+.github
+
+# Local-only Husky hooks executed by git, not by Vercel.
+.husky
+
+# Editor / OS dotfiles that may slip in.
+.vscode
+.idea
+.DS_Store
+
+# Test artefacts.
+coverage
+**/__tests__
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts

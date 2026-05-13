@@ -18,6 +18,22 @@ export default defineConfig([
     languageOptions: {
       globals: globals.browser,
     },
+    rules: {
+      // Block dangerouslySetInnerHTML at the linter so a future PR
+      // cannot quietly bypass React's default JSX escaping. Audit for
+      // the Vercel deploy hardening pass found zero occurrences and
+      // we keep it that way. If a genuine use-case appears (Markdown
+      // render, third-party HTML snippet), the PR introducing it adds
+      // a sanitizer and a scoped eslint-disable with the rationale.
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "JSXAttribute[name.name='dangerouslySetInnerHTML']",
+          message:
+            'dangerouslySetInnerHTML bypasses JSX escaping. Sanitize with DOMPurify and add a scoped override with rationale.',
+        },
+      ],
+    },
   },
   {
     files: ['src/components/ui/**/*.{ts,tsx}', 'src/shell/**/*.{ts,tsx}'],
