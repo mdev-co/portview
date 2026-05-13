@@ -19,6 +19,8 @@
     "@fontsource-variable/geist": "^5.2.8",
     "@nanostores/react": "^1.1.0",
     "@sps/shared": "workspace:^",
+    "@vercel/analytics": "^2.0.1",
+    "@vercel/speed-insights": "^2.0.0",
     "@xstate/react": "^6.1.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
