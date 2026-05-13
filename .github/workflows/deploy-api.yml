@@ -1,0 +1,55 @@
+name: deploy-api
+
+# Auto-deploy the api to Fly.io on every push to main that actually
+# changes the api or its build inputs. Runs on the Fly remote builder
+# (--remote-only) so the GitHub Actions runner only orchestrates the
+# call and ships logs back; the actual Docker build happens on Fly
+# infrastructure where the secrets and registry live.
+#
+# Setup: a Fly API token must be present as a GitHub repository
+# secret named FLY_API_TOKEN. Generate via `fly auth token` locally,
+# then Settings -> Secrets and variables -> Actions -> New repository
+# secret. The token must have deploy permissions on the sps-api app.
+
+on:
+  push:
+    branches:
+      - main
+    # Only redeploy when something the api build depends on changes.
+    # A pure web / docs / adr change has zero effect on the api image
+    # and would burn build minutes for no gain.
+    paths:
+      - 'apps/api/**'
+      - 'packages/shared/**'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'package.json'
+      - '.github/workflows/deploy-api.yml'
+
+# Cancel an in-flight deploy if a newer commit lands on main. Fly
+# itself serialises rollouts but cancelling the older job in CI saves
+# minutes and avoids confusing "stale deploy succeeded just now"
+# notifications.
+concurrency:
+  group: deploy-api-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: flyctl deploy sps-api
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy to Fly
+        run: flyctl deploy --remote-only --config apps/api/fly.toml --app sps-api
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
