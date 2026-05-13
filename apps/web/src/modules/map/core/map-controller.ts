@@ -74,6 +74,16 @@ export class MapController {
     currentAdapter.setSourceData(sourceId, data);
   }
 
+  setLayerVisibility(layerId: string, visible: boolean): void {
+    const { currentAdapter } = this.actor.getSnapshot().context;
+    // The map style switcher can fire before the engine finishes
+    // initializing (e.g. during a fast page-load click). Treat the
+    // call as a no-op until an adapter exists; the next style change
+    // after the ready event will apply the desired visibility.
+    if (!currentAdapter) return;
+    currentAdapter.setLayerVisibility(layerId, visible);
+  }
+
   getRawEngine(): unknown {
     return this.actor.getSnapshot().context.currentAdapter?.getRawEngine() ?? null;
   }
