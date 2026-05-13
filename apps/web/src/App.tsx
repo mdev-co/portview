@@ -6,6 +6,8 @@ import { TrailsToggle } from '@/modules/map/components/trails-toggle';
 import { ThemeToggle } from '@/modules/theme';
 import { IndexRoute } from '@/routes/index-route';
 import { AppShell } from '@/shell/app-shell';
+import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import { Anchor } from 'lucide-react';
 
 const router = createBrowserRouter([
@@ -31,7 +33,15 @@ const router = createBrowserRouter([
 ]);
 
 function App() {
-  return <RouterProvider router={router} />;
+  return (
+    <>
+      <RouterProvider router={router} />
+      {/* Vercel-hosted first-party beacons (same-origin, no third-party script,
+          no cookies, no GDPR banner). Both no-op in dev. */}
+      <Analytics />
+      <SpeedInsights />
+    </>
+  );
 }
 
 export default App;
