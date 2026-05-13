@@ -129,4 +129,54 @@ describe('vessel-history.store', () => {
     expect($vesselKalmanState.get()[100]).toBeUndefined();
     expect($vesselKalmanState.get()[200]).toBeDefined();
   });
+
+  it('drops orphan history within the same tick when a vessel leaves $vessels', () => {
+    // Regression coverage for the previously visible desync: vessel
+    // disappears from $vessels (TTL sweep) but its trail polyline
+    // keeps rendering until the next $vesselPositionHistory sweep
+    // 30-60 s later. The store now listens to $vessels and cascades
+    // the orphan cleanup synchronously, so map and sidebar observe
+    // the same state in the same event loop tick.
+    //
+    // Activating the subscription is required to make `onMount` fire
+    // its body in the nanostores lifecycle; subscribing to either
+    // store (history or kalman) wires the listener.
+    const unsubHistory = $vesselPositionHistory.subscribe(() => {});
+    const unsubKalman = $vesselKalmanState.subscribe(() => {});
+
+    setVessel(vessel({ mmsi: 100 as Mmsi }));
+    setVessel(vessel({ mmsi: 200 as Mmsi }));
+    appendHistoryPoint(100, point(), NOW);
+    appendHistoryPoint(200, point(), NOW);
+    setKalmanState(100, {
+      lng: 14,
+      lat: 53,
+      vlng: 0,
+      vlat: 0,
+      covariance: new Array(16).fill(0),
+      updatedAtUnix: NOW - 60,
+    });
+
+    // Simulate TTL eviction of vessel 100 (full set replacement, the
+    // shape vessels.store's sweepStale uses).
+    const live = $vessels.get();
+    const next: Record<number, LiveVessel> = {};
+    for (const key in live) {
+      const mmsi = Number(key);
+      if (mmsi !== 100) {
+        const v = live[mmsi];
+        if (v !== undefined) next[mmsi] = v;
+      }
+    }
+    $vessels.set(next);
+
+    // No manual sweep call: history and Kalman for 100 must already be
+    // gone because the $vessels.listen hook fired synchronously.
+    expect($vesselPositionHistory.get()[100]).toBeUndefined();
+    expect($vesselPositionHistory.get()[200]).toBeDefined();
+    expect($vesselKalmanState.get()[100]).toBeUndefined();
+
+    unsubHistory();
+    unsubKalman();
+  });
 });

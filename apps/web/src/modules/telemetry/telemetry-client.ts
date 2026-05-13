@@ -94,6 +94,15 @@ export type DispatchHandlers = {
  * static-data cache, replace the history buffer, install the Kalman
  * state, and synthesise a LiveVessel from the last history point so
  * the sidebar and map render immediately, before any live AIS report.
+ *
+ * The synthesised LiveVessel is stamped with `frame.serverTimeUnix`,
+ * not the original history point timestamp - the snapshot is the
+ * server saying "as of now (serverTimeUnix), the last known position
+ * for this vessel is `latest`". Stamping with the older history
+ * timestamp would mean the vessels.store TTL sweep evicts everything
+ * on the very next pass whenever the freshest history sample is
+ * older than the 600 s window, which produced the visible "sidebar
+ * empties while a polyline lingers on the map" desync.
  */
 function applySnapshot(frame: VesselSnapshotFrame): void {
   for (const entry of frame.vessels) {
@@ -109,12 +118,16 @@ function applySnapshot(frame: VesselSnapshotFrame): void {
     }
     const latest = entry.history[entry.history.length - 1];
     if (latest !== undefined) {
-      setVessel(synthesiseLiveVesselFromHistory(entry.mmsi, latest));
+      setVessel(synthesiseLiveVesselFromHistory(entry.mmsi, latest, frame.serverTimeUnix));
     }
   }
 }
 
-function synthesiseLiveVesselFromHistory(mmsi: Mmsi, point: VesselHistoryPoint): LiveVessel {
+function synthesiseLiveVesselFromHistory(
+  mmsi: Mmsi,
+  point: VesselHistoryPoint,
+  serverTimeUnix: number,
+): LiveVessel {
   // Snapshots originate from the same server that emits live frames,
   // so we know the vessel had a position fix at the recorded time.
   // Approximate the flags the next live frame would carry: HAS_FIX
@@ -137,7 +150,7 @@ function synthesiseLiveVesselFromHistory(mmsi: Mmsi, point: VesselHistoryPoint):
     sog: point.sog,
     cog: point.cog,
     trueHeading: point.trueHeading,
-    timestampUnix: point.timestampUnix,
+    timestampUnix: serverTimeUnix,
     flags,
   };
 }
