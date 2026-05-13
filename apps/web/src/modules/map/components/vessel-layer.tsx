@@ -10,7 +10,7 @@ import type { MapLayerMouseEvent, MapMouseEvent, Map as MaplibreMap } from 'mapl
 import { useMapEngine } from '../hooks/use-map-engine';
 import { useMapState } from '../hooks/use-map-state';
 import { trailsToGeoJSON } from '../lib/trails-to-geojson';
-import { ensureVesselArrowIcon } from '../lib/vessel-arrow-icon';
+import { ensureVesselIcons } from '../lib/vessel-icons';
 import { vesselsToGeoJSON } from '../lib/vessels-to-geojson';
 import { $trailVisibilityPredicate } from '../state/trail-visibility';
 import {
@@ -45,7 +45,7 @@ export function VesselLayer(): null {
     if (status !== 'ready') return;
     const map = controller.getRawEngine() as MaplibreMap | null;
     if (map) {
-      ensureVesselArrowIcon(map);
+      ensureVesselIcons(map);
       if (import.meta.env.DEV) {
         (window as unknown as { __sps_map?: MaplibreMap }).__sps_map = map;
       }
