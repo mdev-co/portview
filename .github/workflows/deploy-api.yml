@@ -50,6 +50,11 @@ jobs:
         uses: superfly/flyctl-actions/setup-flyctl@master
 
       - name: Deploy to Fly
-        run: flyctl deploy --remote-only --config apps/api/fly.toml --app sps-api
+        # fly.toml lives at the repo root so the dockerfile path
+        # ("apps/api/Dockerfile") resolves against the same directory
+        # the Dockerfile expects as its build context. flyctl picks
+        # the toml up automatically from the working directory; no
+        # --config flag needed.
+        run: flyctl deploy --remote-only --app sps-api
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
