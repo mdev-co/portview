@@ -220,6 +220,15 @@ export type TelemetryClient = {
 };
 
 function defaultUrl(): string {
+  // Explicit override takes precedence. Vite inlines VITE_WS_URL at
+  // build time, so production builds hosted at one origin (Vercel)
+  // can point at an api hosted at a different origin (Fly). Without
+  // this, the WebSocket falls through to window.location.host which
+  // resolves to the static-hosting origin and has no ws upgrade route.
+  const explicit = import.meta.env.VITE_WS_URL;
+  if (typeof explicit === 'string' && explicit.length > 0) {
+    return explicit;
+  }
   if (typeof window === 'undefined') return 'ws://localhost:3000/ws/telemetry';
   const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
   const host = window.location.host.includes(':5173') ? 'localhost:3000' : window.location.host;
