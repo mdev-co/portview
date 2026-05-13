@@ -9,9 +9,19 @@ const VESSEL_SELECT = {
   name: true,
   callSign: true,
   shipType: true,
+  toBow: true,
+  toStern: true,
+  toPort: true,
+  toStarboard: true,
+  draught: true,
   destination: true,
   eta: true,
   lastSeenAt: true,
+  kalmanLng: true,
+  kalmanLat: true,
+  kalmanVlng: true,
+  kalmanVlat: true,
+  kalmanUpdatedAt: true,
   positions: {
     orderBy: { ingestTimestamp: 'desc' as const },
     take: 1,
@@ -22,6 +32,7 @@ const VESSEL_SELECT = {
       courseOverGround: true,
       trueHeading: true,
       navStatus: true,
+      rateOfTurn: true,
       broadcastTimestamp: true,
       ingestTimestamp: true,
     },
@@ -34,9 +45,19 @@ type VesselRow = {
   name: string | null;
   callSign: string | null;
   shipType: number | null;
+  toBow: number | null;
+  toStern: number | null;
+  toPort: number | null;
+  toStarboard: number | null;
+  draught: number | null;
   destination: string | null;
   eta: Date | null;
   lastSeenAt: Date | null;
+  kalmanLng: number | null;
+  kalmanLat: number | null;
+  kalmanVlng: number | null;
+  kalmanVlat: number | null;
+  kalmanUpdatedAt: Date | null;
   positions: Array<{
     lat: number;
     lng: number;
@@ -44,6 +65,7 @@ type VesselRow = {
     courseOverGround: number | null;
     trueHeading: number | null;
     navStatus: number | null;
+    rateOfTurn: number | null;
     broadcastTimestamp: Date | null;
     ingestTimestamp: Date;
   }>;
@@ -73,12 +95,40 @@ export class VesselsService {
 
 function toSummary(row: VesselRow): VesselSummary {
   const latest = row.positions[0] ?? null;
+  const dimensions =
+    row.toBow !== null &&
+    row.toStern !== null &&
+    row.toPort !== null &&
+    row.toStarboard !== null
+      ? {
+          toBow: row.toBow,
+          toStern: row.toStern,
+          toPort: row.toPort,
+          toStarboard: row.toStarboard,
+        }
+      : null;
+  const kalmanState =
+    row.kalmanLng !== null &&
+    row.kalmanLat !== null &&
+    row.kalmanVlng !== null &&
+    row.kalmanVlat !== null &&
+    row.kalmanUpdatedAt !== null
+      ? {
+          lng: row.kalmanLng,
+          lat: row.kalmanLat,
+          vlng: row.kalmanVlng,
+          vlat: row.kalmanVlat,
+          updatedAt: row.kalmanUpdatedAt.toISOString(),
+        }
+      : null;
   return {
     mmsi: row.mmsi,
     imo: row.imo,
     name: row.name,
     callSign: row.callSign,
     shipType: row.shipType,
+    dimensions,
+    draught: row.draught,
     destination: row.destination,
     eta: row.eta?.toISOString() ?? null,
     lastSeenAt: row.lastSeenAt?.toISOString() ?? null,
@@ -92,9 +142,13 @@ function toSummary(row: VesselRow): VesselSummary {
             courseOverGround: latest.courseOverGround,
             trueHeading: latest.trueHeading,
             navStatus: latest.navStatus,
+            rateOfTurn: latest.rateOfTurn,
+            broadcastTimestamp:
+              latest.broadcastTimestamp?.toISOString() ?? null,
             updatedAt: (
               latest.broadcastTimestamp ?? latest.ingestTimestamp
             ).toISOString(),
           },
+    kalmanState,
   };
 }

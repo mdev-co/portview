@@ -5,6 +5,8 @@
  * REST surface for the AIS vessel tracking project. The frontend consumes this spec via Orval to generate a typed client.
  * OpenAPI spec version: 1.0.0
  */
+import type { VesselDimensions } from './vesselDimensions';
+import type { VesselKalmanState } from './vesselKalmanState';
 import type { VesselPositionSummary } from './vesselPositionSummary';
 
 export interface VesselSummary {
@@ -13,8 +15,11 @@ export interface VesselSummary {
   name: null | string;
   callSign: null | string;
   shipType: null | number;
+  dimensions: null | VesselDimensions;
+  draught: null | number;
   destination: null | string;
   eta: null | string;
   lastSeenAt: null | string;
   position: null | VesselPositionSummary;
+  kalmanState: null | VesselKalmanState;
 }

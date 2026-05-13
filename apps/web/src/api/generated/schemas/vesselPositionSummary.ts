@@ -21,6 +21,8 @@ export interface VesselPositionSummary {
   courseOverGround: null | number;
   trueHeading: null | number;
   navStatus: null | number;
+  rateOfTurn: null | number;
+  broadcastTimestamp: null | string;
   /** ISO 8601 timestamp of the most recent position report. */
   updatedAt: string;
 }
