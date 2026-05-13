@@ -74,6 +74,26 @@
               }
             ]
           },
+          "dimensions": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/VesselDimensions"
+              }
+            ]
+          },
+          "draught": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "number"
+              }
+            ]
+          },
           "destination": {
             "oneOf": [
               {
@@ -115,6 +135,16 @@
                 "$ref": "#/components/schemas/VesselPositionSummary"
               }
             ]
+          },
+          "kalmanState": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/VesselKalmanState"
+              }
+            ]
           }
         },
         "required": [
@@ -123,11 +153,33 @@
           "name",
           "callSign",
           "shipType",
+          "dimensions",
+          "draught",
           "destination",
           "eta",
           "lastSeenAt",
-          "position"
+          "position",
+          "kalmanState"
         ]
+      },
+      "VesselDimensions": {
+        "type": "object",
+        "properties": {
+          "toBow": {
+            "type": "integer"
+          },
+          "toStern": {
+            "type": "integer"
+          },
+          "toPort": {
+            "type": "integer"
+          },
+          "toStarboard": {
+            "type": "integer"
+          }
+        },
+        "required": ["toBow", "toStern", "toPort", "toStarboard"],
+        "description": "Hull dimensions in metres relative to the GNSS antenna position.\nOrigin: ITU-R M.1371-5 type 5 ShipStaticData. Nullable as a group\nbecause either all four fields are reported together (from a single\ntype 5 message) or none are."
       },
       "VesselPositionSummary": {
         "type": "object",
@@ -182,6 +234,27 @@
               }
             ]
           },
+          "rateOfTurn": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "number"
+              }
+            ]
+          },
+          "broadcastTimestamp": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "format": "date-time"
+              }
+            ]
+          },
           "updatedAt": {
             "type": "string",
             "format": "date-time",
@@ -195,8 +268,37 @@
           "courseOverGround",
           "trueHeading",
           "navStatus",
+          "rateOfTurn",
+          "broadcastTimestamp",
           "updatedAt"
         ]
+      },
+      "VesselKalmanState": {
+        "type": "object",
+        "properties": {
+          "lng": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180
+          },
+          "lat": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90
+          },
+          "vlng": {
+            "type": "number"
+          },
+          "vlat": {
+            "type": "number"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": ["lng", "lat", "vlng", "vlat", "updatedAt"],
+        "description": "Persisted Kalman filter state for the constant-velocity 2D model.\nThe frontend re-attaches its filter to this state on cold-start so\nextrapolation continues smoothly instead of restarting from scratch.\nNull when the vessel has no position fix yet."
       },
       "ListVesselsQuery": {
         "type": "object",

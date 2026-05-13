@@ -8,6 +8,8 @@
 
 export * from './getVesselsParams';
 export * from './listVesselsQuery';
+export * from './vesselDimensions';
+export * from './vesselKalmanState';
 export * from './vesselListResponse';
 export * from './vesselPositionSummary';
 export * from './vesselSummary';

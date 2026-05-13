@@ -1,0 +1,81 @@
+direction: down
+vars: {
+  d2-config: {
+    theme-id: 8
+    pad: 40
+  }
+}
+
+prisma_vessel: "Prisma model Vessel\nmmsi, imo, name, callSign, shipType\ntoBow, toStern, toPort, toStarboard, draught\nkalmanLng, kalmanLat, kalmanVlng, kalmanVlat, kalmanUpdatedAt\ndestination, eta, lastSeenAt" {
+  shape: rectangle
+  style: {
+    fill: "#fef3c7"
+    stroke: "#92400e"
+  }
+}
+
+prisma_position: "Prisma model VesselPosition (latest)\nlat, lng, sog, cog, trueHeading\nnavStatus, rateOfTurn\nbroadcastTimestamp, ingestTimestamp" {
+  shape: rectangle
+  style: {
+    fill: "#fef3c7"
+    stroke: "#92400e"
+  }
+}
+
+vessels_select: "VESSEL_SELECT\nPrisma nested select\nincludes positions[orderBy desc, take 1]" {
+  shape: rectangle
+  style: {
+    fill: "#dbeafe"
+    stroke: "#1e40af"
+  }
+}
+
+to_summary: "toSummary(row)\ngroup nullables (dimensions, kalmanState)\nISO timestamp formatting" {
+  shape: rectangle
+  style: {
+    fill: "#dbeafe"
+    stroke: "#1e40af"
+  }
+}
+
+vessel_summary: "VesselSummary (wire shape)\nidentity + dimensions + draught\nposition with rateOfTurn + broadcastTimestamp\nkalmanState" {
+  shape: cylinder
+  style: {
+    fill: "#ede9fe"
+    stroke: "#5b21b6"
+  }
+}
+
+nestia: "nestia AOT transformer\nemits OpenAPI schema" {
+  shape: rectangle
+  icon: https://icons.terrastruct.com/dev%2Ftypescript.svg
+}
+
+spec: "openapi-spec.json\nVesselDimensions, VesselKalmanState components" {
+  shape: cylinder
+  style: {
+    fill: "#ede9fe"
+    stroke: "#5b21b6"
+  }
+}
+
+orval: "Orval CLI\npnpm apigen" {
+  shape: rectangle
+}
+
+client: "Typed web client\ngenerated schemas + fetch" {
+  shape: cylinder
+  style: {
+    fill: "#dcfce7"
+    stroke: "#166534"
+  }
+}
+
+prisma_vessel -> vessels_select
+prisma_position -> vessels_select
+vessels_select -> to_summary
+to_summary -> vessel_summary
+vessel_summary -> nestia: "TS type read by transformer"
+nestia -> spec
+spec -> orval
+orval -> client
