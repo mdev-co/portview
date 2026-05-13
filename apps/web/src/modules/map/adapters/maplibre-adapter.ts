@@ -152,6 +152,20 @@ export class MapLibreAdapter implements IMapEngineAdapter {
     source.setData(data);
   }
 
+  setLayerVisibility(layerId: string, visible: boolean): void {
+    if (!this.map) {
+      throw new AdapterNotInitializedError(ENGINE_TYPE, 'setLayerVisibility');
+    }
+    if (!this.map.getLayer(layerId)) {
+      // Silent no-op rather than throw: a style descriptor referencing
+      // a layer not in the current style spec is a mis-configuration
+      // that should surface as a missing visual, not crash the runtime
+      // sync loop the moment the style switcher is opened.
+      return;
+    }
+    this.map.setLayoutProperty(layerId, 'visibility', visible ? 'visible' : 'none');
+  }
+
   isInitialized(): boolean {
     return this.map !== null && this.readyState;
   }

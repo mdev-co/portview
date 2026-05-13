@@ -38,6 +38,13 @@ export interface IMapEngineAdapter {
 
   flyTo(center: LngLat, zoom?: number): void;
   setSourceData(sourceId: string, data: GeoJSONFeatureCollection): void;
+  /**
+   * Toggle a single layer's visibility on the running map without
+   * rebuilding the style. Used by the map style engine to switch
+   * which base raster and which overlay rasters are active without
+   * forcing MapLibre to reinitialise.
+   */
+  setLayerVisibility(layerId: string, visible: boolean): void;
 
   isInitialized(): boolean;
   isDisposed(): boolean;
