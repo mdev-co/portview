@@ -3,7 +3,7 @@ import { WsAdapter } from '@nestjs/platform-ws';
 import { SwaggerModule } from '@nestjs/swagger';
 
 import { AppModule } from './app.module';
-import { getPort, shouldExposeOpenApi } from './env';
+import { getCorsAllowedOrigins, getPort, shouldExposeOpenApi } from './env';
 import {
   loadOpenApiDocument,
   OPENAPI_UI_PATH,
@@ -14,6 +14,23 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.useWebSocketAdapter(new WsAdapter(app));
   app.setGlobalPrefix('api', { exclude: ['/'] });
+
+  // CORS allowlist from env. Closed by default - if no origins are
+  // configured the api refuses cross-origin browser requests. The
+  // production deploy at sps-api.fly.dev sets the secret to the
+  // public web origin (e.g. https://sps-radar.vercel.app); local
+  // dev sets http://localhost:5173 in the root .env. The WebSocket
+  // gateway has its own origin handling inside WsAdapter and is
+  // unaffected.
+  const corsOrigins = getCorsAllowedOrigins();
+  if (corsOrigins.length > 0) {
+    app.enableCors({
+      origin: corsOrigins,
+      methods: ['GET', 'HEAD', 'OPTIONS', 'POST', 'PUT', 'PATCH', 'DELETE'],
+      allowedHeaders: ['Accept', 'Content-Type'],
+      maxAge: 86400,
+    });
+  }
 
   // OpenAPI exposure is opt-in via env (see ./env.ts). Default is
   // closed everywhere - dev, CI, prod - so the spec is never
