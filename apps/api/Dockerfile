@@ -40,9 +40,17 @@ COPY packages/shared/ packages/shared/
 COPY apps/api/ apps/api/
 
 # Build shared first (its dist is what apps/api types resolve to),
-# then generate the Prisma client, then build the api.
+# then generate the Prisma client, patch the local TypeScript module
+# so the typia + @nestia/core AST transformers run during the api
+# compile, then build the api. The install above used
+# --ignore-scripts so our postinstall (which calls ts-patch install)
+# was skipped; explicitly running it here ensures `nest build` sees
+# the patched tsc and emits @TypedRoute decorated routes with the
+# nestia transformer applied. Without this, compiled controllers
+# throw NoTransformConfigurationError at app startup.
 RUN pnpm --filter @sps/shared build \
   && pnpm --filter @sps/api exec prisma generate \
+  && pnpm --filter @sps/api exec ts-patch install \
   && pnpm --filter @sps/api build
 
 # pnpm deploy creates a self contained production deployment for the
