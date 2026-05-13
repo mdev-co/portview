@@ -1,5 +1,6 @@
 import type { MapStatus } from '../core/map-state';
 import { useMapState } from '../hooks/use-map-state';
+import { useMapStyleSync } from '../hooks/use-map-style-sync';
 import { MapCanvas } from './map-canvas';
 import { VesselLayer } from './vessel-layer';
 
@@ -17,6 +18,8 @@ const LOADING_LABEL: Record<MapStatus, (error: Error | null) => string | null> =
 export function MapView() {
   const { status, error } = useMapState();
   const label = LOADING_LABEL[status](error);
+
+  useMapStyleSync();
 
   return (
     <div className="relative h-full w-full">
