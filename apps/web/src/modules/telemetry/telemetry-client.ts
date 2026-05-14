@@ -12,6 +12,7 @@ import {
   type VesselStaticDataFrame,
   decodeVesselFrame,
 } from '@sps/shared';
+import { $tabVisibility } from './tab-visibility.store';
 import type { LiveVessel } from './types';
 import { appendHistoryPoint, setHistoryFromSnapshot, setKalmanState } from './vessel-history.store';
 import { setVesselStatic } from './vessel-static.store';
@@ -19,6 +20,14 @@ import { setVessel } from './vessels.store';
 
 const RECONNECT_BASE_MS = 1_000;
 const RECONNECT_MAX_MS = 30_000;
+/**
+ * Tab refocus after >= this many milliseconds hidden triggers a forced
+ * WS reconnect. The server emits a fresh snapshot on every connect, so
+ * one reconnect catches the client up on whatever it missed while the
+ * tab was suspended. Shorter than this and we churn on quick window
+ * focus toggles; longer and the sidebar stays empty for too long.
+ */
+const REFOCUS_REFRESH_THRESHOLD_MS = 30_000;
 
 export type TelemetryClientOptions = {
   readonly url?: string;
@@ -250,6 +259,7 @@ export function createTelemetryClient(options: TelemetryClientOptions = {}): Tel
   let stopped = false;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   let state: 'idle' | 'connecting' | 'open' | 'closed' = 'idle';
+  let unsubVisibility: (() => void) | null = null;
 
   function scheduleReconnect(): void {
     if (stopped) return;
@@ -298,6 +308,24 @@ export function createTelemetryClient(options: TelemetryClientOptions = {}): Tel
     start(): void {
       if (state !== 'idle' && state !== 'closed') return;
       stopped = false;
+      // Subscribe to the tab visibility domain store. When the user
+      // returns after >= REFOCUS_REFRESH_THRESHOLD_MS hidden, force a
+      // socket close so the existing reconnect path opens a fresh
+      // session and the server emits a new snapshot stamped with the
+      // current serverTimeUnix - both stores re-hydrate without a
+      // manual page reload.
+      if (unsubVisibility === null) {
+        unsubVisibility = $tabVisibility.listen(visibility => {
+          if (
+            visibility.kind === 'visible' &&
+            visibility.prevHiddenDurationMs >= REFOCUS_REFRESH_THRESHOLD_MS &&
+            state === 'open' &&
+            socket !== null
+          ) {
+            socket.close(1000, 'tab refocus refresh');
+          }
+        });
+      }
       open();
     },
     stop(): void {
@@ -305,6 +333,10 @@ export function createTelemetryClient(options: TelemetryClientOptions = {}): Tel
       if (reconnectTimer !== null) {
         clearTimeout(reconnectTimer);
         reconnectTimer = null;
+      }
+      if (unsubVisibility !== null) {
+        unsubVisibility();
+        unsubVisibility = null;
       }
       if (socket !== null) {
         socket.close(1000, 'client stop');
