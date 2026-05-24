@@ -4,11 +4,11 @@ import { z } from 'zod';
 /**
  * Edge-bridge runtime configuration sourced from the repo-root `.env`.
  *
- * Defaults cover the chunk 1 scaffold path so `pnpm dev` boots without
+ * Defaults cover the local-development path so `pnpm dev` boots without
  * any env file present. Chunk 3 will tighten the certificate paths from
  * optional to required once the mTLS infrastructure is in place; until
  * then the bridge can boot in a degraded "config-loaded-but-no-cert"
- * mode that logs the intended target and exits cleanly.
+ * mode that logs the intended target and connects over plain ws.
  *
  * Read-once: the schema is parsed at boot, never re-read at runtime.
  * Mutating env after boot does not change behaviour.
@@ -44,6 +44,64 @@ const EnvSchema = z.object({
     .describe(
       'Path to the CA certificate (PEM) that signed the backend server cert. ' +
         'Required from chunk 3 onward so the bridge verifies the backend identity.',
+    ),
+  EDGE_BRIDGE_RECONNECT_INITIAL_MS: z.coerce
+    .number()
+    .int()
+    .min(100)
+    .default(1000)
+    .describe('Initial reconnect delay for WSS exponential backoff (default 1 s).'),
+  EDGE_BRIDGE_RECONNECT_MAX_MS: z.coerce
+    .number()
+    .int()
+    .min(1000)
+    .default(30000)
+    .describe('Cap for the exponential backoff reconnect delay (default 30 s).'),
+  EDGE_BRIDGE_RECONNECT_JITTER_MS: z.coerce
+    .number()
+    .int()
+    .min(0)
+    .default(1000)
+    .describe(
+      'Random delay added to every reconnect attempt (uniform in [0, ms]). ' +
+        'Prevents thundering-herd when many bridges reconnect simultaneously.',
+    ),
+  EDGE_BRIDGE_CONNECTION_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .min(500)
+    .default(5000)
+    .describe(
+      'Time the WSS client waits for handshake completion before forcing ' +
+        'close. Without this a half-open TCP can wedge the connect attempt.',
+    ),
+  EDGE_BRIDGE_BACKPRESSURE_WARN_BYTES: z.coerce
+    .number()
+    .int()
+    .min(1024)
+    .default(65536)
+    .describe(
+      'Threshold (bytes) over which WSS buffered amount triggers a warning. ' +
+        'On the Raspberry Pi 1 GB sustained backpressure is the leading OOM cause; ' +
+        'default 64 KB surfaces it early without flooding journalctl.',
+    ),
+  EDGE_BRIDGE_SEND_QUEUE_LIMIT: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .default(1000)
+    .describe(
+      'Maximum number of frames buffered while WSS is disconnected ' +
+        'before the client starts dropping oldest-first.',
+    ),
+  EDGE_BRIDGE_SHUTDOWN_GRACE_MS: z.coerce
+    .number()
+    .int()
+    .min(100)
+    .default(5000)
+    .describe(
+      'Time budget (ms) to drain the in-memory queue after SIGTERM ' +
+        'before forcing the close handshake.',
     ),
 });
 
