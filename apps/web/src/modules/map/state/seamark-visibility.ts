@@ -3,16 +3,15 @@ import { atom } from 'nanostores';
 /**
  * Global toggle for the OpenSeaMap seamark overlay.
  *
- * Each map style descriptor lists `overlay-seamark` in its
- * `overlayLayerIds`, so by default seamarks render on every mode at
- * reduced opacity (gated above zoom 9). This atom lets the operator
- * suppress the overlay entirely - useful on the Voyager base where
- * the chart's own labels already convey enough port context and the
- * extra seamark symbols become visual noise.
+ * The overlay starts hidden; the operator opts in via the seamark
+ * toggle. When on, it renders on top of every map style at reduced
+ * opacity, gated above zoom 9.
  *
- * The sync hook ANDs the descriptor and this atom: an overlay is
- * visible only when (a) the descriptor lists it AND (b) the toggle
- * is on. Future overlays would follow the same pattern.
+ * Each map style descriptor lists `SEAMARK_OVERLAY_LAYER_ID` in its
+ * `overlayLayerIds`, so adding a future mode automatically inherits
+ * the overlay capability. The sync hook ANDs the descriptor and this
+ * atom: an overlay is visible only when (a) the descriptor lists it
+ * AND (b) the toggle is on. Future overlays follow the same pattern.
  */
 export const $seamarkVisible = atom<boolean>(false);
 

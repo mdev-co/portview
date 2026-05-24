@@ -3,6 +3,7 @@ import { useStore } from '@nanostores/react';
 import {
   Crosshair,
   Layers,
+  type LucideIcon,
   Map as MapIcon,
   Moon,
   MountainSnow,
@@ -28,7 +29,7 @@ import {
  * underneath each button for discoverability.
  */
 
-const STYLE_ICONS: Record<MapStyleId, typeof MapIcon> = {
+const STYLE_ICONS: Record<MapStyleId, LucideIcon> = {
   'osm-dark': Moon,
   'osm-light': MapIcon,
   'usgs-imagery-topo': TreePine,

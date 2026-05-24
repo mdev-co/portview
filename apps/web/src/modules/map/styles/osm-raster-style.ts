@@ -23,6 +23,41 @@ export const VESSEL_TRAIL_SOURCE_ID = 'vessel-trails';
 export const VESSEL_TRAIL_LAYER_ID = 'vessels-trails';
 
 /**
+ * Base raster layer ids. Each id labels exactly one entry in the
+ * style spec's `layers` array below and is referenced from the
+ * matching descriptor in `state/map-style.ts` as `baseLayerId`. The
+ * sync hook walks every id in `ALL_BASE_LAYER_IDS` on style switch.
+ * One symbol per layer; renaming touches the export, not two files.
+ */
+export const BASE_OSM_DARK_LAYER_ID = 'base-osm-dark' as const;
+export const BASE_OSM_LIGHT_LAYER_ID = 'base-osm-light' as const;
+export const BASE_USGS_IMAGERY_TOPO_LAYER_ID = 'base-usgs-imagery-topo' as const;
+export const BASE_USGS_TOPO_LAYER_ID = 'base-usgs-topo' as const;
+export const BASE_TACTICAL_LAYER_ID = 'base-tactical' as const;
+export const BASE_BACKDROP_LAYER_ID = 'base-backdrop' as const;
+export const BASE_SATELLITE_LAYER_ID = 'base-satellite' as const;
+
+/**
+ * OpenSeaMap raster overlay layer id. Declared once here next to the
+ * style-spec source/layer definitions and re-exported through the
+ * state module so the descriptor list, the sync hook and the
+ * seamark-visibility atom all reference one symbol. A rename or move
+ * of the overlay now touches a single export, not four files.
+ */
+export const SEAMARK_OVERLAY_LAYER_ID = 'overlay-seamark' as const;
+
+/**
+ * Age threshold above which a vessel's stroke colour shifts to the
+ * dim slate tone, signalling "fix is past the dead-reckoning freshness
+ * window". Sits between the dead-reckoning freeze (90 s) and the TTL
+ * eviction boundary (600 s in `vessels.store`).
+ */
+const STALE_FIX_AGE_SECONDS = 120;
+
+/** Stroke colour applied once a vessel's fix crosses STALE_FIX_AGE_SECONDS. */
+const STALE_STROKE_HEX = '#94a3b8';
+
+/**
  * Per-category top-down ship silhouette selector. Cargo and tanker
  * read as freighter; passenger / sailing / other read as medium
  * vessel; fishing and service read as small craft. Falls back to
@@ -101,18 +136,13 @@ const ringColorByMovementAndCategory: ExpressionSpecification = [
 const isSelected: ExpressionSpecification = ['boolean', ['get', 'selected'], false];
 
 /**
- * A fix older than the dead-reckoning freshness window (90s) but younger
- * than the TTL eviction boundary (600s) gets a visibly dimmed stroke so
- * the operator can tell at a glance that the position is no longer
- * being smoothly interpolated. Threshold sits between the two so a
- * freshly frozen marker fades earlier than the opacity ramp by itself
- * would suggest. Selection wins over staleness (operator picked this
- * vessel, we keep the amber ring regardless).
+ * A fix older than the dead-reckoning freshness window (90 s) but younger
+ * than the TTL eviction boundary (600 s) gets a visibly dimmed stroke so
+ * the operator can tell at a glance that the position is no longer being
+ * smoothly interpolated. Selection wins over staleness (operator picked
+ * this vessel, we keep the amber ring regardless).
  */
-const STALE_FIX_AGE_SECONDS = 120;
 const isStaleFix: ExpressionSpecification = ['>=', ['get', 'ageSeconds'], STALE_FIX_AGE_SECONDS];
-
-const STALE_STROKE_HEX = '#94a3b8';
 
 // Selection is signalled by a separate dashed-ring symbol layer rendered
 // on top of the marker (see VESSEL_SELECTION_RING_LAYER_ID below). The
@@ -265,43 +295,43 @@ export const osmRasterStyle: StyleSpecification = {
      * OpenStreetMap Mapnik base is the only one fetched on first paint.
      */
     {
-      id: 'base-osm-dark',
+      id: BASE_OSM_DARK_LAYER_ID,
       type: 'raster',
       source: 'carto-dark-matter',
       layout: { visibility: 'none' },
     },
     {
-      id: 'base-osm-light',
+      id: BASE_OSM_LIGHT_LAYER_ID,
       type: 'raster',
       source: 'osm-mapnik',
       layout: { visibility: 'visible' },
     },
     {
-      id: 'base-usgs-imagery-topo',
+      id: BASE_USGS_IMAGERY_TOPO_LAYER_ID,
       type: 'raster',
       source: 'esri-world-imagery',
       layout: { visibility: 'none' },
     },
     {
-      id: 'base-usgs-topo',
+      id: BASE_USGS_TOPO_LAYER_ID,
       type: 'raster',
       source: 'esri-world-topo',
       layout: { visibility: 'none' },
     },
     {
-      id: 'base-tactical',
+      id: BASE_TACTICAL_LAYER_ID,
       type: 'raster',
       source: 'maptiler-dataviz-dark',
       layout: { visibility: 'none' },
     },
     {
-      id: 'base-backdrop',
+      id: BASE_BACKDROP_LAYER_ID,
       type: 'raster',
       source: 'maptiler-backdrop-dark',
       layout: { visibility: 'none' },
     },
     {
-      id: 'base-satellite',
+      id: BASE_SATELLITE_LAYER_ID,
       type: 'raster',
       source: 'maptiler-satellite',
       layout: { visibility: 'none' },
@@ -314,7 +344,7 @@ export const osmRasterStyle: StyleSpecification = {
      * vessels rendered on top.
      */
     {
-      id: 'overlay-seamark',
+      id: SEAMARK_OVERLAY_LAYER_ID,
       type: 'raster',
       source: 'seamark',
       minzoom: 9,

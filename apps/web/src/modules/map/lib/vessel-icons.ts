@@ -212,13 +212,6 @@ function addOnce(map: MaplibreMap, id: string, image: ImageData, options: { sdf:
 }
 
 /**
- * Register every vessel-icon variant on the running map. Three SDF
- * silhouettes (cargo / passenger / small) get tinted by the style
- * spec's `icon-color` expression; the selection ring is non-SDF so
- * the amber dash pattern renders unchanged. Safe to call repeatedly
- * via the hasImage guard; called from VesselLayer on map ready.
- */
-/**
  * Register the rounded-corner label badge as a stretchable image.
  * The corner-preserving stretchX/stretchY zones keep the 4 px
  * radius intact while MapLibre's `icon-text-fit` resizes the middle
@@ -240,6 +233,13 @@ function addLabelBackgroundOnce(map: MaplibreMap, image: ImageData): void {
   );
 }
 
+/**
+ * Register every vessel-icon variant on the running map. Three SDF
+ * silhouettes (cargo / passenger / small) get tinted by the style
+ * spec's `icon-color` expression; the selection ring is non-SDF so
+ * the amber dash pattern renders unchanged. Safe to call repeatedly
+ * via the hasImage guard; called from VesselLayer on map ready.
+ */
 export function ensureVesselIcons(map: MaplibreMap): void {
   addOnce(map, VESSEL_ICON_CARGO_ID, buildCargoIcon(), { sdf: true });
   addOnce(map, VESSEL_ICON_PASSENGER_ID, buildPassengerIcon(), { sdf: true });

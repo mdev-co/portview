@@ -7,6 +7,7 @@ import {
   MAP_STYLE_REGISTRY,
 } from '../state/map-style';
 import { $seamarkVisible } from '../state/seamark-visibility';
+import { SEAMARK_OVERLAY_LAYER_ID } from '../styles/osm-raster-style';
 import { useMapEngine } from './use-map-engine';
 import { useMapState } from './use-map-state';
 
@@ -42,7 +43,7 @@ export function useMapStyleSync(): void {
 
     for (const overlayId of ALL_OVERLAY_LAYER_IDS) {
       const descriptorAllows = descriptor.overlayLayerIds.includes(overlayId);
-      const togglesAllow = overlayId === 'overlay-seamark' ? seamarkVisible : true;
+      const togglesAllow = overlayId === SEAMARK_OVERLAY_LAYER_ID ? seamarkVisible : true;
       controller.setLayerVisibility(overlayId, descriptorAllows && togglesAllow);
     }
   }, [activeStyle, controller, seamarkVisible, status]);
