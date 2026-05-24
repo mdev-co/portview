@@ -14,6 +14,7 @@ build/
 .env.*.local
 *.pem
 *.key
+certs/
 
 # IDE
 .vscode/

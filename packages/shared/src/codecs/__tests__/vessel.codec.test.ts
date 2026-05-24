@@ -85,7 +85,7 @@ describe('vessel codec', () => {
   });
 
   it('preserves sourceId enum values across round-trip', () => {
-    const cases = [SourceId.LocalUdp, SourceId.WebSdr, SourceId.AisStream];
+    const cases = [SourceId.LocalUdp, SourceId.WebSdr, SourceId.AisStream, SourceId.EdgeBridge];
     for (const source of cases) {
       const decoded = decodeVesselFrame(encodeVesselFrame({ ...FULL, sourceId: source }));
       expect(decoded.sourceId).toBe(source);

@@ -33,18 +33,19 @@ const EnvSchema = z.object({
   EDGE_BRIDGE_CLIENT_CERT_PATH: z
     .string()
     .optional()
-    .describe('Path to the per-device client certificate (PEM). Required from chunk 3 onward.'),
+    .describe(
+      'Path to the per-device client certificate (PEM). When set together ' +
+        'with the key and CA paths the bridge connects over mTLS; missing ' +
+        'any of the three falls back to plain ws for local dev.',
+    ),
   EDGE_BRIDGE_CLIENT_KEY_PATH: z
     .string()
     .optional()
-    .describe('Path to the per-device client private key (PEM). Required from chunk 3 onward.'),
+    .describe('Path to the per-device client private key (PEM).'),
   EDGE_BRIDGE_CA_CERT_PATH: z
     .string()
     .optional()
-    .describe(
-      'Path to the CA certificate (PEM) that signed the backend server cert. ' +
-        'Required from chunk 3 onward so the bridge verifies the backend identity.',
-    ),
+    .describe('Path to the CA certificate (PEM) that signed the backend server cert.'),
   EDGE_BRIDGE_RECONNECT_INITIAL_MS: z.coerce
     .number()
     .int()

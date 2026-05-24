@@ -19,11 +19,17 @@ const CORS_ALLOWED_ORIGINS = 'CORS_ALLOWED_ORIGINS';
 const EXTERNAL_FEED_TOKEN = 'EXTERNAL_FEED_TOKEN';
 const EXTERNAL_FEED_ENDPOINT = 'EXTERNAL_FEED_ENDPOINT';
 const SPS_EXPOSE_OPENAPI = 'SPS_EXPOSE_OPENAPI';
+const EDGE_INGEST_PORT = 'EDGE_INGEST_PORT';
+const EDGE_INGEST_SERVER_CERT_PATH = 'EDGE_INGEST_SERVER_CERT_PATH';
+const EDGE_INGEST_SERVER_KEY_PATH = 'EDGE_INGEST_SERVER_KEY_PATH';
+const EDGE_INGEST_CA_CERT_PATH = 'EDGE_INGEST_CA_CERT_PATH';
+const EDGE_INGEST_ALLOWED_CNS = 'EDGE_INGEST_ALLOWED_CNS';
 
 const PRODUCTION_ENV = 'production';
 const TRUTHY = 'true';
 
 const DEFAULT_PORT = 3000;
+const DEFAULT_EDGE_INGEST_PORT = 8443;
 
 export function isProduction(): boolean {
   return process.env[NODE_ENV] === PRODUCTION_ENV;
@@ -59,6 +65,42 @@ export function getCorsAllowedOrigins(): string[] {
     .filter((origin) => origin.length > 0);
 }
 
+export type EdgeIngestConfig = {
+  readonly port: number;
+  readonly serverCertPath: string;
+  readonly serverKeyPath: string;
+  readonly caCertPath: string;
+  readonly allowedCns: readonly string[];
+};
+
+/**
+ * Edge-ingest configuration. Returns null when any required variable
+ * is absent or empty - the api boots without the mTLS listener in
+ * that case so local development and tests do not need cert files
+ * staged. When configured, every field is present and non-empty.
+ */
+export function getEdgeIngestConfig(): EdgeIngestConfig | null {
+  const serverCertPath = process.env[EDGE_INGEST_SERVER_CERT_PATH]?.trim();
+  const serverKeyPath = process.env[EDGE_INGEST_SERVER_KEY_PATH]?.trim();
+  const caCertPath = process.env[EDGE_INGEST_CA_CERT_PATH]?.trim();
+  const allowedCnsRaw = process.env[EDGE_INGEST_ALLOWED_CNS]?.trim();
+  if (!serverCertPath || !serverKeyPath || !caCertPath || !allowedCnsRaw) {
+    return null;
+  }
+  const allowedCns = allowedCnsRaw
+    .split(',')
+    .map((cn) => cn.trim())
+    .filter((cn) => cn.length > 0);
+  if (allowedCns.length === 0) return null;
+  const rawPort = process.env[EDGE_INGEST_PORT];
+  const parsedPort = rawPort ? Number(rawPort) : DEFAULT_EDGE_INGEST_PORT;
+  const port =
+    Number.isFinite(parsedPort) && parsedPort > 0 && parsedPort <= 65535
+      ? parsedPort
+      : DEFAULT_EDGE_INGEST_PORT;
+  return { port, serverCertPath, serverKeyPath, caCertPath, allowedCns };
+}
+
 export const ENV_KEYS = {
   NODE_ENV,
   PORT,
@@ -67,4 +109,9 @@ export const ENV_KEYS = {
   EXTERNAL_FEED_TOKEN,
   EXTERNAL_FEED_ENDPOINT,
   SPS_EXPOSE_OPENAPI,
+  EDGE_INGEST_PORT,
+  EDGE_INGEST_SERVER_CERT_PATH,
+  EDGE_INGEST_SERVER_KEY_PATH,
+  EDGE_INGEST_CA_CERT_PATH,
+  EDGE_INGEST_ALLOWED_CNS,
 } as const;

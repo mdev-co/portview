@@ -16,6 +16,7 @@ import {
   validateAisMessage,
 } from '@sps/shared';
 import { type Actor, createActor } from 'xstate';
+import { getEdgeIngestConfig } from '../env';
 import { adaptAisStreamMessage } from './adapters/ais-stream.adapter';
 import { Decoder } from './decoder';
 import { DeadLetterWriter, type SecurityRejection } from './dlq';
@@ -23,6 +24,7 @@ import { publishVesselStatic, publishVesselUpdate } from './ingest.events';
 import { NewMmsiBouncer } from './limiters/new-mmsi-bouncer';
 import { PerMmsiRateLimiter } from './limiters/per-mmsi-rate-limiter';
 import { AisStreamSource } from './sources/ais-stream.source';
+import { EdgeBridgeSource } from './sources/edge-bridge.source';
 import { LocalUdpSource } from './sources/local-udp.source';
 import { WebSdrSource } from './sources/web-sdr.source';
 import {
@@ -143,6 +145,16 @@ export class IngestService implements OnModuleInit, OnModuleDestroy {
 
   private registerSources(): readonly SourceId[] {
     const order: SourceId[] = [];
+
+    const edgeConfig = getEdgeIngestConfig();
+    if (edgeConfig !== null) {
+      try {
+        this.sources.set(SourceId.EdgeBridge, new EdgeBridgeSource(edgeConfig));
+        order.push(SourceId.EdgeBridge);
+      } catch (err) {
+        this.log.warn(`edge-bridge source skipped: ${String(err)}`);
+      }
+    }
 
     const port = Number(this.config.get<string>('INGEST_UDP_PORT') ?? 10110);
     const host = this.config.get<string>('INGEST_UDP_HOST') ?? '127.0.0.1';

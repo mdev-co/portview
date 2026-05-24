@@ -1,27 +1,36 @@
+import { readFileSync } from 'node:fs';
 import { loadConfig } from './config.js';
 import { createLogger } from './logger.js';
 import { UdpListener } from './udp-listener.js';
-import { WssClient } from './wss-client.js';
+import { type TlsClientCredentials, WssClient } from './wss-client.js';
 
 const log = createLogger('main');
 
-/**
- * Edge-bridge boot. Wires the local UDP listener (chunk 2) to the WSS
- * client (chunk 2). mTLS certificate loading hooks into the client in
- * chunk 3; this build connects over plain ws until the backend gateway
- * lands.
- */
+function loadTlsCredentials(
+  certPath: string | undefined,
+  keyPath: string | undefined,
+  caPath: string | undefined,
+): TlsClientCredentials | undefined {
+  if (!certPath || !keyPath || !caPath) return undefined;
+  return {
+    cert: readFileSync(certPath),
+    key: readFileSync(keyPath),
+    ca: readFileSync(caPath),
+  };
+}
+
 async function main(): Promise<void> {
   const config = loadConfig();
-  const mTlsConfigured =
-    config.EDGE_BRIDGE_CLIENT_CERT_PATH !== undefined &&
-    config.EDGE_BRIDGE_CLIENT_KEY_PATH !== undefined &&
-    config.EDGE_BRIDGE_CA_CERT_PATH !== undefined;
+  const tls = loadTlsCredentials(
+    config.EDGE_BRIDGE_CLIENT_CERT_PATH,
+    config.EDGE_BRIDGE_CLIENT_KEY_PATH,
+    config.EDGE_BRIDGE_CA_CERT_PATH,
+  );
 
   log.info('boot', {
     backend: config.EDGE_BRIDGE_BACKEND_URL,
     udp: `${config.EDGE_BRIDGE_LOCAL_UDP_HOST}:${config.EDGE_BRIDGE_LOCAL_UDP_PORT}`,
-    mTLS: mTlsConfigured ? 'configured' : 'pending (chunk 3)',
+    mTLS: tls ? 'configured' : 'disabled',
   });
 
   const listener = new UdpListener(
@@ -37,6 +46,7 @@ async function main(): Promise<void> {
     sendQueueLimit: config.EDGE_BRIDGE_SEND_QUEUE_LIMIT,
     backpressureWarnBytes: config.EDGE_BRIDGE_BACKPRESSURE_WARN_BYTES,
     shutdownGraceMs: config.EDGE_BRIDGE_SHUTDOWN_GRACE_MS,
+    ...(tls ? { tls } : {}),
   });
 
   listener.on('frame', frameEvent => {

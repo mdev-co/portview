@@ -4,6 +4,12 @@ import { createLogger } from './logger.js';
 
 const log = createLogger('wss');
 
+export type TlsClientCredentials = {
+  readonly cert: Buffer;
+  readonly key: Buffer;
+  readonly ca: Buffer;
+};
+
 export type WssClientOptions = {
   readonly url: string;
   readonly initialBackoffMs: number;
@@ -29,6 +35,13 @@ export type WssClientOptions = {
    */
   readonly backpressureWarnBytes: number;
   readonly shutdownGraceMs: number;
+  /**
+   * mTLS credentials. When provided the WebSocket is constructed with
+   * `cert`, `key`, `ca` and `rejectUnauthorized: true` so the backend
+   * server certificate is verified and the client cert is presented to
+   * the backend for mutual authentication.
+   */
+  readonly tls?: TlsClientCredentials;
 };
 
 type State = 'disconnected' | 'connecting' | 'open' | 'reconnecting' | 'closed';
@@ -82,7 +95,14 @@ export class WssClient extends EventEmitter {
     this.state = this.attempt === 0 ? 'connecting' : 'reconnecting';
     log.info('connecting', { url: this.options.url, attempt: this.attempt + 1 });
 
-    const ws = new WebSocket(this.options.url);
+    const ws = this.options.tls
+      ? new WebSocket(this.options.url, {
+          cert: this.options.tls.cert,
+          key: this.options.tls.key,
+          ca: this.options.tls.ca,
+          rejectUnauthorized: true,
+        })
+      : new WebSocket(this.options.url);
     this.ws = ws;
 
     // Handshake timeout: if the backend never responds, terminate the
