@@ -42,6 +42,7 @@ export const SourceId = {
   LocalUdp: 0,
   WebSdr: 1,
   AisStream: 2,
+  EdgeBridge: 3,
 } as const;
 
 export type SourceId = (typeof SourceId)[keyof typeof SourceId];
@@ -50,6 +51,7 @@ const SOURCE_ID_NAMES: Readonly<Record<SourceId, string>> = {
   [SourceId.LocalUdp]: 'LocalUdp',
   [SourceId.WebSdr]: 'WebSdr',
   [SourceId.AisStream]: 'AisStream',
+  [SourceId.EdgeBridge]: 'EdgeBridge',
 };
 
 /** Reverse-lookup helper for logs and DLQ rows. */
