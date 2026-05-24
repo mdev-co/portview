@@ -1,0 +1,170 @@
+direction: down
+vars: {
+  d2-config: {
+    theme-id: 8
+    pad: 40
+  }
+}
+
+user: "Operator click\none of seven map modes" {
+  shape: oval
+  style: {
+    fill: "#d1fae5"
+    stroke: "#065f46"
+  }
+}
+
+switcher: "MapStyleSwitcher\nsegmented control\nApp header" {
+  shape: rectangle
+  style: {
+    fill: "#fef3c7"
+    stroke: "#92400e"
+  }
+}
+
+seamarkToggle: "SeamarkToggle\nglobal overlay switch\nshared ToggleButton" {
+  shape: rectangle
+  style: {
+    fill: "#fef3c7"
+    stroke: "#92400e"
+  }
+}
+
+atom: "activeMapStyle nanostore\natom MapStyleId" {
+  shape: cylinder
+  style: {
+    fill: "#ede9fe"
+    stroke: "#5b21b6"
+  }
+}
+
+seamarkAtom: "seamarkVisible nanostore\natom boolean" {
+  shape: cylinder
+  style: {
+    fill: "#ede9fe"
+    stroke: "#5b21b6"
+  }
+}
+
+registry: "MAP_STYLE_REGISTRY\nbaseLayerId + overlayLayerIds\nper mode" {
+  shape: rectangle
+  style: {
+    fill: "#dbeafe"
+    stroke: "#1e40af"
+  }
+}
+
+sync: "useMapStyleSync\nuseEffect on atoms\nwalks layer ids" {
+  shape: rectangle
+  style: {
+    fill: "#dbeafe"
+    stroke: "#1e40af"
+  }
+}
+
+adapter: "MapLibreAdapter\nsetLayerVisibility(id, visible)\nwarns on unknown" {
+  shape: rectangle
+  icon: https://icons.terrastruct.com/dev%2Ftypescript.svg
+}
+
+ml: "MapLibre map instance\nsetLayoutProperty(visibility)" {
+  shape: rectangle
+  style: {
+    fill: "#dcfce7"
+    stroke: "#166534"
+  }
+}
+
+osm: "OSM Mapnik\nosm-light" {
+  shape: cylinder
+  style: {
+    fill: "#fef3c7"
+    stroke: "#92400e"
+  }
+}
+
+dark: "Carto Dark Matter\nosm-dark" {
+  shape: cylinder
+  style: {
+    fill: "#1f2937"
+    stroke: "#0f172a"
+    font-color: "#f1f5f9"
+  }
+}
+
+esriImg: "Esri World Imagery\nusgs-imagery-topo" {
+  shape: cylinder
+  style: {
+    fill: "#fef3c7"
+    stroke: "#92400e"
+  }
+}
+
+esriTopo: "Esri World Topo\nusgs-topo" {
+  shape: cylinder
+  style: {
+    fill: "#fef3c7"
+    stroke: "#92400e"
+  }
+}
+
+mtTactical: "MapTiler Dataviz Dark\ntactical" {
+  shape: cylinder
+  style: {
+    fill: "#1f2937"
+    stroke: "#0f172a"
+    font-color: "#f1f5f9"
+  }
+}
+
+mtBackdrop: "MapTiler Backdrop Dark\nbackdrop" {
+  shape: cylinder
+  style: {
+    fill: "#1f2937"
+    stroke: "#0f172a"
+    font-color: "#f1f5f9"
+  }
+}
+
+mtSat: "MapTiler Sentinel-2\nsatellite" {
+  shape: cylinder
+  style: {
+    fill: "#fef3c7"
+    stroke: "#92400e"
+  }
+}
+
+seamark: "OpenSeaMap overlay\ntiles.openseamap.org" {
+  shape: cylinder
+  style: {
+    fill: "#dbeafe"
+    stroke: "#1e40af"
+  }
+}
+
+vessels: "Vessel + Trail layers\nstay mounted across modes" {
+  shape: rectangle
+  style: {
+    fill: "#fce7f3"
+    stroke: "#831843"
+  }
+}
+
+user -> switcher: "click"
+user -> seamarkToggle: "toggle"
+switcher -> atom: "setMapStyle(id)"
+seamarkToggle -> seamarkAtom: "setSeamarkVisible"
+atom -> sync: "subscribed"
+seamarkAtom -> sync: "subscribed"
+registry -> sync: "lookup descriptor"
+sync -> adapter: "setLayerVisibility for each layer"
+adapter -> ml
+ml -> osm
+ml -> dark
+ml -> esriImg
+ml -> esriTopo
+ml -> mtTactical
+ml -> mtBackdrop
+ml -> mtSat
+ml -> seamark: "every mode (gated by atom)"
+ml -> vessels: "always visible"
