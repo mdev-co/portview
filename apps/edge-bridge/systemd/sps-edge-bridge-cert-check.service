@@ -1,0 +1,54 @@
+[Unit]
+Description=SPS edge bridge - client certificate expiry probe
+Documentation=https://github.com/mdev-co/sps/blob/main/docs/runbooks/edge-bridge-rpi-deploy.md
+ConditionPathExists=/etc/sps-edge-bridge/client.crt
+
+[Service]
+# Single-shot probe. systemd-analyze still applies the same hardening
+# logic; we use a tight profile because openssl x509 -checkend needs
+# almost nothing.
+Type=oneshot
+DynamicUser=yes
+
+ExecStart=/opt/sps-edge-bridge/scripts/check-edge-cert-expiry.sh /etc/sps-edge-bridge/client.crt
+
+# --- Filesystem ---
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ReadOnlyPaths=/opt/sps-edge-bridge /etc/sps-edge-bridge
+
+# --- Kernel / namespaces ---
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectProc=invisible
+PrivateUsers=yes
+PrivateMounts=yes
+RestrictNamespaces=yes
+
+# --- Privileges ---
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+LockPersonality=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+MemoryDenyWriteExecute=yes
+
+# --- Network ---
+# No outbound network needed - this is a pure local file inspection.
+PrivateNetwork=yes
+
+# --- Syscalls ---
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources @obsolete @cpu-emulation
+SystemCallArchitectures=native
+SystemCallErrorNumber=EPERM
+
+# --- Resources ---
+MemoryMax=32M
+TasksMax=8
+LimitNOFILE=64

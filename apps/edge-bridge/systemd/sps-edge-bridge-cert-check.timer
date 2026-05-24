@@ -1,0 +1,17 @@
+[Unit]
+Description=SPS edge bridge - weekly client cert expiry probe
+Documentation=https://github.com/mdev-co/sps/blob/main/docs/runbooks/edge-bridge-rpi-deploy.md
+
+[Timer]
+# Run once on boot (catch a Pi that has been off and just woke up to a
+# nearly-expired cert), then weekly.
+OnBootSec=10min
+OnCalendar=weekly
+# Persistent: even if the Pi was off when the weekly slot fired, run
+# the probe at next boot so missed checks are not silently skipped.
+Persistent=yes
+RandomizedDelaySec=1h
+Unit=sps-edge-bridge-cert-check.service
+
+[Install]
+WantedBy=timers.target

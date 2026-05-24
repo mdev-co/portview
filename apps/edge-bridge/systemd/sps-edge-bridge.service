@@ -1,0 +1,113 @@
+[Unit]
+Description=SPS edge bridge - rtl_ais UDP to backend WSS forwarder
+Documentation=https://github.com/mdev-co/sps/blob/main/docs/runbooks/edge-bridge-rpi-deploy.md
+After=network-online.target rtl_ais.service
+Wants=network-online.target
+Requires=rtl_ais.service
+
+[Service]
+# notify lets the bridge tell systemd "I'm ready" only after the UDP
+# socket binds and the WSS client opens its first connection. Without
+# notify, systemd would treat the process as ready the moment node
+# starts - long before anything is actually wired up.
+Type=notify
+# systemd-notify subprocess writes WATCHDOG=1 on behalf of main; needs
+# NotifyAccess=all so systemd accepts datagrams from the child PID.
+NotifyAccess=all
+
+# DynamicUser provisions an ephemeral system user just for this service;
+# nothing on disk is owned by this UID across reboots. /var/lib/sps-edge-bridge,
+# /var/log/sps-edge-bridge and /var/cache/sps-edge-bridge are auto-created
+# with the right ownership.
+DynamicUser=yes
+StateDirectory=sps-edge-bridge
+LogsDirectory=sps-edge-bridge
+CacheDirectory=sps-edge-bridge
+
+# The repo is cloned to /opt/sps-edge-bridge and built. The unit reads
+# only the apps/edge-bridge/dist tree at runtime.
+WorkingDirectory=/opt/sps-edge-bridge/apps/edge-bridge
+ExecStart=/usr/bin/node dist/index.js
+
+# Env file lives outside the repo so secrets never leak via git pull.
+# Root owns it, the DynamicUser is granted read via supplementary group.
+EnvironmentFile=/etc/sps-edge-bridge/edge-bridge.env
+
+# Restart on crash, but cap so a tight failure loop trips into "failed"
+# rather than chewing CPU forever.
+Restart=on-failure
+RestartSec=5s
+StartLimitIntervalSec=60s
+StartLimitBurst=3
+
+# Watchdog: process must call sd_notify(WATCHDOG=1) within this window
+# or systemd will SIGKILL + restart. The bridge pings at half this
+# interval from its event loop, so a wedged loop (deadlock, infinite
+# sync work) is caught within 30 s.
+WatchdogSec=30s
+
+# --- Filesystem isolation ---
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ReadOnlyPaths=/opt/sps-edge-bridge
+# StateDirectory etc. are writable automatically; nothing else is.
+
+# --- Kernel isolation ---
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectProc=invisible
+ProcSubset=pid
+ProtectClock=yes
+ProtectHostname=yes
+
+# --- Namespace isolation ---
+PrivateUsers=yes
+PrivateMounts=yes
+RestrictNamespaces=yes
+
+# --- Privilege isolation ---
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+LockPersonality=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+
+# --- Memory isolation ---
+# MemoryDenyWriteExecute is intentionally NOT set: V8 JIT requires
+# W|X transitions for code generation; enabling it crashes Node at
+# startup. The JIT mitigation here is RestrictAddressFamilies +
+# seccomp filter + NoNewPrivileges, which together still block the
+# most common shellcode injection paths.
+
+# --- Network isolation ---
+# Bridge only ever needs IPv4/IPv6 sockets - no raw, netlink, bluetooth, etc.
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+# Inbound: UDP loopback only (rtl_ais on the same Pi).
+# Outbound: any (resolves backend hostname, connects WSS over public net).
+# Tighten further via IPAddressAllow once the backend gets a stable IP.
+IPAddressAllow=localhost
+IPAddressDeny=link-local multicast
+
+# --- Syscall filter ---
+# system-service is the curated baseline (~250 syscalls) for long-running
+# services; we drop the @privileged group (mount, reboot, kexec ...) and
+# the @resources group (setrlimit beyond own caps, sched_setparam ...).
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources @obsolete @cpu-emulation
+SystemCallArchitectures=native
+SystemCallErrorNumber=EPERM
+
+# --- Resource limits ---
+# Pi is 1 GB RAM; cap the bridge to stop a runaway from OOMing rtl_ais.
+MemoryMax=256M
+MemoryHigh=192M
+TasksMax=32
+LimitNOFILE=1024
+
+[Install]
+WantedBy=multi-user.target

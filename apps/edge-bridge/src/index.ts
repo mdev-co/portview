@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { loadConfig } from './config.js';
 import { createLogger } from './logger.js';
 import { UdpListener } from './udp-listener.js';
+import { SystemdNotify } from './watchdog.js';
 import { type TlsClientCredentials, WssClient } from './wss-client.js';
 
 const log = createLogger('main');
@@ -21,6 +22,7 @@ function loadTlsCredentials(
 
 async function main(): Promise<void> {
   const config = loadConfig();
+  const notify = new SystemdNotify();
   const tls = loadTlsCredentials(
     config.EDGE_BRIDGE_CLIENT_CERT_PATH,
     config.EDGE_BRIDGE_CLIENT_KEY_PATH,
@@ -31,6 +33,7 @@ async function main(): Promise<void> {
     backend: config.EDGE_BRIDGE_BACKEND_URL,
     udp: `${config.EDGE_BRIDGE_LOCAL_UDP_HOST}:${config.EDGE_BRIDGE_LOCAL_UDP_PORT}`,
     mTLS: tls ? 'configured' : 'disabled',
+    systemdNotify: notify.isEnabled() ? 'enabled' : 'disabled',
   });
 
   const listener = new UdpListener(
@@ -63,12 +66,19 @@ async function main(): Promise<void> {
 
   await listener.start();
   client.start();
+  notify.ready();
+  notify.status(
+    `listener on ${config.EDGE_BRIDGE_LOCAL_UDP_HOST}:${config.EDGE_BRIDGE_LOCAL_UDP_PORT}, backend ${config.EDGE_BRIDGE_BACKEND_URL}`,
+  );
+  notify.startWatchdog();
 
   let shuttingDown = false;
   const shutdown = async (signal: string): Promise<void> => {
     if (shuttingDown) return;
     shuttingDown = true;
     log.info('shutdown signal', { signal });
+    notify.stopping();
+    notify.stopWatchdog();
     await client.stop();
     await listener.stop();
     process.exit(0);
