@@ -16,6 +16,19 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  /**
+   * Vite 6+ defaults to binding only the IPv6 loopback (`[::1]`) on
+   * macOS. Chrome / Safari resolve `localhost` to the IPv4 loopback
+   * first and refuse the connection before falling back to v6, so a
+   * fresh `pnpm dev` looks like it "does not start in the browser"
+   * even though the terminal shows "ready". `host: true` binds the
+   * dev server on every interface (0.0.0.0 + ::), restoring the
+   * previous behaviour and letting `localhost`, `127.0.0.1` and the
+   * LAN IP all reach the same Vite.
+   */
+  server: {
+    host: true,
+  },
   test: {
     environment: 'node',
     include: ['src/**/__tests__/**/*.test.ts', 'src/**/*.test.ts'],
