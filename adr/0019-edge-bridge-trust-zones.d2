@@ -1,0 +1,142 @@
+direction: right
+vars: {
+  d2-config: {
+    theme-id: 8
+    pad: 40
+  }
+}
+
+# Three trust zones drawn as containment groups. Anything that crosses
+# a zone boundary is annotated with the mechanism that enforces the
+# boundary (mTLS, allowlist, sandbox).
+
+physical: "Physical layer\nantenna + SDR\nRF environment, untrusted" {
+  shape: rectangle
+  style: {
+    fill: "#fee2e2"
+    stroke: "#991b1b"
+    stroke-width: 2
+  }
+
+  antenna: "Dipole + LNA\n162 MHz" {
+    shape: oval
+    style: {
+      fill: "#fecaca"
+      stroke: "#7f1d1d"
+    }
+  }
+  rtl_ais: "rtl_ais daemon\nNMEA decoder\nUDP 127.0.0.1:10110" {
+    shape: rectangle
+    style: {
+      fill: "#fef3c7"
+      stroke: "#92400e"
+    }
+  }
+  antenna -> rtl_ais: "AIS over RF\n(passive)"
+}
+
+device: "Device trust zone (Pi)\nsystemd sandbox\nDynamicUser, seccomp" {
+  shape: rectangle
+  style: {
+    fill: "#fef3c7"
+    stroke: "#92400e"
+    stroke-width: 2
+  }
+
+  bridge: "edge-bridge\nNode service\nType=notify + watchdog" {
+    shape: rectangle
+    style: {
+      fill: "#dbeafe"
+      stroke: "#1e40af"
+    }
+  }
+
+  cert_store: "/etc/sps-edge-bridge\nclient.crt + client.key\n0640 root:keys" {
+    shape: cylinder
+    style: {
+      fill: "#ede9fe"
+      stroke: "#5b21b6"
+    }
+  }
+
+  cert_check: "cert-check timer\nweekly probe\nexit on expiry" {
+    shape: rectangle
+    style: {
+      fill: "#fce7f3"
+      stroke: "#9d174d"
+    }
+  }
+
+  cert_store -> bridge: "read at boot\n(supplementary group)"
+  cert_store -> cert_check: "openssl x509 -checkend"
+}
+
+cloud: "Cloud trust zone\nbackend api\nseparate listener" {
+  shape: rectangle
+  style: {
+    fill: "#dcfce7"
+    stroke: "#166534"
+    stroke-width: 2
+  }
+
+  tls_terminator: "https.Server\nrequestCert: true\nrejectUnauthorized: true\nminVersion: TLSv1.2" {
+    shape: rectangle
+    style: {
+      fill: "#fef9c3"
+      stroke: "#854d0e"
+    }
+  }
+
+  allowlist: "CN allowlist\nEDGE_INGEST_ALLOWED_CNS\n2nd gate" {
+    shape: diamond
+    style: {
+      fill: "#ffe4e6"
+      stroke: "#9f1239"
+    }
+  }
+
+  source: "EdgeBridgeSource\nISource impl\npriority 0" {
+    shape: rectangle
+    style: {
+      fill: "#dbeafe"
+      stroke: "#1e40af"
+    }
+  }
+
+  ingest: "IngestService\nFSM + decoder\nDLQ + validators" {
+    shape: rectangle
+    style: {
+      fill: "#dbeafe"
+      stroke: "#1e40af"
+    }
+  }
+
+  db: "PostgreSQL + PostGIS\nvessel facts" {
+    shape: cylinder
+    style: {
+      fill: "#ede9fe"
+      stroke: "#5b21b6"
+    }
+  }
+
+  tls_terminator -> allowlist: "extracted CN"
+  allowlist -> source: "if CN ∈ allowlist"
+  allowlist -> source: "close 1008\n'cn-not-allowed'" {
+    style: {
+      stroke: "#991b1b"
+      stroke-dash: 5
+    }
+  }
+  source -> ingest: "NmeaFrame events"
+  ingest -> db: "validated AisMessage"
+}
+
+# Cross-zone arrows = the network. mTLS is the only thing that connects
+# the device zone to the cloud zone; nothing else is allowed.
+rtl_ais -> bridge: "UDP loopback\n(same Pi, never on the wire)"
+bridge -> tls_terminator: "WSS over public internet\nmTLS handshake\n+ rejectUnauthorized" {
+  style: {
+    stroke: "#1e40af"
+    stroke-width: 3
+  }
+}
