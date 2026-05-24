@@ -7,14 +7,17 @@ import {
   VESSEL_FLAG_HAS_FIX,
   VESSEL_FLAG_HAS_IDENTITY,
   VESSEL_FRAME_BYTES,
+  VESSEL_SNAPSHOT_FRAME_KIND,
   VESSEL_STATIC_FRAME_KIND,
+  type VesselSnapshotFrame,
   type VesselStaticDataFrame,
   type VesselUpdateFrame,
   encodeVesselFrame,
 } from '@sps/shared';
 import { dispatchTelemetryMessage } from '../telemetry-client';
+import { $vesselPositionHistory } from '../vessel-history.store';
 import { $vesselStaticData } from '../vessel-static.store';
-import { $vessels } from '../vessels.store';
+import { $vessels, __test as vesselsTest } from '../vessels.store';
 
 const POSITION_FRAME: VesselUpdateFrame = {
   messageType: 1,
@@ -51,6 +54,7 @@ let warnSpy: ReturnType<typeof vi.spyOn>;
 beforeEach(() => {
   $vessels.set({});
   $vesselStaticData.set({});
+  $vesselPositionHistory.set({});
   warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
 
@@ -144,5 +148,82 @@ describe('dispatchTelemetryMessage - unexpected payload', () => {
     dispatchTelemetryMessage({ not: 'expected' });
 
     expect(warnSpy).toHaveBeenCalledWith('[telemetry] unexpected message type; ignoring');
+  });
+});
+
+describe('dispatchTelemetryMessage - snapshot path', () => {
+  // The user-reported "sidebar empties, ghost shape lingers on the map"
+  // bug came from synthesising a LiveVessel with the latest history
+  // point's timestampUnix. AisStream's free tier sub samples reports
+  // so the freshest history sample can easily be 4-5 minutes old at
+  // load time. The vessels.store TTL sweep (>600 s) then evicts the
+  // synthetic entry on the very next pass while the trail polyline
+  // (history-driven, separate sweep) lingers, hence the desync.
+  //
+  // After the fix the synthetic vessel is stamped with
+  // `frame.serverTimeUnix`, which is the server-side clock at the
+  // moment the snapshot was emitted: vessels survive the immediate
+  // sweep and age out only after a real 600 s of silence on the live
+  // feed.
+
+  const SERVER_TIME_UNIX = 1_715_001_000; // "now" at snapshot emit
+  const HISTORY_POINT_AGE_S = 400; // older than freshness window
+
+  function makeSnapshot(overrides: Partial<VesselSnapshotFrame> = {}): VesselSnapshotFrame {
+    return {
+      kind: VESSEL_SNAPSHOT_FRAME_KIND,
+      serverTimeUnix: SERVER_TIME_UNIX,
+      vessels: [
+        {
+          mmsi: 261_111_111 as Mmsi,
+          staticData: null,
+          history: [
+            {
+              lng: 14.55,
+              lat: 53.42,
+              sog: 5.2,
+              cog: 90,
+              trueHeading: 90,
+              timestampUnix: SERVER_TIME_UNIX - HISTORY_POINT_AGE_S,
+            },
+          ],
+          kalman: null,
+        },
+      ],
+      ...overrides,
+    };
+  }
+
+  it('stamps synthetic vessels with the snapshot server time, not the history point time', () => {
+    dispatchTelemetryMessage(JSON.stringify(makeSnapshot()));
+
+    const stored = $vessels.get()[261_111_111];
+    expect(stored).toBeDefined();
+    expect(stored?.timestampUnix).toBe(SERVER_TIME_UNIX);
+    expect(stored?.timestampUnix).not.toBe(SERVER_TIME_UNIX - HISTORY_POINT_AGE_S);
+    // Position fields still come from the history point so dead reckoning
+    // and trail rendering have something to interpolate from.
+    expect(stored?.lng).toBeCloseTo(14.55, 4);
+    expect(stored?.lat).toBeCloseTo(53.42, 4);
+  });
+
+  it('keeps the synthetic vessel alive through an immediate TTL sweep', () => {
+    dispatchTelemetryMessage(JSON.stringify(makeSnapshot()));
+    // Sweep at "snapshot + 5 s". Even though the history point itself
+    // is 400 s old (would otherwise trip the > 600 s threshold once we
+    // reach SERVER_TIME_UNIX + 200 s real time), the vessel is stamped
+    // with the snapshot time so the sweep keeps it.
+    vesselsTest.sweepStale(SERVER_TIME_UNIX + 5);
+    expect($vessels.get()[261_111_111]).toBeDefined();
+  });
+
+  it('skips synthesising a LiveVessel for an entry with empty history', () => {
+    const frame = makeSnapshot({
+      vessels: [{ mmsi: 261_222_222 as Mmsi, staticData: null, history: [], kalman: null }],
+    });
+
+    dispatchTelemetryMessage(JSON.stringify(frame));
+
+    expect($vessels.get()[261_222_222]).toBeUndefined();
   });
 });

@@ -136,6 +136,44 @@ export function setKalmanState(mmsi: number, state: VesselKalmanState): void {
   $vesselKalmanState.setKey(mmsi, state);
 }
 
+/**
+ * Drop history and Kalman entries whose mmsi is no longer in $vessels.
+ * No age trimming - this is the cheap, time-independent cascade that
+ * runs on every $vessels mutation so an eviction in vessels.store is
+ * reflected here in the same event-loop tick. The periodic
+ * `sweepOrphans` below additionally trims stale points by wall clock.
+ */
+function dropOrphans(): void {
+  const live = $vessels.get();
+  const history = $vesselPositionHistory.get();
+  const kalman = $vesselKalmanState.get();
+  let mutatedHistory = false;
+  let mutatedKalman = false;
+  const nextHistory: Record<number, readonly VesselHistoryPoint[]> = {};
+  const nextKalman: Record<number, VesselKalmanState> = {};
+  for (const key in history) {
+    const mmsi = Number(key);
+    const entry = history[mmsi];
+    if (entry === undefined) continue;
+    if (live[mmsi] === undefined) {
+      mutatedHistory = true;
+      continue;
+    }
+    nextHistory[mmsi] = entry;
+  }
+  for (const key in kalman) {
+    const mmsi = Number(key);
+    if (live[mmsi] === undefined) {
+      mutatedKalman = true;
+      continue;
+    }
+    const entry = kalman[mmsi];
+    if (entry !== undefined) nextKalman[mmsi] = entry;
+  }
+  if (mutatedHistory) $vesselPositionHistory.set(nextHistory);
+  if (mutatedKalman) $vesselKalmanState.set(nextKalman);
+}
+
 function sweepOrphans(nowSeconds: number = Math.floor(Date.now() / 1_000)): void {
   const live = $vessels.get();
   const history = $vesselPositionHistory.get();
@@ -175,7 +213,19 @@ function sweepOrphans(nowSeconds: number = Math.floor(Date.now() / 1_000)): void
 
 onMount($vesselPositionHistory, () => {
   const interval = setInterval(() => sweepOrphans(), SWEEP_INTERVAL_MS);
-  return () => clearInterval(interval);
+  // Couple the orphan cascade to every $vessels mutation. Without this,
+  // a TTL eviction in vessels.store leaves the trail polyline rendered
+  // for up to SWEEP_INTERVAL_MS - 1 seconds after the vessel marker
+  // and the sidebar entry have both disappeared (the previous failure
+  // mode the user reported: sidebar empty, "ghost shape" still on the
+  // map). The cascade calls `dropOrphans` (no wall-clock trim) so it
+  // is deterministic in tests that fix a virtual NOW; the periodic
+  // sweep above still handles point age.
+  const unsubVessels = $vessels.listen(() => dropOrphans());
+  return () => {
+    clearInterval(interval);
+    unsubVessels();
+  };
 });
 
-export const __test = { sweepOrphans, SWEEP_INTERVAL_MS, trimByAge, isOutlier };
+export const __test = { dropOrphans, sweepOrphans, SWEEP_INTERVAL_MS, trimByAge, isOutlier };
