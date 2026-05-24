@@ -1,5 +1,5 @@
-import type { ExpressionSpecification, StyleSpecification } from 'maplibre-gl';
-import { SHIP_TYPE_CATEGORIES } from '@sps/shared';
+import type { ExpressionSpecification, LayerSpecification, StyleSpecification } from 'maplibre-gl';
+import { SHIP_TYPE_CATEGORIES, type ShipTypeCategory } from '@sps/shared';
 import {
   VESSEL_CATEGORY_PALETTE,
   VESSEL_CATEGORY_RING_PALETTE,
@@ -58,6 +58,26 @@ const STALE_FIX_AGE_SECONDS = 120;
 const STALE_STROKE_HEX = '#94a3b8';
 
 /**
+ * Build a base raster layer entry for the style spec. Every base mode
+ * shares the same shape (id + source + initial visibility); exactly
+ * one starts `'visible'` and the rest start `'none'` so MapLibre
+ * fetches only the active mode's tiles on first paint. The sync hook
+ * toggles `layout.visibility` as the operator changes modes.
+ */
+function makeBaseRasterLayer(
+  id: string,
+  source: string,
+  visibility: 'visible' | 'none',
+): LayerSpecification {
+  return {
+    id,
+    type: 'raster',
+    source,
+    layout: { visibility },
+  };
+}
+
+/**
  * Per-category top-down ship silhouette selector. Cargo and tanker
  * read as freighter; passenger / sailing / other read as medium
  * vessel; fishing and service read as small craft. Falls back to
@@ -83,20 +103,29 @@ const ICON_BY_CATEGORY: ExpressionSpecification = [
   VESSEL_ICON_PASSENGER_ID,
 ];
 
-const categoryMatchPairs: string[] = SHIP_TYPE_CATEGORIES.flatMap(c => [
-  c,
-  VESSEL_CATEGORY_PALETTE[c].hex,
-]);
+/**
+ * Build a MapLibre `match` expression that maps a vessel's `category`
+ * attribute to a hex colour from the supplied palette, falling back
+ * to the palette's `other` entry for any unrecognised category.
+ *
+ * MapLibre's `ExpressionSpecification` is a discriminated tuple union
+ * that the TS compiler cannot narrow from a `flatMap` spread; the
+ * runtime shape is correct (alternating string keys + colour outputs,
+ * hex fallback at the tail) so the single `as` is the documented
+ * boundary cast for this DSL, not a workaround for a deeper bug.
+ */
+function buildCategoryColorMatchExpression(
+  palette: Readonly<Record<ShipTypeCategory, { readonly hex: string }>>,
+): ExpressionSpecification {
+  const expression: unknown[] = ['match', ['get', 'category']];
+  for (const category of SHIP_TYPE_CATEGORIES) {
+    expression.push(category, palette[category].hex);
+  }
+  expression.push(palette.other.hex);
+  return expression as ExpressionSpecification;
+}
 
-// MapLibre's ExpressionSpecification is a discriminated tuple union that the
-// TS compiler cannot narrow from a spread; the runtime shape is correct
-// (alternating string keys + values, hex fallback at the tail).
-const colorByCategory = [
-  'match',
-  ['get', 'category'],
-  ...categoryMatchPairs,
-  VESSEL_CATEGORY_PALETTE.other.hex,
-] as unknown as ExpressionSpecification;
+const colorByCategory = buildCategoryColorMatchExpression(VESSEL_CATEGORY_PALETTE);
 
 // A vessel under way (SOG > IS_MOVING threshold encoded into the flags
 // upstream) takes the underway green fill so the eye picks up movement
@@ -114,17 +143,7 @@ const fillColorByMovementAndCategory: ExpressionSpecification = [
 // tier) so the dashed ring reads as a glowing outline one shade
 // lighter than the 500/600-tier fill body - "neon outline on a
 // saturated body" rather than dark silhouette on pastel.
-const ringCategoryMatchPairs: string[] = SHIP_TYPE_CATEGORIES.flatMap(c => [
-  c,
-  VESSEL_CATEGORY_RING_PALETTE[c].hex,
-]);
-
-const ringColorByCategory = [
-  'match',
-  ['get', 'category'],
-  ...ringCategoryMatchPairs,
-  VESSEL_CATEGORY_RING_PALETTE.other.hex,
-] as unknown as ExpressionSpecification;
+const ringColorByCategory = buildCategoryColorMatchExpression(VESSEL_CATEGORY_RING_PALETTE);
 
 const ringColorByMovementAndCategory: ExpressionSpecification = [
   'case',
@@ -294,48 +313,13 @@ export const osmRasterStyle: StyleSpecification = {
      * Initial state reflects DEFAULT_MAP_STYLE = 'osm-light' so the
      * OpenStreetMap Mapnik base is the only one fetched on first paint.
      */
-    {
-      id: BASE_OSM_DARK_LAYER_ID,
-      type: 'raster',
-      source: 'carto-dark-matter',
-      layout: { visibility: 'none' },
-    },
-    {
-      id: BASE_OSM_LIGHT_LAYER_ID,
-      type: 'raster',
-      source: 'osm-mapnik',
-      layout: { visibility: 'visible' },
-    },
-    {
-      id: BASE_USGS_IMAGERY_TOPO_LAYER_ID,
-      type: 'raster',
-      source: 'esri-world-imagery',
-      layout: { visibility: 'none' },
-    },
-    {
-      id: BASE_USGS_TOPO_LAYER_ID,
-      type: 'raster',
-      source: 'esri-world-topo',
-      layout: { visibility: 'none' },
-    },
-    {
-      id: BASE_TACTICAL_LAYER_ID,
-      type: 'raster',
-      source: 'maptiler-dataviz-dark',
-      layout: { visibility: 'none' },
-    },
-    {
-      id: BASE_BACKDROP_LAYER_ID,
-      type: 'raster',
-      source: 'maptiler-backdrop-dark',
-      layout: { visibility: 'none' },
-    },
-    {
-      id: BASE_SATELLITE_LAYER_ID,
-      type: 'raster',
-      source: 'maptiler-satellite',
-      layout: { visibility: 'none' },
-    },
+    makeBaseRasterLayer(BASE_OSM_DARK_LAYER_ID, 'carto-dark-matter', 'none'),
+    makeBaseRasterLayer(BASE_OSM_LIGHT_LAYER_ID, 'osm-mapnik', 'visible'),
+    makeBaseRasterLayer(BASE_USGS_IMAGERY_TOPO_LAYER_ID, 'esri-world-imagery', 'none'),
+    makeBaseRasterLayer(BASE_USGS_TOPO_LAYER_ID, 'esri-world-topo', 'none'),
+    makeBaseRasterLayer(BASE_TACTICAL_LAYER_ID, 'maptiler-dataviz-dark', 'none'),
+    makeBaseRasterLayer(BASE_BACKDROP_LAYER_ID, 'maptiler-backdrop-dark', 'none'),
+    makeBaseRasterLayer(BASE_SATELLITE_LAYER_ID, 'maptiler-satellite', 'none'),
     /**
      * Seamark overlay. Drawn at reduced opacity and gated above zoom
      * 9 so the marker density at country / region zoom does not

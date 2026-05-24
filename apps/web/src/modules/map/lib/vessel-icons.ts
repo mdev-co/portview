@@ -206,9 +206,15 @@ function buildLabelBackgroundIcon(): ImageData {
   return ctx.getImageData(0, 0, SIZE, SIZE);
 }
 
-function addOnce(map: MaplibreMap, id: string, image: ImageData, options: { sdf: boolean }): void {
+type AddImageOptions = { sdf: boolean; pixelRatio?: number };
+
+function addOnce(map: MaplibreMap, id: string, image: ImageData, options: AddImageOptions): void {
   if (map.hasImage(id)) return;
-  map.addImage(id, { width: image.width, height: image.height, data: image.data }, options);
+  const imageOptions: AddImageOptions = { sdf: options.sdf };
+  if (options.pixelRatio !== undefined) {
+    imageOptions.pixelRatio = options.pixelRatio;
+  }
+  map.addImage(id, { width: image.width, height: image.height, data: image.data }, imageOptions);
 }
 
 /**
@@ -233,18 +239,68 @@ function addLabelBackgroundOnce(map: MaplibreMap, image: ImageData): void {
   );
 }
 
+const VESSEL_ICON_IDS: readonly string[] = [
+  VESSEL_ICON_CARGO_ID,
+  VESSEL_ICON_PASSENGER_ID,
+  VESSEL_ICON_SMALL_ID,
+  VESSEL_SELECTION_RING_ID,
+  VESSEL_UNSELECTED_RING_ID,
+  VESSEL_LABEL_BG_ID,
+];
+
 /**
  * Register every vessel-icon variant on the running map. Three SDF
  * silhouettes (cargo / passenger / small) get tinted by the style
  * spec's `icon-color` expression; the selection ring is non-SDF so
- * the amber dash pattern renders unchanged. Safe to call repeatedly
- * via the hasImage guard; called from VesselLayer on map ready.
+ * the amber dash pattern renders unchanged.
+ *
+ * Re-entry safe in two stages. First: if every icon id is already
+ * registered (HMR re-mount, route change, engine swap), skip without
+ * allocating any canvas. Second: build all `ImageData` objects up
+ * front inside one try/catch; on canvas-context failure (mobile
+ * Safari context-loss, hardware acceleration disabled, OOM) we warn
+ * and return before any partial registration, so the vessel layer
+ * falls back to its circle renderer for every category instead of
+ * showing icons for some and circles for others.
+ *
+ * SDF icons receive `pixelRatio: window.devicePixelRatio` so their
+ * silhouettes render at native DPI on HiDPI displays (Retina, 4K)
+ * instead of MapLibre's default 1.0 which down-samples by 2x.
  */
 export function ensureVesselIcons(map: MaplibreMap): void {
-  addOnce(map, VESSEL_ICON_CARGO_ID, buildCargoIcon(), { sdf: true });
-  addOnce(map, VESSEL_ICON_PASSENGER_ID, buildPassengerIcon(), { sdf: true });
-  addOnce(map, VESSEL_ICON_SMALL_ID, buildSmallIcon(), { sdf: true });
-  addOnce(map, VESSEL_SELECTION_RING_ID, buildSelectionRingIcon(), { sdf: false });
-  addOnce(map, VESSEL_UNSELECTED_RING_ID, buildUnselectedRingIcon(), { sdf: true });
-  addLabelBackgroundOnce(map, buildLabelBackgroundIcon());
+  if (VESSEL_ICON_IDS.every(id => map.hasImage(id))) return;
+
+  const pixelRatio = typeof window !== 'undefined' ? (window.devicePixelRatio ?? 1) : 1;
+
+  let images: {
+    cargo: ImageData;
+    passenger: ImageData;
+    small: ImageData;
+    selectionRing: ImageData;
+    unselectedRing: ImageData;
+    labelBg: ImageData;
+  };
+  try {
+    images = {
+      cargo: buildCargoIcon(),
+      passenger: buildPassengerIcon(),
+      small: buildSmallIcon(),
+      selectionRing: buildSelectionRingIcon(),
+      unselectedRing: buildUnselectedRingIcon(),
+      labelBg: buildLabelBackgroundIcon(),
+    };
+  } catch (error) {
+    console.warn(
+      '[vessel-icons] 2D canvas context unavailable; vessels will render as circles.',
+      error,
+    );
+    return;
+  }
+
+  addOnce(map, VESSEL_ICON_CARGO_ID, images.cargo, { sdf: true, pixelRatio });
+  addOnce(map, VESSEL_ICON_PASSENGER_ID, images.passenger, { sdf: true, pixelRatio });
+  addOnce(map, VESSEL_ICON_SMALL_ID, images.small, { sdf: true, pixelRatio });
+  addOnce(map, VESSEL_SELECTION_RING_ID, images.selectionRing, { sdf: false });
+  addOnce(map, VESSEL_UNSELECTED_RING_ID, images.unselectedRing, { sdf: true, pixelRatio });
+  addLabelBackgroundOnce(map, images.labelBg);
 }

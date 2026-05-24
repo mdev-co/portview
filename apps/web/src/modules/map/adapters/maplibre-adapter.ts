@@ -157,10 +157,15 @@ export class MapLibreAdapter implements IMapEngineAdapter {
       throw new AdapterNotInitializedError(ENGINE_TYPE, 'setLayerVisibility');
     }
     if (!this.map.getLayer(layerId)) {
-      // Silent no-op rather than throw: a style descriptor referencing
-      // a layer not in the current style spec is a mis-configuration
-      // that should surface as a missing visual, not crash the runtime
-      // sync loop the moment the style switcher is opened.
+      // A descriptor referencing a layer not in the current style spec
+      // is a configuration mismatch that should surface as a missing
+      // visual, not a runtime crash mid-style-switch. Warn loudly so
+      // dev and preview deploys catch the drift without taking the map
+      // offline; production keeps rendering the rest of the scene.
+      console.warn(
+        `[MapLibreAdapter] setLayerVisibility called for unknown layer "${layerId}". ` +
+          'Style descriptor references a layer not declared in the current style spec.',
+      );
       return;
     }
     this.map.setLayoutProperty(layerId, 'visibility', visible ? 'visible' : 'none');
