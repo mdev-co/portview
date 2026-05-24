@@ -1,4 +1,14 @@
 import { atom } from 'nanostores';
+import {
+  BASE_BACKDROP_LAYER_ID,
+  BASE_OSM_DARK_LAYER_ID,
+  BASE_OSM_LIGHT_LAYER_ID,
+  BASE_SATELLITE_LAYER_ID,
+  BASE_TACTICAL_LAYER_ID,
+  BASE_USGS_IMAGERY_TOPO_LAYER_ID,
+  BASE_USGS_TOPO_LAYER_ID,
+  SEAMARK_OVERLAY_LAYER_ID,
+} from '../styles/osm-raster-style';
 
 /**
  * Map style engine.
@@ -49,52 +59,52 @@ export const MAP_STYLE_REGISTRY: Record<MapStyleId, MapStyleDescriptor> = {
     label: 'OSM Dark',
     description:
       'CARTO Dark Matter - OpenStreetMap data, dark palette, EU CDN with fast tile delivery.',
-    baseLayerId: 'base-osm-dark',
-    overlayLayerIds: ['overlay-seamark'],
+    baseLayerId: BASE_OSM_DARK_LAYER_ID,
+    overlayLayerIds: [SEAMARK_OVERLAY_LAYER_ID],
   },
   'osm-light': {
     id: 'osm-light',
     label: 'OSM Light',
     description: 'OpenStreetMap Standard - classic Mapnik raster with full street and POI detail.',
-    baseLayerId: 'base-osm-light',
-    overlayLayerIds: ['overlay-seamark'],
+    baseLayerId: BASE_OSM_LIGHT_LAYER_ID,
+    overlayLayerIds: [SEAMARK_OVERLAY_LAYER_ID],
   },
   'usgs-imagery-topo': {
     id: 'usgs-imagery-topo',
     label: 'USGS Imagery + Topo',
     description:
       'Esri World Imagery served from the global ArcGIS CDN - high-resolution satellite worldwide.',
-    baseLayerId: 'base-usgs-imagery-topo',
-    overlayLayerIds: ['overlay-seamark'],
+    baseLayerId: BASE_USGS_IMAGERY_TOPO_LAYER_ID,
+    overlayLayerIds: [SEAMARK_OVERLAY_LAYER_ID],
   },
   'usgs-topo': {
     id: 'usgs-topo',
     label: 'USGS Topo',
     description:
       'USGS World Topo via Esri ArcGIS CDN - global topographic raster with terrain, roads, place names and contours. Same Esri-USGS partnership pipeline as USGS Imagery; deep zoom (z0-19), fast from EU.',
-    baseLayerId: 'base-usgs-topo',
-    overlayLayerIds: ['overlay-seamark'],
+    baseLayerId: BASE_USGS_TOPO_LAYER_ID,
+    overlayLayerIds: [SEAMARK_OVERLAY_LAYER_ID],
   },
   tactical: {
     id: 'tactical',
     label: 'Tactical',
     description: 'MapTiler Dataviz Dark - maximum contrast for live vessel monitoring.',
-    baseLayerId: 'base-tactical',
-    overlayLayerIds: ['overlay-seamark'],
+    baseLayerId: BASE_TACTICAL_LAYER_ID,
+    overlayLayerIds: [SEAMARK_OVERLAY_LAYER_ID],
   },
   backdrop: {
     id: 'backdrop',
     label: 'Backdrop',
     description: 'MapTiler Backdrop Dark - minimalist dark base for clean data overlay.',
-    baseLayerId: 'base-backdrop',
-    overlayLayerIds: ['overlay-seamark'],
+    baseLayerId: BASE_BACKDROP_LAYER_ID,
+    overlayLayerIds: [SEAMARK_OVERLAY_LAYER_ID],
   },
   satellite: {
     id: 'satellite',
     label: 'Satellite',
     description: 'MapTiler Sentinel-2 satellite imagery with seamark overlay.',
-    baseLayerId: 'base-satellite',
-    overlayLayerIds: ['overlay-seamark'],
+    baseLayerId: BASE_SATELLITE_LAYER_ID,
+    overlayLayerIds: [SEAMARK_OVERLAY_LAYER_ID],
   },
 };
 
@@ -103,8 +113,14 @@ export const ALL_BASE_LAYER_IDS: readonly string[] = MAP_STYLE_IDS.map(
   id => MAP_STYLE_REGISTRY[id].baseLayerId,
 );
 
-/** Every overlay layer the style spec declares; used for the off-toggle loop. */
-export const ALL_OVERLAY_LAYER_IDS = ['overlay-seamark'] as const;
+/**
+ * Every overlay layer the style spec declares; derived from the registry
+ * so a new overlay added to any descriptor automatically lands in the
+ * off-toggle loop without a second edit.
+ */
+export const ALL_OVERLAY_LAYER_IDS: readonly string[] = Array.from(
+  new Set(MAP_STYLE_IDS.flatMap(id => MAP_STYLE_REGISTRY[id].overlayLayerIds)),
+);
 
 export const DEFAULT_MAP_STYLE: MapStyleId = 'osm-light';
 
