@@ -21,7 +21,7 @@
 # Typical bootstrap for a local dev environment:
 #   scripts/gen-edge-certs.sh ca
 #   scripts/gen-edge-certs.sh server
-#   scripts/gen-edge-certs.sh client pi-szczecin-01
+#   scripts/gen-edge-certs.sh client <device-cn>
 
 set -euo pipefail
 

@@ -2,9 +2,7 @@ import { extractCn } from './edge-bridge.source';
 
 describe('extractCn', () => {
   it('returns CN string from a well-formed peer cert subject', () => {
-    expect(extractCn({ subject: { CN: 'pi-szczecin-01' } })).toBe(
-      'pi-szczecin-01',
-    );
+    expect(extractCn({ subject: { CN: 'device-001' } })).toBe('device-001');
   });
 
   it('returns null when subject is missing', () => {
