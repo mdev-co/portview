@@ -3,10 +3,9 @@ import { type ReactNode, createContext, memo, useContext, useEffect, useRef } fr
 import { cn } from '@/lib/utils';
 import { useMapEngine } from '@/modules/map/hooks/use-map-engine';
 import { getVesselDisplayPosition } from '@/modules/map/lib/vessel-display-position';
-import { $disabledTrailMmsis, toggleTrailForVessel } from '@/modules/map/state/trail-visibility';
+import { toggleTrailForVessel } from '@/modules/map/state/trail-visibility';
 import { VESSEL_CATEGORY_PALETTE, VESSEL_PALETTE } from '@/modules/map/styles/vessel-palette';
 import { $vesselKalmanState, type LiveVessel } from '@/modules/telemetry';
-import { useStore } from '@nanostores/react';
 import {
   Anchor,
   CalendarClock,
@@ -31,6 +30,7 @@ import {
   shipTypeCategory,
   sourceIdName,
 } from '@sps/shared';
+import { useTrailEnabledForMmsi } from '../hooks/use-trail-enabled-for-mmsi';
 import { useVesselStatic } from '../hooks/use-vessel-static';
 import { STATUS_LABEL, deriveVesselStatus } from '../lib/derive-status';
 import {
@@ -290,7 +290,6 @@ function Label() {
 function Actions() {
   const { vessel, selected } = useRow();
   const controller = useMapEngine();
-  const kalmanStates = useStore($vesselKalmanState);
   const canFly = vessel.lng !== null && vessel.lat !== null;
   return (
     <span className={styles.actions} onClick={e => e.stopPropagation()}>
@@ -304,8 +303,12 @@ function Actions() {
           // Resolve the same display position the marker uses on the map
           // so the camera lands exactly on the visible shape, not on the
           // raw last fix that may be 60 s behind the Kalman projection.
+          // Kalman state read lazily on click; subscribing per row would
+          // pay a listener for every position frame when only the click
+          // handler consumes the value.
           const now = Math.floor(Date.now() / 1_000);
-          const display = getVesselDisplayPosition(vessel, kalmanStates[vessel.mmsi], now);
+          const kalmanState = $vesselKalmanState.get()[vessel.mmsi];
+          const display = getVesselDisplayPosition(vessel, kalmanState, now);
           const target: [number, number] = display
             ? [display.lng, display.lat]
             : [vessel.lng!, vessel.lat!];
@@ -334,9 +337,8 @@ function Actions() {
 function Details() {
   const { vessel, selected } = useRow();
   const staticFrame = useVesselStatic(vessel.mmsi);
-  const disabledTrails = useStore($disabledTrailMmsis);
+  const trailShown = useTrailEnabledForMmsi(vessel.mmsi);
   if (!selected) return null;
-  const trailShown = !disabledTrails.has(vessel.mmsi);
   return (
     <>
       <div className={styles.illustrationFrame}>

@@ -1,0 +1,155 @@
+direction: down
+vars: {
+  d2-config: {
+    theme-id: 8
+    pad: 40
+  }
+}
+
+# Pipeline diagram for ADR-0021. Two branches from the same store
+# update: the prior fan-out path on the left, the throttled + per-key
+# filtered path on the right. Both observed the same ingest rate;
+# only the right path bounds React reconciliation cost.
+
+source: "WebSocket frame\nbinary VesselUpdateFrame\n10-20 Hz with antenna" {
+  shape: rectangle
+  style: {
+    fill: "#fef3c7"
+    stroke: "#92400e"
+    stroke-width: 2
+  }
+}
+
+client: "telemetry-client.ts\ndispatchTelemetryMessage\nsetVessel(vessel)" {
+  shape: rectangle
+  style: {
+    fill: "#dbeafe"
+    stroke: "#1e40af"
+  }
+}
+
+store: "vessels store.setKey(mmsi, vessel)\nNano Stores map() atomic write\nemits to all listeners" {
+  shape: cylinder
+  style: {
+    fill: "#ede9fe"
+    stroke: "#5b21b6"
+    stroke-width: 2
+  }
+}
+
+before: "Before\nuseStore(vessels store)\nfan-out path" {
+  shape: rectangle
+  style: {
+    fill: "#fee2e2"
+    stroke: "#991b1b"
+    stroke-width: 2
+  }
+
+  store_sub: "useStore(vessels store)\ntop-level subscribe\nfires on every setKey" {
+    shape: rectangle
+    style: {
+      fill: "#fecaca"
+      stroke: "#7f1d1d"
+    }
+  }
+
+  full_list: "Object.values + sort\nnew array reference\nuseMemo invalidates" {
+    shape: rectangle
+    style: {
+      fill: "#fecaca"
+      stroke: "#7f1d1d"
+    }
+  }
+
+  reconcile: "React beginWork\n46 x VesselListItem\n~552 elements diffed" {
+    shape: rectangle
+    style: {
+      fill: "#fecaca"
+      stroke: "#7f1d1d"
+    }
+  }
+
+  inp_bad: "INP 412 ms\nlong interaction warning\nclick delayed 379 ms" {
+    shape: rectangle
+    style: {
+      fill: "#991b1b"
+      stroke: "#7f1d1d"
+      font-color: "#ffffff"
+    }
+  }
+
+  store_sub -> full_list: "every emit"
+  full_list -> reconcile: "new ref per tick"
+  reconcile -> inp_bad: "10-20 times per second"
+}
+
+after: "After\nthrottled list + per-key rows\nbounded reconciliation" {
+  shape: rectangle
+  style: {
+    fill: "#dcfce7"
+    stroke: "#166534"
+    stroke-width: 2
+  }
+
+  list_sub: "useThrottledVesselList\nvessels store.listen()\ntrailing-edge timer 250 ms" {
+    shape: rectangle
+    style: {
+      fill: "#bbf7d0"
+      stroke: "#14532d"
+    }
+  }
+
+  coalesce: "createThrottledListener\nemits coalesce in-window\none commit per 250 ms" {
+    shape: diamond
+    style: {
+      fill: "#fef9c3"
+      stroke: "#854d0e"
+    }
+  }
+
+  row_kalman: "useVesselKalmanForMmsi\nlisten + filter by mmsi\nfires only on own key" {
+    shape: rectangle
+    style: {
+      fill: "#bbf7d0"
+      stroke: "#14532d"
+    }
+  }
+
+  row_trail: "useTrailEnabledForMmsi\nlisten + filter by mmsi\nfires only on own toggle" {
+    shape: rectangle
+    style: {
+      fill: "#bbf7d0"
+      stroke: "#14532d"
+    }
+  }
+
+  reconcile_ok: "React beginWork\n1 x VesselListItem\n12 elements diffed" {
+    shape: rectangle
+    style: {
+      fill: "#bbf7d0"
+      stroke: "#14532d"
+    }
+  }
+
+  inp_ok: "INP < 200 ms\nno long interaction\nclick under 50 ms delay" {
+    shape: rectangle
+    style: {
+      fill: "#166534"
+      stroke: "#14532d"
+      font-color: "#ffffff"
+    }
+  }
+
+  list_sub -> coalesce: "raw emits"
+  coalesce -> reconcile_ok: "4 Hz max"
+  row_kalman -> reconcile_ok: "only on own key"
+  row_trail -> reconcile_ok: "only on own toggle"
+  reconcile_ok -> inp_ok: "<= 4 commits per second"
+}
+
+source -> client: "every frame"
+client -> store: "10-20 Hz writes"
+store -> before.store_sub: "fan-out"
+store -> after.list_sub: "throttled"
+store -> after.row_kalman: "per key"
+store -> after.row_trail: "per key"
