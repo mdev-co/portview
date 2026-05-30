@@ -40,6 +40,14 @@ Both use `useSyncExternalStore` with a subscribe closure that retains the last p
 
 `useTrailEnabledForMmsi` reads from `@/modules/map/state/trail-visibility` but lives under `modules/selection/hooks/` next to `useVesselStatic` and `useSelectedVessel`. The consumer side owns the hook, the store side owns the data. Same convention the existing per-key hooks follow.
 
+### D-21-5: Read convention - nano-stores in React components are read through a dedicated hook
+
+Every nano-store consumed inside a React component reads through a dedicated hook in the consumer module's `hooks/` directory. The hook composes `useSyncExternalStore` with either `createPerKeyListener` (when filtering by mmsi) or `createThrottledListener` (when the consumer is rate-bounded). Direct `useStore($foo)` is acceptable only for single-value atoms whose render path depends on the value (themes, toggles, map readiness). Direct `.get()` is acceptable only outside React - for example the MapLibre rAF render loop in `apps/web/src/modules/map/components/vessel-layer.tsx`.
+
+The tradeoff is honest: a dedicated per-mmsi hook fires its filter closure on every store update across the fleet before deciding nothing changed - dozens of strict-equality checks per ingest frame at current scale. The cost is a fraction of a millisecond per second, well worth the read-pattern consistency. Performance-driven exceptions belong outside React, not in component code.
+
+This is enforced by convention rather than by lint: the dedicated hooks already exist for every high-frequency store (`useSelectedVessel`, `useVesselStatic`, `useVesselKalmanForMmsi`, `useTrailEnabledForMmsi`, `useThrottledVesselList`), and the file naming pattern (`use-<thing>-for-mmsi.ts` or `use-<thing>.ts`) signals intent at the import site. A future contributor reaching for `useStore($vesselKalmanState)` finds the existing hook one file over.
+
 ## Consequences
 
 - Position frames continue to land in the store at ingest rate; the sidebar list now reconciles at most four times per second regardless of frame rate. The map render path is unaffected and continues to consume the store directly.
