@@ -14,13 +14,14 @@ import {
 } from 'lucide-react';
 import { useEscapeKey } from '../hooks/use-escape-key';
 import { useGroupedVesselList } from '../hooks/use-grouped-vessel-list';
+import { useSidebarGroupExpansion } from '../hooks/use-sidebar-group-expansion';
 import { useVesselList } from '../hooks/use-vessel-list';
 import { STATUS_LABEL } from '../lib/derive-status';
 import { $selectedMmsi, clearSelection, selectVessel } from '../store';
 import { SidebarSection } from './sidebar-section';
 import { VesselListItem } from './vessel-list-item';
 
-const COPY = {
+const SIDEBAR_TEXT = {
   ariaLabel: 'Live vessels sidebar',
   vesselsTitle: 'Vessels',
   emptyTitle: 'Waiting for AIS feed.',
@@ -53,20 +54,29 @@ export function VesselSidebar() {
   const groups = useGroupedVesselList();
   const selectedMmsi = useStore($selectedMmsi);
   const hasSelection = selectedMmsi !== null;
+  const { isOpen, toggleGroup } = useSidebarGroupExpansion(groups, selectedMmsi);
 
   useEscapeKey(hasSelection, clearSelection);
 
   return (
-    <aside className={styles.sidebar} aria-label={COPY.ariaLabel}>
+    <aside className={styles.sidebar} aria-label={SIDEBAR_TEXT.ariaLabel}>
       <SidebarSection defaultOpen>
-        <SidebarSection.Header icon={Ship} title={COPY.vesselsTitle} count={fullList.length} />
+        <SidebarSection.Header
+          icon={Ship}
+          title={SIDEBAR_TEXT.vesselsTitle}
+          count={fullList.length}
+        />
         <SidebarSection.Body>
           {fullList.length === 0 ? (
-            <EmptyState icon={Ship} title={COPY.emptyTitle} hint={COPY.emptyHint} />
+            <EmptyState icon={Ship} title={SIDEBAR_TEXT.emptyTitle} hint={SIDEBAR_TEXT.emptyHint} />
           ) : (
             <div className={styles.outerScroll}>
-              {groups.map((group, index) => (
-                <SidebarSection key={group.status} defaultOpen={index === 0 || groups.length <= 2}>
+              {groups.map(group => (
+                <SidebarSection
+                  key={group.status}
+                  open={isOpen(group.status)}
+                  onOpenChange={() => toggleGroup(group.status)}
+                >
                   <SidebarSection.Header
                     icon={GROUP_ICON[group.status]}
                     title={STATUS_LABEL[group.status]}
@@ -99,16 +109,16 @@ export function VesselSidebar() {
       </SidebarSection>
 
       <SidebarSection disabled defaultOpen={false}>
-        <SidebarSection.Header icon={Filter} title={COPY.filtersTitle} />
+        <SidebarSection.Header icon={Filter} title={SIDEBAR_TEXT.filtersTitle} />
         <SidebarSection.Body>
-          <Placeholder>{COPY.filtersBody}</Placeholder>
+          <Placeholder>{SIDEBAR_TEXT.filtersBody}</Placeholder>
         </SidebarSection.Body>
       </SidebarSection>
 
       <SidebarSection disabled defaultOpen={false}>
-        <SidebarSection.Header icon={Activity} title={COPY.sourceHealthTitle} />
+        <SidebarSection.Header icon={Activity} title={SIDEBAR_TEXT.sourceHealthTitle} />
         <SidebarSection.Body>
-          <Placeholder>{COPY.sourceHealthBody}</Placeholder>
+          <Placeholder>{SIDEBAR_TEXT.sourceHealthBody}</Placeholder>
         </SidebarSection.Body>
       </SidebarSection>
     </aside>

@@ -38,16 +38,37 @@ const styles = {
 type RootProps = {
   readonly disabled?: boolean;
   readonly defaultOpen?: boolean;
+  /**
+   * Optional controlled open state. When provided, the section uses
+   * this value and `onOpenChange` to report user-initiated toggles.
+   * Pass both for a fully controlled section (parent owns expansion
+   * state, e.g. to auto-expand when a selection lands inside it).
+   * Pass neither to keep the internal uncontrolled state seeded by
+   * `defaultOpen`.
+   */
+  readonly open?: boolean;
+  readonly onOpenChange?: (next: boolean) => void;
   readonly children: ReactNode;
 };
 
-function Root({ disabled = false, defaultOpen = true, children }: RootProps) {
-  const [open, setOpen] = useState(defaultOpen && !disabled);
+function Root({
+  disabled = false,
+  defaultOpen = true,
+  open: openProp,
+  onOpenChange,
+  children,
+}: RootProps) {
+  const [internalOpen, setInternalOpen] = useState(defaultOpen && !disabled);
+  const isControlled = openProp !== undefined;
+  const open = isControlled ? openProp : internalOpen;
   const ctx: SidebarSectionContext = {
     open,
     disabled,
     toggle: () => {
-      if (!disabled) setOpen(value => !value);
+      if (disabled) return;
+      const next = !open;
+      if (!isControlled) setInternalOpen(next);
+      onOpenChange?.(next);
     },
   };
   return (
