@@ -10,6 +10,7 @@ import type { MapLayerMouseEvent, MapMouseEvent, Map as MaplibreMap } from 'mapl
 import { useMapEngine } from '../hooks/use-map-engine';
 import { useMapState } from '../hooks/use-map-state';
 import { trailsToGeoJSON } from '../lib/trails-to-geojson';
+import { createTransitionTracker } from '../lib/transition-tracker';
 import { ensureVesselIcons } from '../lib/vessel-icons';
 import { vesselsToGeoJSON } from '../lib/vessels-to-geojson';
 import { $trailVisibilityPredicate } from '../state/trail-visibility';
@@ -24,6 +25,16 @@ import {
 const VESSEL_INTERACTIVE_LAYERS = [VESSEL_LAYER_ID, VESSEL_ARROW_LAYER_ID, VESSEL_LABEL_LAYER_ID];
 
 const HOVER_CURSOR = 'pointer';
+
+/**
+ * Length of the cubic-ease lerp performed by `smoothedDisplayPosition`
+ * after each AIS report. Mirrored here so the rAF tick can prune
+ * completed transitions on the same schedule the tracker uses to
+ * settle a vessel onto its target coordinate. If the lerp duration
+ * changes in `dead-reckoning-tracker.ts`, update this constant in
+ * lockstep.
+ */
+const TRANSITION_DURATION_MS = 1_500;
 
 type LayerClickEvent = MapLayerMouseEvent & {
   __vesselHandled?: boolean;
@@ -51,52 +62,123 @@ export function VesselLayer(): null {
       }
     }
 
-    const render = (): void => {
-      const vessels = $vessels.get();
-      const staticData = $vesselStaticData.get();
-      const selectedMmsi = $selectedMmsi.get();
-      const kalmanStates = $vesselKalmanState.get();
+    // Track which MMSIs are inside their 1.5 s lerp window. The rAF
+    // tick skips the vessel rebuild entirely when the tracker is
+    // empty, which is the steady-state between AIS broadcasts (every
+    // 2-180 s per vessel). Each $vessels listener invocation marks
+    // the touched mmsi; the tick prunes entries whose transition has
+    // elapsed. See ADR-0022 for the full reasoning.
+    const transitionTracker = createTransitionTracker(TRANSITION_DURATION_MS);
+
+    const renderVessels = (): void => {
       const nowSeconds = Math.floor(Date.now() / 1_000);
       controller.setSourceData(
         VESSEL_SOURCE_ID,
-        vesselsToGeoJSON(vessels, staticData, selectedMmsi, nowSeconds, kalmanStates),
+        vesselsToGeoJSON(
+          $vessels.get(),
+          $vesselStaticData.get(),
+          $selectedMmsi.get(),
+          nowSeconds,
+          $vesselKalmanState.get(),
+        ),
       );
-      // Trails source is rebuilt at the same cadence so live position
-      // appends and selection changes show up on the polyline without
-      // a separate tick. Visibility predicate combines selection,
-      // global show-all toggle and the per-vessel disable set.
+    };
+
+    const renderTrails = (): void => {
       controller.setSourceData(
         VESSEL_TRAIL_SOURCE_ID,
         trailsToGeoJSON(
           $vesselPositionHistory.get(),
-          staticData,
-          selectedMmsi,
+          $vesselStaticData.get(),
+          $selectedMmsi.get(),
           $trailVisibilityPredicate.get(),
         ),
       );
     };
 
-    render();
+    // Prime both sources once on mount so the layer is populated
+    // before the first AIS report lands. Subsequent updates flow
+    // through the rAF tick (vessels) and the dedicated listeners
+    // (trails, vessel-property changes).
+    renderVessels();
+    renderTrails();
 
     let rafId = 0;
     const tick = (): void => {
-      render();
+      if (transitionTracker.size() > 0) {
+        transitionTracker.pruneCompleted(performance.now());
+        // Rebuild after the prune so the final tick of a completed
+        // transition still writes the settled coordinate. The next
+        // idle tick is skipped because the tracker is now empty.
+        renderVessels();
+      }
       rafId = window.requestAnimationFrame(tick);
     };
     rafId = window.requestAnimationFrame(tick);
 
-    const unsubscribePosition = $vessels.listen(render);
-    const unsubscribeStatic = $vesselStaticData.listen(render);
-    const unsubscribeSelection = $selectedMmsi.listen(render);
-    const unsubscribeHistory = $vesselPositionHistory.listen(render);
-    const unsubscribeTrailVisibility = $trailVisibilityPredicate.listen(render);
+    // Vessel position frames mark the touched mmsi as transitioning so
+    // the rAF tick wakes up to animate the lerp. The `_oldValue`
+    // parameter is unused but keeps the signature aligned with the
+    // nanostores listen contract.
+    const unsubscribePosition = $vessels.listen((_value, _oldValue, changedKey) => {
+      if (changedKey === undefined) return;
+      const mmsi = Number(changedKey);
+      if (Number.isFinite(mmsi)) {
+        transitionTracker.mark(mmsi, performance.now());
+      }
+    });
+
+    // Property changes (name, category, selection, trail visibility)
+    // do not animate, but they do change feature properties. Mark every
+    // currently-displayed mmsi as active for one tick so the next rAF
+    // rebuild picks up the new properties. This is coarse - a per-key
+    // diff would be cheaper at scale, but the current fleet size makes
+    // the simpler approach preferable.
+    const markAllVesselsActive = (): void => {
+      const nowMs = performance.now();
+      for (const mmsiKey in $vessels.get()) {
+        const mmsi = Number(mmsiKey);
+        if (Number.isFinite(mmsi)) {
+          transitionTracker.mark(mmsi, nowMs);
+        }
+      }
+    };
+
+    const unsubscribeStatic = $vesselStaticData.listen(() => {
+      markAllVesselsActive();
+    });
+    const unsubscribeSelection = $selectedMmsi.listen(() => {
+      markAllVesselsActive();
+      // Selection also paints the trail differently; rebuild now so
+      // the polyline highlight matches without waiting for a position
+      // history mutation.
+      renderTrails();
+    });
+
+    // Trails rebuild only when an input that determines the polyline
+    // content or styling changes. Position history mutation is the
+    // common case (new AIS fix appended). Static data is needed for
+    // the per-category trail colour. Selection is handled above so it
+    // also marks vessels active. Trail visibility is the show-all
+    // toggle plus the per-vessel disable set.
+    const unsubscribeHistory = $vesselPositionHistory.listen(() => {
+      renderTrails();
+    });
+    const unsubscribeTrailStaticColour = $vesselStaticData.listen(() => {
+      renderTrails();
+    });
+    const unsubscribeTrailVisibility = $trailVisibilityPredicate.listen(() => {
+      renderTrails();
+    });
 
     return () => {
       window.cancelAnimationFrame(rafId);
+      transitionTracker.clear();
       unsubscribePosition();
       unsubscribeStatic();
       unsubscribeSelection();
       unsubscribeHistory();
+      unsubscribeTrailStaticColour();
       unsubscribeTrailVisibility();
     };
   }, [controller, status]);

@@ -1,0 +1,173 @@
+direction: down
+vars: {
+  d2-config: {
+    theme-id: 8
+    pad: 40
+  }
+}
+
+# Two render pipelines: the prior every-frame rebuild path on the left,
+# the transition-tracked + listener-driven path on the right.
+
+source: "Stores\nNano Stores listeners + .get()" {
+  shape: rectangle
+  style: {
+    fill: "#fef3c7"
+    stroke: "#92400e"
+    stroke-width: 2
+  }
+
+  vessels_store: "vessels store\nper-key setKey at 10-20 Hz" {
+    shape: cylinder
+    style: {
+      fill: "#ede9fe"
+      stroke: "#5b21b6"
+    }
+  }
+
+  trails_store: "history + static + selection + visibility\nmutates per AIS broadcast or user action" {
+    shape: cylinder
+    style: {
+      fill: "#ede9fe"
+      stroke: "#5b21b6"
+    }
+  }
+}
+
+before: "Before\n60 fps rebuild for everything" {
+  shape: rectangle
+  style: {
+    fill: "#fee2e2"
+    stroke: "#991b1b"
+    stroke-width: 2
+  }
+
+  raf_loop: "rAF tick at 60 Hz\nUNCONDITIONAL render call" {
+    shape: rectangle
+    style: {
+      fill: "#fecaca"
+      stroke: "#7f1d1d"
+    }
+  }
+
+  listeners_b: "5 store listeners\nALSO call render on every emit" {
+    shape: rectangle
+    style: {
+      fill: "#fecaca"
+      stroke: "#7f1d1d"
+    }
+  }
+
+  full_rebuild: "render() rebuild\nvessel + trail GeoJSON\nfull O(N) iteration each call" {
+    shape: rectangle
+    style: {
+      fill: "#fecaca"
+      stroke: "#7f1d1d"
+    }
+  }
+
+  gpu_b: "MapLibre setSourceData x2\nGPU re-upload + retessellation\n60-80 invocations per second" {
+    shape: rectangle
+    style: {
+      fill: "#991b1b"
+      stroke: "#7f1d1d"
+      font-color: "#ffffff"
+    }
+  }
+
+  cost_b: "1070 ms / 5 s recording\n21 percent main thread budget" {
+    shape: rectangle
+    style: {
+      fill: "#991b1b"
+      stroke: "#7f1d1d"
+      font-color: "#ffffff"
+    }
+  }
+
+  raf_loop -> full_rebuild: "every frame"
+  listeners_b -> full_rebuild: "extra triggers"
+  full_rebuild -> gpu_b
+  gpu_b -> cost_b
+}
+
+after: "After\ntransition-tracked vessels + listener trails" {
+  shape: rectangle
+  style: {
+    fill: "#dcfce7"
+    stroke: "#166534"
+    stroke-width: 2
+  }
+
+  transition_tracker: "createTransitionTracker(1500ms)\nMap of mmsi to start time\nseeded by vessels.listen" {
+    shape: rectangle
+    style: {
+      fill: "#bbf7d0"
+      stroke: "#14532d"
+    }
+  }
+
+  raf_gate: "rAF tick\nif tracker.size == 0 -> skip\nelse prune + render vessels" {
+    shape: diamond
+    style: {
+      fill: "#fef9c3"
+      stroke: "#854d0e"
+    }
+  }
+
+  vessel_rebuild: "renderVessels()\nonly while transitions active\n1.5 s after each AIS report" {
+    shape: rectangle
+    style: {
+      fill: "#bbf7d0"
+      stroke: "#14532d"
+    }
+  }
+
+  trail_listeners: "history + static + selection + visibility\nlisten direct, no rAF" {
+    shape: rectangle
+    style: {
+      fill: "#bbf7d0"
+      stroke: "#14532d"
+    }
+  }
+
+  trail_rebuild: "renderTrails()\nonly on input mutation\n5-10 invocations per minute" {
+    shape: rectangle
+    style: {
+      fill: "#bbf7d0"
+      stroke: "#14532d"
+    }
+  }
+
+  gpu_a: "MapLibre setSourceData\nvessels per active tick\ntrails per listener emit" {
+    shape: rectangle
+    style: {
+      fill: "#166534"
+      stroke: "#14532d"
+      font-color: "#ffffff"
+    }
+  }
+
+  cost_a: "less than 300 ms / 5 s\nidle CPU near zero\nGPU paint stays 60 fps" {
+    shape: rectangle
+    style: {
+      fill: "#166534"
+      stroke: "#14532d"
+      font-color: "#ffffff"
+    }
+  }
+
+  transition_tracker -> raf_gate: "size > 0?"
+  raf_gate -> vessel_rebuild: "yes"
+  trail_listeners -> trail_rebuild: "on emit"
+  vessel_rebuild -> gpu_a
+  trail_rebuild -> gpu_a
+  gpu_a -> cost_a
+}
+
+source.vessels_store -> before.raf_loop: "ignored (rAF fires anyway)"
+source.vessels_store -> before.listeners_b: "every emit"
+source.trails_store -> before.listeners_b: "every emit"
+
+source.vessels_store -> after.transition_tracker: "mark on per-key emit"
+source.vessels_store -> after.raf_gate: "static or selection -> mark all active"
+source.trails_store -> after.trail_listeners: "direct listen"
