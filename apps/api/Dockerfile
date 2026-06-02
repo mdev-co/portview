@@ -70,8 +70,12 @@ RUN pnpm --filter @sps/api deploy --prod /prod \
 
 FROM node:22-alpine AS runtime
 # Pull Alpine security fixes in the runtime stage too. tini handles
-# PID 1 duties; openssl is required by the Prisma client at runtime.
-RUN corepack enable && apk upgrade --no-cache && apk add --no-cache openssl tini
+# PID 1 duties; openssl is required by the Prisma client at runtime;
+# tailscale + ca-certificates power the userspace tailnet join that
+# the docker-entrypoint script performs before exec-ing the app.
+RUN corepack enable \
+  && apk upgrade --no-cache \
+  && apk add --no-cache openssl tini tailscale ca-certificates
 WORKDIR /app
 
 ENV NODE_ENV=production \
@@ -79,13 +83,25 @@ ENV NODE_ENV=production \
     NODE_OPTIONS=--max-old-space-size=384
 
 COPY --from=build --chown=node:node /prod /app
+COPY apps/api/docker-entrypoint.sh /docker-entrypoint.sh
+RUN chmod +x /docker-entrypoint.sh
 
-USER node
+# Note on USER directive: deliberately runs as root.
+# tailscaled needs write access to /var/lib/tailscale (persistent Fly
+# volume) for its state file; the volume is owned by root by default
+# and node:node cannot chown it back from inside the container. Running
+# the whole stack as root keeps the entrypoint simple and avoids the
+# gosu / su-exec dance. Container isolation (Fly machine sandbox + no
+# host bind mounts + Tailscale userspace networking) bounds the blast
+# radius if Node is compromised.
 
 EXPOSE 3000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD node -e "fetch('http://localhost:3000/').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
 
-ENTRYPOINT ["/sbin/tini", "--"]
+# tini owns PID 1; docker-entrypoint.sh sets up certs + tailnet before
+# exec-ing the upstream CMD. Both run before the Node app starts so
+# /tmp/certs and the tailnet interface are in place when Nest boots.
+ENTRYPOINT ["/sbin/tini", "--", "/docker-entrypoint.sh"]
 CMD ["sh", "-c", "npx prisma migrate deploy --schema=prisma/schema.prisma && node dist/src/main.js"]

@@ -43,3 +43,16 @@ primary_region = "fra"
   cpu_kind = "shared"
   cpus = 1
   memory_mb = 512
+
+# Persistent Tailscale daemon state. The state file holds the device's
+# private key and machine identity. Without persistence the container's
+# /tmp resets on every deploy and the daemon registers as a NEW device
+# (so the hostname `sps-api-fly` gets a `-1`, `-2`, ... suffix and the
+# tailnet IP rotates). With the volume mounted at /var/lib/tailscale,
+# the same identity survives deploys and the hostname + IP stay stable.
+#
+# Volume size 1 GB is dramatically larger than the state file (~few KB)
+# but is the minimum Fly volume size and costs effectively nothing.
+[mounts]
+  source = "tailscale_state"
+  destination = "/var/lib/tailscale"
