@@ -74,8 +74,17 @@ gen_server() {
   mkdir -p "$SERVER_DIR"
 
   local san="DNS:localhost,IP:127.0.0.1"
+  # Detect IPv4 vs DNS name so callers can mix `./gen server foo.example.com 100.99.223.61`
+  # without having to pre-prefix each extra. A bare IPv4 written as
+  # DNS:1.2.3.4 produces a TLS handshake mismatch the moment the
+  # client connects by IP, which is exactly what bit the Pi 4 deploy.
+  local ipv4_re='^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$'
   for extra in "$@"; do
-    san="${san},DNS:${extra}"
+    if [[ "$extra" =~ $ipv4_re ]]; then
+      san="${san},IP:${extra}"
+    else
+      san="${san},DNS:${extra}"
+    fi
   done
 
   openssl genrsa -out "$SERVER_DIR/server.key" "$KEY_BITS"
