@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
   type Mmsi,
+  type SourceId,
   VESSEL_HISTORY_MAX_POINTS,
   VESSEL_SNAPSHOT_FRAME_KIND,
   type VesselHistoryPoint,
@@ -77,6 +78,7 @@ export class SnapshotBuilder {
         staticData: buildStaticDataPayload(v, mmsi),
         history,
         kalman: buildKalmanState(v),
+        sourceId: (v.lastSourceId as SourceId | null) ?? null,
       };
     });
 
@@ -106,6 +108,7 @@ type VesselRow = {
   destination: string | null;
   eta: Date | null;
   lastSeenAt: Date | null;
+  lastSourceId: number | null;
   kalmanLng: number | null;
   kalmanLat: number | null;
   kalmanVlng: number | null;

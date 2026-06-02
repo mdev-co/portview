@@ -61,7 +61,7 @@ export class VesselPersistenceService {
   }
 
   private async persistPosition(event: VesselUpdateEvent): Promise<void> {
-    const { message, receivedAt } = event;
+    const { message, sourceId, receivedAt } = event;
     if (
       message.messageType !== 1 &&
       message.messageType !== 2 &&
@@ -114,6 +114,7 @@ export class VesselPersistenceService {
         where: { mmsi },
         update: {
           lastSeenAt: broadcastTimestamp,
+          lastSourceId: sourceId,
           kalmanLng: nextKalman.lng,
           kalmanLat: nextKalman.lat,
           kalmanVlng: nextKalman.vlng,
@@ -124,6 +125,7 @@ export class VesselPersistenceService {
         create: {
           mmsi,
           lastSeenAt: broadcastTimestamp,
+          lastSourceId: sourceId,
           kalmanLng: nextKalman.lng,
           kalmanLat: nextKalman.lat,
           kalmanVlng: nextKalman.vlng,
@@ -142,6 +144,7 @@ export class VesselPersistenceService {
           trueHeading: heading,
           rateOfTurn: rot,
           navStatus,
+          sourceId,
           broadcastTimestamp,
         },
       }),
@@ -149,7 +152,7 @@ export class VesselPersistenceService {
   }
 
   private async persistStatic(event: VesselStaticEvent): Promise<void> {
-    const { message, receivedAt } = event;
+    const { message, sourceId, receivedAt } = event;
     const mmsi = Number(message.mmsi);
     const broadcastTimestamp = new Date(receivedAt);
 
@@ -172,6 +175,7 @@ export class VesselPersistenceService {
           destination: message.destination.trim() || undefined,
           eta: etaToDate(message.eta) ?? undefined,
           lastSeenAt: broadcastTimestamp,
+          lastSourceId: sourceId,
         },
         create: {
           mmsi,
@@ -190,6 +194,7 @@ export class VesselPersistenceService {
           destination: message.destination.trim() || null,
           eta: etaToDate(message.eta),
           lastSeenAt: broadcastTimestamp,
+          lastSourceId: sourceId,
         },
       });
       return;
@@ -206,11 +211,13 @@ export class VesselPersistenceService {
         update: {
           name: message.vesselName.trim() || undefined,
           lastSeenAt: broadcastTimestamp,
+          lastSourceId: sourceId,
         },
         create: {
           mmsi,
           name: message.vesselName.trim() || null,
           lastSeenAt: broadcastTimestamp,
+          lastSourceId: sourceId,
         },
       });
       return;
@@ -229,6 +236,7 @@ export class VesselPersistenceService {
           toPort: message.dimensions?.toPort ?? undefined,
           toStarboard: message.dimensions?.toStarboard ?? undefined,
           lastSeenAt: broadcastTimestamp,
+          lastSourceId: sourceId,
         },
         create: {
           mmsi,
@@ -242,6 +250,7 @@ export class VesselPersistenceService {
           toPort: message.dimensions?.toPort ?? null,
           toStarboard: message.dimensions?.toStarboard ?? null,
           lastSeenAt: broadcastTimestamp,
+          lastSourceId: sourceId,
         },
       });
     }

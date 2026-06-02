@@ -1,4 +1,4 @@
-import type { Mmsi } from './brands';
+import type { Mmsi, SourceId } from './brands';
 import type { VesselStaticDataFrame } from './vessel-static';
 
 /**
@@ -49,6 +49,14 @@ export type VesselSnapshotEntry = {
   readonly staticData: Omit<VesselStaticDataFrame, 'kind'> | null;
   readonly history: readonly VesselHistoryPoint[];
   readonly kalman: VesselKalmanState | null;
+  /**
+   * Source identifier (SourceId enum) of the latest frame that updated
+   * the parent vessel row. Null for pre-existing rows that predate
+   * sourceId tracking or rows seeded outside the normal ingest pipeline.
+   * The FE labels the source from this value instead of inventing a
+   * default.
+   */
+  readonly sourceId: SourceId | null;
 };
 
 export type VesselSnapshotFrame = {
