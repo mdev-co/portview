@@ -13,12 +13,40 @@ import { z } from 'zod';
  * Read-once: the schema is parsed at boot, never re-read at runtime.
  * Mutating env after boot does not change behaviour.
  */
+
+/**
+ * Split the raw `EDGE_BRIDGE_BACKEND_URL` value into the array consumed
+ * by {@link WssClientPool}. Whitespace around each entry is stripped and
+ * empty entries are dropped so trailing commas or accidental double
+ * separators do not crash the bridge at boot.
+ *
+ * Exported and used by the schema refine below so there is exactly one
+ * parser for the comma-separated list - validation and consumption can
+ * never drift apart.
+ */
+export function parseBackendUrls(raw: string): readonly string[] {
+  return raw
+    .split(',')
+    .map(u => u.trim())
+    .filter(u => u.length > 0);
+}
+
 const EnvSchema = z.object({
   EDGE_BRIDGE_BACKEND_URL: z
     .string()
-    .url()
     .default('wss://localhost:8443/edge-ingest')
-    .describe('WSS endpoint of the apps/api EdgeIngestGateway (chunk 3).'),
+    .refine(raw => parseBackendUrls(raw).length > 0, {
+      message: 'at least one ws:// or wss:// URL required',
+    })
+    .refine(raw => parseBackendUrls(raw).every(u => /^wss?:\/\//.test(u)), {
+      message: 'every comma-separated URL must start with ws:// or wss://',
+    })
+    .describe(
+      'WSS endpoint(s) of EdgeBridgeSource listeners. Comma-separated for ' +
+        'multi-sink broadcast: every frame is forwarded to every endpoint ' +
+        'independently. Each sink keeps its own reconnect state and queue. ' +
+        'Single URL = original single-sink behaviour.',
+    ),
   EDGE_BRIDGE_LOCAL_UDP_PORT: z.coerce
     .number()
     .int()

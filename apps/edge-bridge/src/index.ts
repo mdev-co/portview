@@ -1,9 +1,10 @@
 import { readFileSync } from 'node:fs';
-import { loadConfig } from './config.js';
+import { loadConfig, parseBackendUrls } from './config.js';
 import { createLogger } from './logger.js';
 import { UdpListener } from './udp-listener.js';
 import { SystemdNotify } from './watchdog.js';
-import { type TlsClientCredentials, WssClient } from './wss-client.js';
+import { WssClientPool } from './wss-client-pool.js';
+import type { TlsClientCredentials } from './wss-client.js';
 
 const log = createLogger('main');
 
@@ -29,8 +30,13 @@ async function main(): Promise<void> {
     config.EDGE_BRIDGE_CA_CERT_PATH,
   );
 
+  const backendUrls = parseBackendUrls(config.EDGE_BRIDGE_BACKEND_URL);
+  if (backendUrls.length === 0) {
+    throw new Error('EDGE_BRIDGE_BACKEND_URL parsed to an empty list - check repo-root .env');
+  }
+
   log.info('boot', {
-    backend: config.EDGE_BRIDGE_BACKEND_URL,
+    backends: backendUrls,
     udp: `${config.EDGE_BRIDGE_LOCAL_UDP_HOST}:${config.EDGE_BRIDGE_LOCAL_UDP_PORT}`,
     mTLS: tls ? 'configured' : 'disabled',
     systemdNotify: notify.isEnabled() ? 'enabled' : 'disabled',
@@ -40,8 +46,8 @@ async function main(): Promise<void> {
     config.EDGE_BRIDGE_LOCAL_UDP_HOST,
     config.EDGE_BRIDGE_LOCAL_UDP_PORT,
   );
-  const client = new WssClient({
-    url: config.EDGE_BRIDGE_BACKEND_URL,
+  const pool = new WssClientPool({
+    urls: backendUrls,
     initialBackoffMs: config.EDGE_BRIDGE_RECONNECT_INITIAL_MS,
     maxBackoffMs: config.EDGE_BRIDGE_RECONNECT_MAX_MS,
     reconnectJitterMs: config.EDGE_BRIDGE_RECONNECT_JITTER_MS,
@@ -57,7 +63,7 @@ async function main(): Promise<void> {
       length: frameEvent.frame.length,
       from: `${frameEvent.remoteAddress}:${frameEvent.remotePort}`,
     });
-    client.send(frameEvent.frame);
+    pool.send(frameEvent.frame);
   });
   listener.on('error', err => {
     log.error('listener error, exiting', { error: err.message });
@@ -65,10 +71,10 @@ async function main(): Promise<void> {
   });
 
   await listener.start();
-  client.start();
+  pool.start();
   notify.ready();
   notify.status(
-    `listener on ${config.EDGE_BRIDGE_LOCAL_UDP_HOST}:${config.EDGE_BRIDGE_LOCAL_UDP_PORT}, backend ${config.EDGE_BRIDGE_BACKEND_URL}`,
+    `listener on ${config.EDGE_BRIDGE_LOCAL_UDP_HOST}:${config.EDGE_BRIDGE_LOCAL_UDP_PORT}, backends [${backendUrls.join(', ')}]`,
   );
   notify.startWatchdog();
 
@@ -79,7 +85,7 @@ async function main(): Promise<void> {
     log.info('shutdown signal', { signal });
     notify.stopping();
     notify.stopWatchdog();
-    await client.stop();
+    await pool.stop();
     await listener.stop();
     process.exit(0);
   };
