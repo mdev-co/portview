@@ -176,7 +176,7 @@ function Row({ children }: { readonly children: ReactNode }) {
       ref={rowRef}
       role="button"
       tabIndex={0}
-      aria-selected={selected}
+      aria-pressed={selected}
       aria-expanded={selected}
       onClick={handleSelect}
       onKeyDown={event => {

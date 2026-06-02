@@ -41,8 +41,12 @@ export function useMapStyleSync(): void {
       controller.setLayerVisibility(baseId, baseId === descriptor.baseLayerId);
     }
 
+    // Set lookup for O(1) per-overlay membership instead of O(N) `includes`
+    // on every iteration. Cheap to construct (overlay count is small) and
+    // keeps the hook fast even if the registry grows.
+    const allowedOverlays = new Set(descriptor.overlayLayerIds);
     for (const overlayId of ALL_OVERLAY_LAYER_IDS) {
-      const descriptorAllows = descriptor.overlayLayerIds.includes(overlayId);
+      const descriptorAllows = allowedOverlays.has(overlayId);
       const togglesAllow = overlayId === SEAMARK_OVERLAY_LAYER_ID ? seamarkVisible : true;
       controller.setLayerVisibility(overlayId, descriptorAllows && togglesAllow);
     }
