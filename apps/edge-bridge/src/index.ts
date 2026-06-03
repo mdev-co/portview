@@ -85,8 +85,13 @@ async function main(): Promise<void> {
     log.info('shutdown signal', { signal });
     notify.stopping();
     notify.stopWatchdog();
-    await pool.stop();
+    // Stop the UDP listener first so no new AIS frames arrive at the
+    // pool after the WSS sinks start tearing down. The reverse order
+    // would let inbound frames land in each per-sink queue after
+    // shutdownRequested = true was set on the clients, and the queue
+    // would never drain - frames lost silently on every restart.
     await listener.stop();
+    await pool.stop();
     process.exit(0);
   };
   process.on('SIGTERM', () => void shutdown('SIGTERM'));
