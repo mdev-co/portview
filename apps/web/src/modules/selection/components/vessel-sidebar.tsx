@@ -83,6 +83,7 @@ export function VesselSidebar() {
                         >
                           <VesselListItem.Row>
                             <VesselListItem.StatusDot />
+                            <VesselListItem.SourceDot />
                             <VesselListItem.Label />
                             <VesselListItem.Actions />
                           </VesselListItem.Row>

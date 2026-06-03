@@ -122,7 +122,7 @@ export const ALL_OVERLAY_LAYER_IDS: readonly string[] = Array.from(
   new Set(MAP_STYLE_IDS.flatMap(id => MAP_STYLE_REGISTRY[id].overlayLayerIds)),
 );
 
-export const DEFAULT_MAP_STYLE: MapStyleId = 'osm-light';
+export const DEFAULT_MAP_STYLE: MapStyleId = 'osm-dark';
 
 export const $activeMapStyle = atom<MapStyleId>(DEFAULT_MAP_STYLE);
 

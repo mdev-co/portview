@@ -1,5 +1,6 @@
 import type { ExpressionSpecification, LayerSpecification, StyleSpecification } from 'maplibre-gl';
 import { SHIP_TYPE_CATEGORIES, type ShipTypeCategory } from '@sps/shared';
+import { opacityBySource } from './source-palette';
 import {
   VESSEL_CATEGORY_PALETTE,
   VESSEL_CATEGORY_RING_PALETTE,
@@ -199,6 +200,16 @@ const opacityByAge: ExpressionSpecification = [
   600,
   0,
 ];
+
+/**
+ * Combined opacity: the age ramp above multiplied by the source-based
+ * multiplier from `source-palette`. A vessel that is both fresh AND
+ * EdgeBridge-owned renders at 0.95; a fresh AisStream vessel renders at
+ * 0.95 * 0.55 = 0.52; both fade to zero in lockstep at the staleness
+ * boundary. Single expression so every vessel layer (circles, arrows,
+ * labels) shares the exact same fade.
+ */
+const opacityCombined: ExpressionSpecification = ['*', opacityByAge, opacityBySource];
 
 export const osmRasterStyle: StyleSpecification = {
   version: 8,
@@ -411,8 +422,8 @@ export const osmRasterStyle: StyleSpecification = {
         // produced. One ramp, both layers, no visual "boxes".
         'circle-stroke-width': ['interpolate', ['linear'], ['zoom'], 8, 0.5, 11, 1, 14, 2, 18, 2],
         'circle-stroke-color': strokeColorByStaleness,
-        'circle-opacity': opacityByAge,
-        'circle-stroke-opacity': opacityByAge,
+        'circle-opacity': opacityCombined,
+        'circle-stroke-opacity': opacityCombined,
       },
     },
     {
@@ -429,7 +440,7 @@ export const osmRasterStyle: StyleSpecification = {
       },
       paint: {
         'icon-color': fillColorByMovementAndCategory,
-        'icon-opacity': opacityByAge,
+        'icon-opacity': opacityCombined,
         // No icon-halo - earlier slate-900 halo around the SDF
         // silhouette produced visible step artefacts as MapLibre
         // sampled the distance field at small icon-size. The
@@ -488,8 +499,8 @@ export const osmRasterStyle: StyleSpecification = {
       },
       paint: {
         'text-color': '#ffffff',
-        'text-opacity': opacityByAge,
-        'icon-opacity': opacityByAge,
+        'text-opacity': opacityCombined,
+        'icon-opacity': opacityCombined,
       },
     },
   ],

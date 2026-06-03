@@ -45,8 +45,15 @@ export function MapStyleSwitcher() {
     <div
       role="radiogroup"
       aria-label="Map style"
-      className="border-border bg-background inline-flex h-8 items-center rounded-md border p-0.5 text-xs"
+      className="border-border bg-background inline-flex h-8 items-center gap-1 rounded-md border py-0.5 pr-0.5 pl-2 text-xs"
     >
+      <span
+        aria-hidden
+        className="text-muted-foreground font-mono text-[10px] font-semibold tracking-widest uppercase select-none"
+      >
+        Map
+      </span>
+      <span aria-hidden className="bg-border mx-0.5 h-4 w-px" />
       {MAP_STYLE_IDS.map(id => {
         const descriptor = MAP_STYLE_REGISTRY[id];
         const Icon = STYLE_ICONS[id];
