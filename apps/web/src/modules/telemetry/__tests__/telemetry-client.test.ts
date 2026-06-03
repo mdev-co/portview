@@ -11,6 +11,7 @@ import {
   type VesselSnapshotFrame,
   type VesselStaticDataFrame,
   type VesselUpdateFrame,
+  encodeSnapshot,
   encodeVesselFrame,
 } from '@sps/shared';
 import { dispatchTelemetryMessage } from '../telemetry-client';
@@ -74,22 +75,63 @@ describe('dispatchTelemetryMessage - binary path', () => {
     expect(onVessel).toHaveBeenCalledTimes(1);
   });
 
+  it('routes a binary snapshot that happens to encode to exactly 40 bytes through the snapshot decoder, not the position decoder (regression: 40-byte collision)', () => {
+    // A 1-vessel 1-history-point snapshot encodes to exactly 40 bytes.
+    // The old length-first dispatcher misrouted this buffer to the
+    // position decoder and wrote garbage into $vessels. The marker
+    // byte (0xFE) at offset 0 is now the routing key, so the snapshot
+    // decoder claims the buffer regardless of its body length.
+    const snapshot: VesselSnapshotFrame = {
+      kind: VESSEL_SNAPSHOT_FRAME_KIND,
+      serverTimeUnix: 1_780_000_000,
+      vessels: [
+        {
+          mmsi: 261_999_999 as Mmsi,
+          staticData: null,
+          history: [
+            {
+              lng: 14.5,
+              lat: 53.4,
+              sog: null,
+              cog: null,
+              trueHeading: null,
+              timestampUnix: 1_780_000_000,
+            },
+          ],
+          kalman: null,
+          sourceId: null,
+        },
+      ],
+    };
+    const encoded = encodeSnapshot(snapshot);
+    expect(encoded.byteLength).toBe(40);
+
+    const onSnapshot = vi.fn();
+    const onVessel = vi.fn();
+    dispatchTelemetryMessage(encoded.buffer as ArrayBuffer, { onSnapshot, onVessel });
+
+    expect(onSnapshot).toHaveBeenCalledTimes(1);
+    expect(onVessel).not.toHaveBeenCalled();
+    expect($vessels.get()[261_999_999]).toBeDefined();
+  });
+
   it('logs and skips a binary frame whose type marker matches no known kind', () => {
     const onVessel = vi.fn();
 
     // A buffer that is not 40 bytes and whose leading byte matches
     // neither BINARY_FRAME_TYPE_SNAPSHOT nor BINARY_FRAME_TYPE_STATIC
     // is an unknown frame - the dispatcher logs and bails out without
-    // touching any store.
+    // touching any store. Pick 0x42 as it is far from both markers
+    // (0xFE, 0xFF) and from any legal AIS messageType (1..27).
     const bytes = new Uint8Array(8);
-    bytes[0] = 0xff;
+    bytes[0] = 0x42;
     dispatchTelemetryMessage(bytes.buffer, { onVessel });
 
     expect(onVessel).not.toHaveBeenCalled();
     expect($vessels.get()).toEqual({});
     expect(warnSpy).toHaveBeenCalledWith(
       '[telemetry] unknown binary frame',
-      expect.objectContaining({ marker: 0xff }),
+      expect.objectContaining({ marker: 0x42 }),
     );
   });
 });

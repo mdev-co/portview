@@ -183,47 +183,50 @@ function synthesiseLiveVesselFromHistory(
  */
 export function dispatchTelemetryMessage(data: unknown, handlers: DispatchHandlers = {}): void {
   if (data instanceof ArrayBuffer) {
-    // Three binary frame kinds share the WebSocket. The 40-byte
-    // position update is identified by exact length (its codec has no
-    // type marker). Variable-length frames (snapshot, static) carry a
-    // one-byte type marker at offset 0 that the dispatcher reads to
-    // route into the right Protobuf decoder.
-    if (data.byteLength === VESSEL_FRAME_BYTES) {
-      // fall through to position-frame handling below
-    } else {
-      const bytes = new Uint8Array(data);
-      const marker = bytes[0];
-      if (marker === BINARY_FRAME_TYPE_SNAPSHOT) {
-        let snapshot: VesselSnapshotFrame;
-        try {
-          snapshot = decodeSnapshot(bytes);
-        } catch (err) {
-          console.warn('[telemetry] binary snapshot decode failed', { error: err });
-          return;
-        }
-        applySnapshot(snapshot);
-        handlers.onSnapshot?.(snapshot);
+    // Three binary frame kinds share the WebSocket. The dispatcher
+    // routes by the leading marker byte FIRST and falls back to the
+    // fixed-length position-frame decoder only when the marker is not
+    // recognised. The marker bytes (0xFE, 0xFF) are chosen outside
+    // the legal AIS messageType range (1..27), so a position frame's
+    // byte[0] (always a valid messageType) cannot be mistaken for a
+    // snapshot/static marker. Length-first ordering would misroute a
+    // variable-length snapshot that happens to encode to exactly the
+    // position-frame size (a 1-vessel 1-history-point snapshot does);
+    // marker-first is correct by construction.
+    const bytes = new Uint8Array(data);
+    const marker = bytes.length > 0 ? bytes[0] : undefined;
+    if (marker === BINARY_FRAME_TYPE_SNAPSHOT) {
+      let snapshot: VesselSnapshotFrame;
+      try {
+        snapshot = decodeSnapshot(bytes);
+      } catch (err) {
+        console.warn('[telemetry] binary snapshot decode failed', { error: err });
         return;
       }
-      if (marker === BINARY_FRAME_TYPE_STATIC) {
-        let staticFrame: VesselStaticDataFrame;
-        try {
-          staticFrame = decodeStaticFrame(bytes);
-        } catch (err) {
-          console.warn('[telemetry] binary static decode failed', { error: err });
-          return;
-        }
-        setVesselStatic(staticFrame);
-        handlers.onStatic?.(staticFrame);
+      applySnapshot(snapshot);
+      handlers.onSnapshot?.(snapshot);
+      return;
+    }
+    if (marker === BINARY_FRAME_TYPE_STATIC) {
+      let staticFrame: VesselStaticDataFrame;
+      try {
+        staticFrame = decodeStaticFrame(bytes);
+      } catch (err) {
+        console.warn('[telemetry] binary static decode failed', { error: err });
         return;
       }
+      setVesselStatic(staticFrame);
+      handlers.onStatic?.(staticFrame);
+      return;
+    }
+    if (data.byteLength !== VESSEL_FRAME_BYTES) {
       console.warn('[telemetry] unknown binary frame', {
         length: data.byteLength,
         marker,
       });
       return;
     }
-    const frame = decodeVesselFrame(new Uint8Array(data));
+    const frame = decodeVesselFrame(bytes);
     const vessel: LiveVessel = {
       mmsi: frame.mmsi,
       messageType: frame.messageType,

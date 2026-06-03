@@ -16,9 +16,17 @@ import { VESSEL_STATIC_FRAME_KIND, type VesselStaticDataFrame } from '../types/v
  * their fixed length as the discriminator and do NOT carry this byte.
  * Variable-length frames (snapshot, static) need a marker because the
  * frontend dispatcher cannot tell them apart from length alone.
+ *
+ * Marker values MUST be disjoint from the legal first byte of a
+ * position frame, which carries `messageType` in {1, 2, 3, 5, 18}
+ * (AIS message-type range 1..27 by spec). `0xFE` and `0xFF` sit
+ * outside the entire valid messageType range, so a dispatcher
+ * inspecting `bytes[0]` can route a frame to snapshot/static/position
+ * unambiguously even when a variable-length encoder happens to
+ * produce a buffer of exactly the position-frame size.
  */
-export const BINARY_FRAME_TYPE_SNAPSHOT = 0x01;
-export const BINARY_FRAME_TYPE_STATIC = 0x02;
+export const BINARY_FRAME_TYPE_SNAPSHOT = 0xfe;
+export const BINARY_FRAME_TYPE_STATIC = 0xff;
 
 /**
  * Binary codec for the cold-start vessel snapshot frame.

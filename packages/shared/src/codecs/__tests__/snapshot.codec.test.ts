@@ -160,6 +160,70 @@ describe('snapshot.codec', () => {
     expect(decoded.eta).toEqual({ month: null, day: null, hour: null, minute: null });
   });
 
+  it('marker bytes are disjoint from the AIS messageType range so a position frame is never mistaken for a snapshot/static frame', () => {
+    // AIS spec messageType range is 1..27 (bit-packed in the first
+    // 6 bits of every message). The binary position-frame codec
+    // writes that messageType directly at byte[0]. Marker bytes
+    // therefore must NOT fall inside {1..27} - otherwise a
+    // dispatcher inspecting byte[0] would route a real position
+    // frame whose messageType happens to equal the marker to the
+    // wrong decoder. 0xFE (254) and 0xFF (255) sit well outside the
+    // range and guarantee disjointness.
+    const AIS_MAX_MESSAGE_TYPE = 27;
+    expect(BINARY_FRAME_TYPE_SNAPSHOT).toBeGreaterThan(AIS_MAX_MESSAGE_TYPE);
+    expect(BINARY_FRAME_TYPE_STATIC).toBeGreaterThan(AIS_MAX_MESSAGE_TYPE);
+    expect(BINARY_FRAME_TYPE_SNAPSHOT).not.toBe(BINARY_FRAME_TYPE_STATIC);
+  });
+
+  it('encoded snapshot and static frames always carry their marker as the first byte (regression: dispatcher must route by marker, not length)', () => {
+    // A 1-vessel 1-history-point snapshot encodes to exactly 40
+    // bytes - the same length as the position frame. Before the
+    // marker-byte change, a length-first dispatcher misrouted that
+    // snapshot to the position decoder. The marker must always be
+    // at byte[0] so the dispatcher can route correctly regardless
+    // of the body length collision.
+    const snapshot: VesselSnapshotFrame = {
+      kind: VESSEL_SNAPSHOT_FRAME_KIND,
+      serverTimeUnix: 1_780_000_000,
+      vessels: [
+        {
+          mmsi: 261_182_517 as Mmsi,
+          staticData: null,
+          history: [
+            {
+              lng: 14.5,
+              lat: 53.4,
+              sog: null,
+              cog: null,
+              trueHeading: null,
+              timestampUnix: 1_780_000_000,
+            },
+          ],
+          kalman: null,
+          sourceId: null,
+        },
+      ],
+    };
+    const encoded = encodeSnapshot(snapshot);
+    expect(encoded[0]).toBe(BINARY_FRAME_TYPE_SNAPSHOT);
+
+    const staticFrame: VesselStaticDataFrame = {
+      kind: VESSEL_STATIC_FRAME_KIND,
+      mmsi: 261_182_517 as Mmsi,
+      vesselName: 'X',
+      imo: null,
+      callSign: '',
+      shipType: 0 as unknown as ShipTypeCode,
+      dimensions: null,
+      draught: null,
+      destination: '',
+      eta: { month: null, day: null, hour: null, minute: null },
+      receivedAt: 1_780_000_000,
+    };
+    const encodedStatic = encodeStaticFrame(staticFrame);
+    expect(encodedStatic[0]).toBe(BINARY_FRAME_TYPE_STATIC);
+  });
+
   it('shrinks the wire payload compared to JSON.stringify', () => {
     const vessels = Array.from({ length: 50 }, (_, i) => ({
       mmsi: (261_000_000 + i) as Mmsi,

@@ -39,9 +39,19 @@ export default defineConfig(({ command }) => ({
    *   paths or symbol names. Stack traces in production logs are
    *   minified, which is the tradeoff we accept here.
    * - `esbuild.drop: ['console', 'debugger']`: removes every
-   *   `console.*` call and every `debugger` statement from the
-   *   build. Only applied when `command === 'build'` so `vite dev`
-   *   keeps the full developer console for local debugging.
+   *   `console.*` call (including `warn` and `error`) and every
+   *   `debugger` statement from the build. Only applied when
+   *   `command === 'build'` so `vite dev` keeps the full developer
+   *   console for local debugging.
+   *   TRADE-OFF: this also strips diagnostic `console.warn` /
+   *   `console.error` paths (e.g. telemetry decode failures,
+   *   unknown-frame routing). Acceptable today because nothing
+   *   reads the production console - no Sentry, no Datadog, no
+   *   PostHog. Once an error tracker is wired in, switch to
+   *   `pure: ['console.log', 'console.info', 'console.debug',
+   *   'console.trace']` so dead-code elimination removes only the
+   *   noisy levels while `warn` / `error` survive and can feed
+   *   the tracker's automatic console-breadcrumb capture.
    * - `esbuild.legalComments: 'none'`: drops `@license` / `@preserve`
    *   banners. We attribute upstream libraries on the live page, not
    *   inside the bundle.
