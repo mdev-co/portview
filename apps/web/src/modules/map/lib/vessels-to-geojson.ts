@@ -1,5 +1,6 @@
 import {
   type ShipTypeCategory,
+  type SourceId,
   VESSEL_FLAG_HAS_FIX,
   VESSEL_FLAG_IS_MOVING,
   type VesselKalmanState,
@@ -21,6 +22,7 @@ type VesselFeatureProperties = {
   readonly ageSeconds: number;
   readonly category: ShipTypeCategory;
   readonly selected: boolean;
+  readonly sourceId: SourceId | null;
   readonly name?: string;
 };
 
@@ -95,6 +97,7 @@ export function vesselsToGeoJSON(
         ageSeconds: Math.max(0, nowSeconds - vessel.timestampUnix),
         category: categoryFor(staticData, vessel.mmsi),
         selected: vessel.mmsi === selectedMmsi,
+        sourceId: vessel.sourceId,
         ...(name !== undefined && { name }),
       },
     });

@@ -127,7 +127,9 @@ function applySnapshot(frame: VesselSnapshotFrame): void {
     }
     const latest = entry.history[entry.history.length - 1];
     if (latest !== undefined) {
-      setVessel(synthesiseLiveVesselFromHistory(entry.mmsi, latest, frame.serverTimeUnix));
+      setVessel(
+        synthesiseLiveVesselFromHistory(entry.mmsi, latest, frame.serverTimeUnix, entry.sourceId),
+      );
     }
   }
 }
@@ -136,6 +138,7 @@ function synthesiseLiveVesselFromHistory(
   mmsi: Mmsi,
   point: VesselHistoryPoint,
   serverTimeUnix: number,
+  snapshotSourceId: SourceId | null,
 ): LiveVessel {
   // Snapshots originate from the same server that emits live frames,
   // so we know the vessel had a position fix at the recorded time.
@@ -148,11 +151,15 @@ function synthesiseLiveVesselFromHistory(
     flags |= VESSEL_FLAG_IS_MOVING;
   }
   flags |= VESSEL_FLAG_HAS_IDENTITY;
+  // Inherit the source id the server persisted alongside this vessel
+  // row, so the FE label stays consistent with the actual provenance.
+  // Fall back to AisStream for legacy rows that predate sourceId
+  // tracking - the next live frame will overwrite this within seconds.
   return {
     mmsi,
     messageType: 1,
     navStatus: null,
-    sourceId: SourceId.AisStream,
+    sourceId: snapshotSourceId ?? SourceId.AisStream,
     rateOfTurn: null,
     lng: point.lng,
     lat: point.lat,

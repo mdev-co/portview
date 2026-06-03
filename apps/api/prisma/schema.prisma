@@ -33,6 +33,11 @@ model Vessel {
   destination String?   @db.VarChar(20)
   eta         DateTime?
   lastSeenAt  DateTime? @map("last_seen_at")
+  // Source identifier (SourceId enum from @sps/shared) of the latest
+  // frame that updated this row. Surfaced in the WS snapshot so the FE
+  // can label the source without inventing a default. Nullable for
+  // pre-existing rows that predate sourceId tracking.
+  lastSourceId Int?     @map("last_source_id")
   createdAt   DateTime  @default(now())  @map("created_at")
   updatedAt   DateTime  @updatedAt        @map("updated_at")
 
@@ -68,6 +73,10 @@ model VesselPosition {
   trueHeading        Int?      @map("true_heading")
   rateOfTurn         Float?    @map("rate_of_turn")
   navStatus          Int?      @map("nav_status")
+  // Source identifier (SourceId enum) of the ingest source that produced
+  // this point. Kept on the row so per-point provenance is preserved even
+  // when the parent vessel switches sources later.
+  sourceId           Int?      @map("source_id")
   broadcastTimestamp DateTime? @map("broadcast_timestamp")
   ingestTimestamp    DateTime  @default(now()) @map("ingest_timestamp")
   // GENERATED ALWAYS AS column maintained by PostGIS in the migration.

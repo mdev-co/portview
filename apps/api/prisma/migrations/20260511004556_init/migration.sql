@@ -16,6 +16,7 @@ CREATE TABLE "vessels" (
     "destination" VARCHAR(20),
     "eta" TIMESTAMP(3),
     "last_seen_at" TIMESTAMP(3),
+    "last_source_id" INTEGER,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
     "kalman_lng" DOUBLE PRECISION,
@@ -39,6 +40,7 @@ CREATE TABLE "vessel_positions" (
     "true_heading" INTEGER,
     "rate_of_turn" DOUBLE PRECISION,
     "nav_status" INTEGER,
+    "source_id" INTEGER,
     "broadcast_timestamp" TIMESTAMP(3),
     "ingest_timestamp" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     -- Spatial column derived from (lng, lat) at write time. STORED so

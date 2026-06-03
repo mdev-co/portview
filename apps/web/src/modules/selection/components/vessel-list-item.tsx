@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 import { useMapEngine } from '@/modules/map/hooks/use-map-engine';
 import { getVesselDisplayPosition } from '@/modules/map/lib/vessel-display-position';
 import { toggleTrailForVessel } from '@/modules/map/state/trail-visibility';
+import { paletteFor as sourcePaletteFor } from '@/modules/map/styles/source-palette';
 import { VESSEL_CATEGORY_PALETTE, VESSEL_PALETTE } from '@/modules/map/styles/vessel-palette';
 import { $vesselKalmanState, type LiveVessel } from '@/modules/telemetry';
 import {
@@ -59,6 +60,7 @@ const styles = {
   rowSelected:
     'bg-primary/10 before:absolute before:inset-y-2 before:left-0 before:w-[3px] before:rounded-r-full before:bg-primary',
   dotBase: 'mt-1.5 size-3 shrink-0 rounded-full ring-2 ring-offset-0',
+  sourceDotBase: 'mt-2 size-1.5 shrink-0 rounded-full border border-solid',
   body: 'min-w-0 flex-1',
   titleRow: 'flex items-baseline gap-2',
   mmsi: 'text-foreground font-mono text-[0.95rem] font-semibold tabular-nums truncate tracking-tight',
@@ -203,6 +205,30 @@ function StatusDot() {
     <span
       className={cn(styles.dotBase, VESSEL_PALETTE[status].dot)}
       aria-label={STATUS_LABEL[status]}
+    />
+  );
+}
+
+/**
+ * Tiny coloured dot next to the status dot encoding the ingest source.
+ * Filled emerald for EdgeBridge (owned RTL-SDR antenna), hollow slate
+ * for AisStream / WebSdr fallbacks, amber for LocalUdp dev feeds, and
+ * a near-invisible slate-200 for legacy rows that predate sourceId
+ * tracking. The dot is small (6 px) on purpose - it adds a second
+ * signal next to the status dot without crowding the row.
+ */
+function SourceDot() {
+  const { vessel } = useRow();
+  const palette = sourcePaletteFor(vessel.sourceId);
+  return (
+    <span
+      className={cn(styles.sourceDotBase, palette.dotFilled ? '' : 'bg-transparent')}
+      style={{
+        backgroundColor: palette.dotFilled ? palette.dotHex : 'transparent',
+        borderColor: palette.dotHex,
+      }}
+      aria-label={`Source: ${palette.label}`}
+      title={palette.description}
     />
   );
 }
@@ -399,6 +425,7 @@ function Field({
 Root.displayName = 'VesselListItem';
 Row.displayName = 'VesselListItem.Row';
 StatusDot.displayName = 'VesselListItem.StatusDot';
+SourceDot.displayName = 'VesselListItem.SourceDot';
 CategoryBadge.displayName = 'VesselListItem.CategoryBadge';
 Label.displayName = 'VesselListItem.Label';
 Actions.displayName = 'VesselListItem.Actions';
@@ -408,6 +435,7 @@ Field.displayName = 'VesselListItem.Field';
 export const VesselListItem = Object.assign(Root, {
   Row,
   StatusDot,
+  SourceDot,
   CategoryBadge,
   Label,
   Actions,

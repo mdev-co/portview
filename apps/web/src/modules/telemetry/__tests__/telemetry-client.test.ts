@@ -188,6 +188,7 @@ describe('dispatchTelemetryMessage - snapshot path', () => {
             },
           ],
           kalman: null,
+          sourceId: null,
         },
       ],
       ...overrides,
@@ -219,7 +220,15 @@ describe('dispatchTelemetryMessage - snapshot path', () => {
 
   it('skips synthesising a LiveVessel for an entry with empty history', () => {
     const frame = makeSnapshot({
-      vessels: [{ mmsi: 261_222_222 as Mmsi, staticData: null, history: [], kalman: null }],
+      vessels: [
+        {
+          mmsi: 261_222_222 as Mmsi,
+          staticData: null,
+          history: [],
+          kalman: null,
+          sourceId: null,
+        },
+      ],
     });
 
     dispatchTelemetryMessage(JSON.stringify(frame));
