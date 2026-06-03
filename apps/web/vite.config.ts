@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react';
 import path from 'node:path';
 import { defineConfig } from 'vite';
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [react(), tailwindcss()],
   // Project rule: single .env at repo root. Without this, Vite would
   // look for .env in apps/web/ and silently miss VITE_API_URL,
@@ -29,8 +29,36 @@ export default defineConfig({
   server: {
     host: true,
   },
+  /**
+   * Production hardening. The shipped bundle is the only artefact a
+   * curious observer can read from the browser DevTools, so we keep
+   * it lean and free of source-level breadcrumbs to limit what a
+   * passive reverse-engineer can pick up at a glance.
+   *
+   * - `sourcemap: false`: no .map files, no readable original file
+   *   paths or symbol names. Stack traces in production logs are
+   *   minified, which is the tradeoff we accept here.
+   * - `esbuild.drop: ['console', 'debugger']`: removes every
+   *   `console.*` call and every `debugger` statement from the
+   *   build. Only applied when `command === 'build'` so `vite dev`
+   *   keeps the full developer console for local debugging.
+   * - `esbuild.legalComments: 'none'`: drops `@license` / `@preserve`
+   *   banners. We attribute upstream libraries on the live page, not
+   *   inside the bundle.
+   */
+  build: {
+    sourcemap: false,
+    minify: 'esbuild',
+  },
+  esbuild:
+    command === 'build'
+      ? {
+          drop: ['console', 'debugger'],
+          legalComments: 'none',
+        }
+      : undefined,
   test: {
     environment: 'node',
     include: ['src/**/__tests__/**/*.test.ts', 'src/**/*.test.ts'],
   },
-});
+}));
