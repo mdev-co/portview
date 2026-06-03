@@ -1,5 +1,6 @@
 import {
   type AisMessage,
+  BINARY_FRAME_TYPE_STATIC,
   type Imo,
   type Mmsi,
   type ShipTypeCode,
@@ -7,6 +8,7 @@ import {
   type StaticData,
   VESSEL_FRAME_BYTES,
   VESSEL_STATIC_FRAME_KIND,
+  decodeStaticFrame,
   decodeVesselFrame,
 } from '@sps/shared';
 import { WebSocket } from 'ws';
@@ -185,7 +187,7 @@ describe('TelemetryWsGateway.onVesselStatic', () => {
     };
   });
 
-  it('serialises a discriminated JSON envelope and sends it as a text frame', () => {
+  it('encodes vessel.static as a Protobuf binary frame with the static type marker', () => {
     const a = makeClient();
     clients.add(a);
 
@@ -193,14 +195,16 @@ describe('TelemetryWsGateway.onVesselStatic', () => {
 
     expect(a.send).toHaveBeenCalledTimes(1);
     const [payload, opts] = a.send.mock.calls[0];
-    expect(opts).toEqual({ binary: false });
-    expect(typeof payload).toBe('string');
-    const parsed = JSON.parse(payload as string) as Record<string, unknown>;
-    expect(parsed.kind).toBe(VESSEL_STATIC_FRAME_KIND);
-    expect(parsed.mmsi).toBe(STATIC_MESSAGE.mmsi);
-    expect(parsed.vesselName).toBe(STATIC_MESSAGE.vesselName);
-    expect(parsed.imo).toBe(STATIC_MESSAGE.imo);
-    expect(parsed.shipType).toBe(STATIC_MESSAGE.shipType);
+    expect(opts).toEqual({ binary: true });
+    expect(payload).toBeInstanceOf(Uint8Array);
+    const bytes = payload as Uint8Array;
+    expect(bytes[0]).toBe(BINARY_FRAME_TYPE_STATIC);
+    const decoded = decodeStaticFrame(bytes);
+    expect(decoded.kind).toBe(VESSEL_STATIC_FRAME_KIND);
+    expect(decoded.mmsi).toBe(STATIC_MESSAGE.mmsi);
+    expect(decoded.vesselName).toBe(STATIC_MESSAGE.vesselName);
+    expect(decoded.imo).toBe(STATIC_MESSAGE.imo);
+    expect(decoded.shipType).toBe(STATIC_MESSAGE.shipType);
   });
 
   it('respects backpressure: skips slow clients on static frames too', () => {

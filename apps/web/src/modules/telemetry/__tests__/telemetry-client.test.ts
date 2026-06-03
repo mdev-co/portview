@@ -6,7 +6,6 @@ import {
   SourceId,
   VESSEL_FLAG_HAS_FIX,
   VESSEL_FLAG_HAS_IDENTITY,
-  VESSEL_FRAME_BYTES,
   VESSEL_SNAPSHOT_FRAME_KIND,
   VESSEL_STATIC_FRAME_KIND,
   type VesselSnapshotFrame,
@@ -75,16 +74,22 @@ describe('dispatchTelemetryMessage - binary path', () => {
     expect(onVessel).toHaveBeenCalledTimes(1);
   });
 
-  it('skips a binary frame whose length does not match the codec contract', () => {
+  it('logs and skips a binary frame whose type marker matches no known kind', () => {
     const onVessel = vi.fn();
 
-    dispatchTelemetryMessage(new ArrayBuffer(VESSEL_FRAME_BYTES - 1), { onVessel });
+    // A buffer that is not 40 bytes and whose leading byte matches
+    // neither BINARY_FRAME_TYPE_SNAPSHOT nor BINARY_FRAME_TYPE_STATIC
+    // is an unknown frame - the dispatcher logs and bails out without
+    // touching any store.
+    const bytes = new Uint8Array(8);
+    bytes[0] = 0xff;
+    dispatchTelemetryMessage(bytes.buffer, { onVessel });
 
     expect(onVessel).not.toHaveBeenCalled();
     expect($vessels.get()).toEqual({});
     expect(warnSpy).toHaveBeenCalledWith(
-      '[telemetry] unexpected frame length',
-      expect.objectContaining({ expected: VESSEL_FRAME_BYTES }),
+      '[telemetry] unknown binary frame',
+      expect.objectContaining({ marker: 0xff }),
     );
   });
 });

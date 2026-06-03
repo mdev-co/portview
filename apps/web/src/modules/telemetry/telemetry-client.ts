@@ -1,4 +1,6 @@
 import {
+  BINARY_FRAME_TYPE_SNAPSHOT,
+  BINARY_FRAME_TYPE_STATIC,
   type Mmsi,
   SourceId,
   VESSEL_FLAG_HAS_FIX,
@@ -10,6 +12,8 @@ import {
   type VesselHistoryPoint,
   type VesselSnapshotFrame,
   type VesselStaticDataFrame,
+  decodeSnapshot,
+  decodeStaticFrame,
   decodeVesselFrame,
 } from '@sps/shared';
 import { $tabVisibility } from './tab-visibility.store';
@@ -179,10 +183,43 @@ function synthesiseLiveVesselFromHistory(
  */
 export function dispatchTelemetryMessage(data: unknown, handlers: DispatchHandlers = {}): void {
   if (data instanceof ArrayBuffer) {
-    if (data.byteLength !== VESSEL_FRAME_BYTES) {
-      console.warn('[telemetry] unexpected frame length', {
-        expected: VESSEL_FRAME_BYTES,
-        got: data.byteLength,
+    // Three binary frame kinds share the WebSocket. The 40-byte
+    // position update is identified by exact length (its codec has no
+    // type marker). Variable-length frames (snapshot, static) carry a
+    // one-byte type marker at offset 0 that the dispatcher reads to
+    // route into the right Protobuf decoder.
+    if (data.byteLength === VESSEL_FRAME_BYTES) {
+      // fall through to position-frame handling below
+    } else {
+      const bytes = new Uint8Array(data);
+      const marker = bytes[0];
+      if (marker === BINARY_FRAME_TYPE_SNAPSHOT) {
+        let snapshot: VesselSnapshotFrame;
+        try {
+          snapshot = decodeSnapshot(bytes);
+        } catch (err) {
+          console.warn('[telemetry] binary snapshot decode failed', { error: err });
+          return;
+        }
+        applySnapshot(snapshot);
+        handlers.onSnapshot?.(snapshot);
+        return;
+      }
+      if (marker === BINARY_FRAME_TYPE_STATIC) {
+        let staticFrame: VesselStaticDataFrame;
+        try {
+          staticFrame = decodeStaticFrame(bytes);
+        } catch (err) {
+          console.warn('[telemetry] binary static decode failed', { error: err });
+          return;
+        }
+        setVesselStatic(staticFrame);
+        handlers.onStatic?.(staticFrame);
+        return;
+      }
+      console.warn('[telemetry] unknown binary frame', {
+        length: data.byteLength,
+        marker,
       });
       return;
     }

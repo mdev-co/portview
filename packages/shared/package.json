@@ -27,6 +27,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "protobufjs": "^8.5.0",
     "tslog": "^4.10.2",
     "xstate": "^5.31.0"
   },
