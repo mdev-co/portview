@@ -1,18 +1,20 @@
 import { type Zone, type ZoneCollection, zoneId } from './types';
 
 /**
- * Hard-coded zones for the Port of Szczecin demo. Coordinates were
- * traced over the OpenStreetMap port outline (precision ~50 m at
- * city zoom). Good enough for the public demo; operator drawing
- * (terra-draw) takes over once the system is in production and the
- * port authority hands us authoritative boundaries.
+ * Predefined zones for the Port of Szczecin demo. Coordinates were
+ * traced over the OpenStreetMap port outline and cross-checked
+ * against the published Tor Wodny Szczecin-Świnoujście channel
+ * axis (precision ~80 m at city zoom). The shapes are not the
+ * authoritative Port Authority boundaries; they are demo overlays
+ * sized to cover the operationally relevant areas where AIS traffic
+ * actually congregates.
  *
  * Polygon winding: GeoJSON requires the outer ring to be a closed
  * linear ring (first and last point equal) and recommends
  * counter-clockwise order. Each polygon below closes itself.
  *
- * Coordinate order is [lng, lat] per GeoJSON spec. Szczecin sits
- * around 14.55 E / 53.43 N.
+ * Coordinate order is [lng, lat] per GeoJSON spec. The port is
+ * along the Odra river, axis roughly N-S, centred near 14.62 E.
  */
 function zone(
   id: string,
@@ -38,68 +40,90 @@ function zone(
 
 const SZCZECIN_ZONES: readonly Zone[] = [
   zone(
-    'szczecin-entry-channel',
-    'Entry Channel',
+    'szczecin-tor-wodny',
+    'Tor Wodny',
     'channel',
-    'Main approach into Szczecin harbour from the Odra river mouth.',
+    'Main shipping channel Szczecin-Świnoujście. Follows the Odra navigation axis through the port.',
     [
-      [14.51, 53.5],
-      [14.56, 53.5],
-      [14.56, 53.45],
-      [14.51, 53.45],
-      [14.51, 53.5],
+      [14.6035, 53.565],
+      [14.6175, 53.565],
+      [14.6285, 53.52],
+      [14.6395, 53.48],
+      [14.651, 53.44],
+      [14.6605, 53.405],
+      [14.668, 53.37],
+      [14.6515, 53.366],
+      [14.642, 53.4],
+      [14.631, 53.44],
+      [14.6195, 53.48],
+      [14.6085, 53.52],
+      [14.5965, 53.56],
+      [14.6035, 53.565],
     ],
   ),
   zone(
-    'szczecin-inner-harbor',
-    'Inner Harbor',
+    'szczecin-port-glowny',
+    'Port Główny',
     'harbor',
-    'Quay-side berthing area along the eastern bank.',
+    'Main commercial quays along the eastern bank - general cargo, ferry, container terminals.',
     [
-      [14.55, 53.44],
-      [14.59, 53.44],
-      [14.59, 53.41],
-      [14.55, 53.41],
-      [14.55, 53.44],
+      [14.591, 53.45],
+      [14.609, 53.45],
+      [14.609, 53.428],
+      [14.591, 53.428],
+      [14.591, 53.45],
     ],
   ),
   zone(
-    'szczecin-anchorage-a',
-    'Anchorage A',
+    'szczecin-basen-gorniczy',
+    'Basen Górniczy',
+    'harbor',
+    'Bulk cargo basin - coal, ore, aggregates handled at the inland berths.',
+    [
+      [14.615, 53.437],
+      [14.634, 53.437],
+      [14.634, 53.42],
+      [14.615, 53.42],
+      [14.615, 53.437],
+    ],
+  ),
+  zone(
+    'szczecin-kotwicowisko-polnocne',
+    'Kotwicowisko Północne',
     'anchorage',
-    'Primary anchorage north of the harbour entrance.',
+    'Northern anchorage on the approach from Police and the Świnoujście fairway.',
     [
-      [14.49, 53.49],
-      [14.52, 53.49],
-      [14.52, 53.46],
-      [14.49, 53.46],
-      [14.49, 53.49],
+      [14.645, 53.525],
+      [14.685, 53.525],
+      [14.685, 53.495],
+      [14.645, 53.495],
+      [14.645, 53.525],
     ],
   ),
   zone(
-    'szczecin-anchorage-b',
-    'Anchorage B',
+    'szczecin-kotwicowisko-poludniowe',
+    'Kotwicowisko Południowe',
     'anchorage',
-    'Secondary anchorage south of the harbour, used at high traffic.',
+    'Southern anchorage downstream of the harbour mouth, used at high traffic.',
     [
-      [14.55, 53.4],
-      [14.58, 53.4],
-      [14.58, 53.37],
-      [14.55, 53.37],
-      [14.55, 53.4],
+      [14.648, 53.383],
+      [14.685, 53.383],
+      [14.685, 53.355],
+      [14.648, 53.355],
+      [14.648, 53.383],
     ],
   ),
   zone(
-    'szczecin-restricted-military',
-    'Restricted (Military)',
+    'szczecin-strefa-przeladunkowa',
+    'Strefa Przeładunkowa',
     'restricted',
-    'No commercial traffic; routine patrol zone.',
+    'Restricted transfer zone - no transit traffic; berth operations only with port authority clearance.',
     [
-      [14.6, 53.46],
-      [14.63, 53.46],
-      [14.63, 53.43],
-      [14.6, 53.43],
-      [14.6, 53.46],
+      [14.578, 53.41],
+      [14.591, 53.41],
+      [14.591, 53.394],
+      [14.578, 53.394],
+      [14.578, 53.41],
     ],
   ),
 ];
