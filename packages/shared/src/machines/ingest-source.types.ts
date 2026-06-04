@@ -49,6 +49,16 @@ export interface IngestContext {
   readonly prioritizedSourceIds: readonly SourceId[];
   currentSourceId: SourceId | null;
   triedSourceIds: readonly SourceId[];
+  /**
+   * Sources that timed out of their healthy window and were demoted
+   * without an error. The IngestService keeps their transport alive
+   * so they can fire `SOURCE_RECLAIMED` when traffic resumes. A warm
+   * source is excluded from the normal switching rotation - it is
+   * promotable only via reclaim. Hard-errored sources go to
+   * `triedSourceIds` instead and are blocked until the exhausted
+   * retry cycle resets the whole list.
+   */
+  warmSourceIds: readonly SourceId[];
   lastFrameAt: number | null;
   framesAccepted: number;
   framesRejected: number;
@@ -61,7 +71,14 @@ export type IngestEvent =
   | { type: 'SOURCE_CONNECTED'; sourceId: SourceId }
   | { type: 'SOURCE_FAILED'; sourceId: SourceId; reason: string }
   | { type: 'FRAME_RECEIVED'; sourceId: SourceId; frameAt: number }
-  | { type: 'FRAME_REJECTED'; sourceId: SourceId; reason: FrameRejectionReason };
+  | { type: 'FRAME_REJECTED'; sourceId: SourceId; reason: FrameRejectionReason }
+  /**
+   * Fired by the IngestService when a warm (previously demoted but
+   * still subscribed) source produces a frame. Triggers re-promotion
+   * iff the reclaimed source ranks higher in the priority list than
+   * the current source.
+   */
+  | { type: 'SOURCE_RECLAIMED'; sourceId: SourceId; frameAt: number };
 
 export interface IngestActorInput {
   readonly prioritizedSourceIds: readonly SourceId[];

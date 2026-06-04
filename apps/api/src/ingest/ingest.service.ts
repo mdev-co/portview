@@ -58,6 +58,23 @@ function securityKindToFsmReason(
 const STATS_INTERVAL_MS = 30_000;
 
 /**
+ * Minimum gap between SOURCE_RECLAIMED events fired for the same warm
+ * source. The FSM's `canReclaim` guard already rejects spurious
+ * reclaim attempts, but a misbehaving fallback that keeps a warm
+ * source spamming the FSM would still burn CPU; throttling at the
+ * transport layer caps the cost. Picked to be shorter than the
+ * shortest FSM transition (EXHAUSTED_RETRY_MS = 60 s) so a real
+ * recovery wave is never starved by the throttle.
+ */
+const RECLAIM_THROTTLE_MS = 30_000;
+
+type WarmSubscription = {
+  frameUnsub: () => void;
+  errorUnsub: () => void;
+  lastReclaimAt: number;
+};
+
+/**
  * Orchestrates the AIS ingest pipeline inside the NestJS container.
  *
  * Replaces the standalone apps/ingest worker that used to live in its
@@ -89,6 +106,13 @@ export class IngestService implements OnModuleInit, OnModuleDestroy {
   private activeSource: ISource | null = null;
   private activeFrameUnsub: (() => void) | null = null;
   private activeErrorUnsub: (() => void) | null = null;
+  /**
+   * Warm transports stay subscribed after a soft demote so a recovered
+   * source can fire SOURCE_RECLAIMED and slide back into the active
+   * slot without the IngestService having to re-dial it. Keyed by
+   * SourceId; tracks the throttle timestamp per source.
+   */
+  private readonly warmSources = new Map<SourceId, WarmSubscription>();
   private statsTimer: NodeJS.Timeout | null = null;
   private stateUnsub: (() => void) | null = null;
   private previousState: string | null = null;
@@ -104,7 +128,10 @@ export class IngestService implements OnModuleInit, OnModuleDestroy {
       input: { prioritizedSourceIds: prioritized },
     });
     const subscription = this.actor.subscribe((snapshot) => {
-      this.reconcileActiveSource(snapshot.context.currentSourceId);
+      this.reconcileSources(
+        snapshot.context.currentSourceId,
+        snapshot.context.warmSourceIds,
+      );
       this.logStateTransition(
         String(snapshot.value),
         snapshot.context.currentSourceId,
@@ -125,6 +152,7 @@ export class IngestService implements OnModuleInit, OnModuleDestroy {
       this.statsTimer = null;
     }
     this.detachActiveSource();
+    this.detachAllWarmSources();
     if (this.actor !== null) {
       this.actor.send({ type: 'STOP' });
       this.actor.stop();
@@ -205,42 +233,164 @@ export class IngestService implements OnModuleInit, OnModuleDestroy {
     return order;
   }
 
-  private reconcileActiveSource(desiredId: SourceId | null): void {
-    const desiredSource =
-      desiredId !== null ? (this.sources.get(desiredId) ?? null) : null;
+  /**
+   * Project the FSM's `(currentSourceId, warmSourceIds)` snapshot to
+   * the live set of transport subscriptions. Three role transitions
+   * are handled:
+   *
+   *  - active -> warm (FSM soft-demoted current). Keep the transport
+   *    alive, detach the active frame pipeline, attach a warm-frame
+   *    listener that fires throttled SOURCE_RECLAIMED to the FSM.
+   *  - warm -> active (FSM reclaimed). Promote without re-dialling:
+   *    drop the warm listener, attach the active pipeline, do NOT
+   *    call source.start() again (the transport never closed).
+   *  - any -> tried (FSM hard-failed the source). Close the
+   *    transport and drop all listeners.
+   *
+   * The method is idempotent: callers can invoke it on every FSM
+   * snapshot without worrying about double-subscribing.
+   */
+  private reconcileSources(
+    currentId: SourceId | null,
+    warmIds: readonly SourceId[],
+  ): void {
+    const desiredActive =
+      currentId !== null ? (this.sources.get(currentId) ?? null) : null;
+    const desiredWarm = new Set(warmIds);
 
-    if (this.activeSource && this.activeSource !== desiredSource) {
-      const stopping = this.activeSource;
+    // Detach the previous active source if it changed. If it was
+    // demoted to warm, KEEP the transport alive so the new warm
+    // subscription can attach without a reconnect window.
+    if (this.activeSource !== null && this.activeSource !== desiredActive) {
+      const previous = this.activeSource;
       this.detachActiveSource();
       this.activeSource = null;
-      void stopping
-        .stop()
-        .catch((err) => this.log.error(`source stop failed: ${String(err)}`));
+      if (!desiredWarm.has(previous.id)) {
+        void previous
+          .stop()
+          .catch((err) =>
+            this.log.error(
+              `source stop failed ${sourceIdName(previous.id)}: ${String(err)}`,
+            ),
+          );
+      }
     }
 
-    if (desiredSource && desiredSource !== this.activeSource) {
-      this.activeSource = desiredSource;
-      this.attachSource(desiredSource);
-      desiredSource
-        .start()
-        .then(() => {
-          this.log.log(`source connected: ${sourceIdName(desiredSource.id)}`);
-          this.actor?.send({
-            type: 'SOURCE_CONNECTED',
-            sourceId: desiredSource.id,
-          });
-        })
-        .catch((err: Error) => {
-          this.log.error(
-            `source start failed: ${sourceIdName(desiredSource.id)} ${err.message}`,
-          );
-          this.actor?.send({
-            type: 'SOURCE_FAILED',
-            sourceId: desiredSource.id,
-            reason: err.message,
-          });
-        });
+    // Detach warm sources that are no longer warm AND not active. The
+    // FSM does this when a source transitions warm -> active (handled
+    // below) or when the exhausted retry cycle clears warmSourceIds.
+    for (const [id, warm] of Array.from(this.warmSources)) {
+      if (desiredWarm.has(id) && id !== currentId) continue;
+      warm.frameUnsub();
+      warm.errorUnsub();
+      this.warmSources.delete(id);
+      if (id !== currentId) {
+        // Source is being fully retired (no longer warm, not active).
+        // If it was previously tracked as warm-only, close the
+        // transport here.
+        const src = this.sources.get(id);
+        if (src !== undefined) {
+          void src
+            .stop()
+            .catch((err) =>
+              this.log.error(
+                `warm source stop failed ${sourceIdName(id)}: ${String(err)}`,
+              ),
+            );
+        }
+      }
     }
+
+    // Promote to active: either a fresh dial or a warm->active swap
+    // (transport already running).
+    if (desiredActive !== null && desiredActive !== this.activeSource) {
+      const wasWarm = this.warmSources.has(desiredActive.id);
+      this.activeSource = desiredActive;
+      this.attachSource(desiredActive);
+      if (wasWarm) {
+        // Transport never closed; FSM expects SOURCE_CONNECTED to
+        // confirm the promotion.
+        this.warmSources.delete(desiredActive.id);
+        this.log.log(
+          `source reclaimed: ${sourceIdName(desiredActive.id)} (warm transport reused)`,
+        );
+        this.actor?.send({
+          type: 'SOURCE_CONNECTED',
+          sourceId: desiredActive.id,
+        });
+      } else {
+        desiredActive
+          .start()
+          .then(() => {
+            this.log.log(`source connected: ${sourceIdName(desiredActive.id)}`);
+            this.actor?.send({
+              type: 'SOURCE_CONNECTED',
+              sourceId: desiredActive.id,
+            });
+          })
+          .catch((err: Error) => {
+            this.log.error(
+              `source start failed: ${sourceIdName(desiredActive.id)} ${err.message}`,
+            );
+            this.actor?.send({
+              type: 'SOURCE_FAILED',
+              sourceId: desiredActive.id,
+              reason: err.message,
+            });
+          });
+      }
+    }
+
+    // Attach warm-source listeners that did not exist yet. The
+    // transport is already running because the source was active at
+    // the moment the FSM moved it to warm.
+    for (const id of warmIds) {
+      if (id === currentId) continue;
+      if (this.warmSources.has(id)) continue;
+      const src = this.sources.get(id);
+      if (src === undefined) continue;
+      this.attachWarmSource(src);
+    }
+  }
+
+  private attachWarmSource(source: ISource): void {
+    const tracking: WarmSubscription = {
+      lastReclaimAt: 0,
+      frameUnsub: source.onFrame((frame) => {
+        const now = frame.receivedAt;
+        const current = this.warmSources.get(source.id);
+        if (current === undefined) return;
+        if (now - current.lastReclaimAt < RECLAIM_THROTTLE_MS) return;
+        current.lastReclaimAt = now;
+        this.log.log(
+          `warm-source frame received, requesting reclaim: ${sourceIdName(source.id)}`,
+        );
+        this.actor?.send({
+          type: 'SOURCE_RECLAIMED',
+          sourceId: source.id,
+          frameAt: now,
+        });
+      }),
+      errorUnsub: source.onError((err) => {
+        this.log.warn(
+          `warm source error ${sourceIdName(source.id)}: ${err.message}`,
+        );
+        this.actor?.send({
+          type: 'SOURCE_FAILED',
+          sourceId: source.id,
+          reason: err.message,
+        });
+      }),
+    };
+    this.warmSources.set(source.id, tracking);
+  }
+
+  private detachAllWarmSources(): void {
+    for (const [, tracking] of this.warmSources) {
+      tracking.frameUnsub();
+      tracking.errorUnsub();
+    }
+    this.warmSources.clear();
   }
 
   private attachSource(source: ISource): void {
