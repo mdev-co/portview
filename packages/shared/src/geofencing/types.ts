@@ -38,6 +38,13 @@ export type ZoneProperties = {
   readonly kind: ZoneKind;
   /** Optional one-line description for tooltip / detail panel. */
   readonly description?: string;
+  /**
+   * Operator-controlled map visibility. `undefined` and `true` render
+   * the zone on the map; `false` hides it. Hidden zones still take
+   * part in the dwell-time pipeline so events fire as usual - this
+   * flag is a rendering preference, not a logic gate.
+   */
+  readonly visible?: boolean;
 };
 
 /**

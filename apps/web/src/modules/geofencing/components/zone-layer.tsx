@@ -2,7 +2,15 @@ import { useEffect } from 'react';
 import { useMapEngine } from '@/modules/map/hooks/use-map-engine';
 import { useMapState } from '@/modules/map/hooks/use-map-state';
 import type { ExpressionSpecification, GeoJSONSource, Map as MaplibreMap } from 'maplibre-gl';
+import type { ZoneCollection } from '@sps/shared';
 import { $geofenceZones } from '../state/geofence-zones.atom';
+
+function filterVisible(collection: ZoneCollection): ZoneCollection {
+  return {
+    type: 'FeatureCollection',
+    features: collection.features.filter(f => f.properties.visible !== false),
+  };
+}
 
 /**
  * MapLibre source + layer identifiers owned by the zone overlay.
@@ -82,7 +90,7 @@ export function ZoneLayer(): null {
     const map = controller.getRawEngine() as MaplibreMap | null;
     if (map === null) return;
 
-    const initial = $geofenceZones.get();
+    const initial = filterVisible($geofenceZones.get());
     if (!map.getSource(ZONE_SOURCE_ID)) {
       map.addSource(ZONE_SOURCE_ID, { type: 'geojson', data: initial });
     } else {
@@ -135,7 +143,7 @@ export function ZoneLayer(): null {
 
     const unsubscribe = $geofenceZones.subscribe(next => {
       const source = map.getSource(ZONE_SOURCE_ID) as GeoJSONSource | undefined;
-      if (source) source.setData(next);
+      if (source) source.setData(filterVisible(next));
     });
 
     return (): void => {

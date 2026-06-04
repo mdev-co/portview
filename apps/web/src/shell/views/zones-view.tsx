@@ -3,7 +3,7 @@ import { ZoneDrawToolbar } from '@/modules/geofencing/components/zone-draw-toolb
 import { $geofenceZones, setGeofenceZones } from '@/modules/geofencing/state/geofence-zones.atom';
 import { useStore } from '@nanostores/react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Check, Pencil, Trash2, X } from 'lucide-react';
+import { Check, Eye, EyeOff, Pencil, Trash2, X } from 'lucide-react';
 import type { Zone, ZoneCollection, ZoneId, ZoneKind } from '@sps/shared';
 import { GlassPanel } from '../primitives/glass-panel';
 
@@ -149,6 +149,25 @@ function ZoneRow({
             </>
           ) : (
             <>
+              <IconButton
+                onClick={() => onPatch({ visible: zone.properties.visible === false })}
+                label={
+                  zone.properties.visible === false
+                    ? `Show ${zone.properties.label} on map`
+                    : `Hide ${zone.properties.label} from map`
+                }
+                className={
+                  zone.properties.visible === false
+                    ? 'text-foreground'
+                    : 'opacity-0 group-hover:opacity-100'
+                }
+              >
+                {zone.properties.visible === false ? (
+                  <EyeOff className="size-3.5" strokeWidth={1.7} />
+                ) : (
+                  <Eye className="size-3.5" strokeWidth={1.7} />
+                )}
+              </IconButton>
               <IconButton
                 onClick={onEditOpen}
                 label={`Rename ${zone.properties.label}`}
