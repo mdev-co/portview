@@ -288,20 +288,41 @@ export type TelemetryClient = {
   readonly status: () => 'idle' | 'connecting' | 'open' | 'closed';
 };
 
+/**
+ * NestJS gateway path. Hard-coupled to
+ * `@WebSocketGateway({ path: '/ws/telemetry' })` in
+ * `apps/api/src/telemetry-ws/telemetry-ws.gateway.ts`. Both sides
+ * MUST agree, so the value is owned by this client and appended to
+ * whatever origin the env override provides - the operator cannot
+ * point the socket at a wrong path by setting `VITE_WS_URL` to a
+ * URL that omits or mistypes `/ws/telemetry`.
+ */
+export const TELEMETRY_WS_PATH = '/ws/telemetry';
+
+/**
+ * Build the final WebSocket URL from an explicit env override.
+ * `VITE_WS_URL` is contracted to carry only the origin
+ * (`wss://host[:port]`); the client appends the path so an env-var
+ * typo cannot point the socket at a wrong path. Legacy env values
+ * that already include `/ws/telemetry` keep working - the suffix is
+ * stripped before re-appending, making normalisation idempotent.
+ */
+export function resolveTelemetryWsUrl(explicit: string | undefined): string | null {
+  if (typeof explicit !== 'string' || explicit.length === 0) return null;
+  const stripped = explicit.replace(/\/+$/, '').replace(/\/ws\/telemetry$/, '');
+  return `${stripped}${TELEMETRY_WS_PATH}`;
+}
+
 function defaultUrl(): string {
-  // Explicit override takes precedence. Vite inlines VITE_WS_URL at
-  // build time, so production builds hosted at one origin (Vercel)
-  // can point at an api hosted at a different origin (Fly). Without
-  // this, the WebSocket falls through to window.location.host which
-  // resolves to the static-hosting origin and has no ws upgrade route.
-  const explicit = import.meta.env.VITE_WS_URL;
-  if (typeof explicit === 'string' && explicit.length > 0) {
-    return explicit;
-  }
-  if (typeof window === 'undefined') return 'ws://localhost:3000/ws/telemetry';
+  // Vite inlines VITE_WS_URL at build time, so production builds
+  // hosted at one origin (Vercel) can point at an api hosted at a
+  // different origin (Fly) without compiling the URL into source.
+  const resolved = resolveTelemetryWsUrl(import.meta.env.VITE_WS_URL);
+  if (resolved !== null) return resolved;
+  if (typeof window === 'undefined') return `ws://localhost:3000${TELEMETRY_WS_PATH}`;
   const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
   const host = window.location.host.includes(':5173') ? 'localhost:3000' : window.location.host;
-  return `${proto}://${host}/ws/telemetry`;
+  return `${proto}://${host}${TELEMETRY_WS_PATH}`;
 }
 
 /**

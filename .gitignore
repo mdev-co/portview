@@ -48,3 +48,4 @@ Thumbs.db
 # Uncomment when copying internal ADRs into repo for public publishing.
 # docs/adr/private/
 .husky/_/
+.vercel
