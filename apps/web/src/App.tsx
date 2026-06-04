@@ -7,6 +7,7 @@ import { ThemeToggle } from '@/modules/theme';
 import { IndexRoute } from '@/routes/index-route';
 import { AppShell } from '@/shell/app-shell';
 import { BottomDock } from '@/shell/bottom-dock';
+import { DockVisibilityToggle } from '@/shell/dock-visibility-toggle';
 import { SidebarRouter } from '@/shell/sidebar-router';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/react';
@@ -26,6 +27,7 @@ const router = createBrowserRouter([
                 <MapStyleSwitcher />
                 <SeamarkToggle />
                 <TrailsToggle />
+                <DockVisibilityToggle />
                 <ThemeToggle />
               </div>
             </header>

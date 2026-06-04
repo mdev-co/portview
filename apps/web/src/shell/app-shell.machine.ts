@@ -12,6 +12,9 @@ export type SidebarView = (typeof SIDEBAR_VIEWS)[number];
 export const DRAWER_SNAPS = ['hidden', 'peek', 'mid', 'full'] as const;
 export type DrawerSnap = (typeof DRAWER_SNAPS)[number];
 
+export const DOCK_MODES = ['auto', 'pinned', 'hidden'] as const;
+export type DockMode = (typeof DOCK_MODES)[number];
+
 export type DetailTarget =
   | { readonly kind: 'vessel'; readonly id: number }
   | { readonly kind: 'zone'; readonly id: string }
@@ -23,6 +26,7 @@ export type AppShellContext = {
   sidebarCollapsed: boolean;
   detailTarget: DetailTarget;
   drawerSnap: DrawerSnap;
+  dockMode: DockMode;
 };
 
 export type AppShellEvent =
@@ -31,7 +35,8 @@ export type AppShellEvent =
   | { type: 'sidebar.setView'; view: SidebarView }
   | { type: 'detail.open'; target: NonNullable<DetailTarget> }
   | { type: 'detail.close' }
-  | { type: 'drawer.snap'; snap: DrawerSnap };
+  | { type: 'drawer.snap'; snap: DrawerSnap }
+  | { type: 'dock.setMode'; mode: DockMode };
 
 export type AppShellInput = {
   readonly initialPreset?: PresetId;
@@ -73,6 +78,12 @@ export const appShellMachine = setup({
       presetId: ({ context }) =>
         context.presetId === 'detail-focus' ? 'classic' : context.presetId,
     }),
+    setDockMode: assign({
+      dockMode: ({ event }) => {
+        if (event.type !== 'dock.setMode') throw new Error('setDockMode: wrong event');
+        return event.mode;
+      },
+    }),
     setDrawerSnap: assign({
       drawerSnap: ({ event }) => {
         if (event.type !== 'drawer.snap') throw new Error('setDrawerSnap: wrong event');
@@ -94,6 +105,7 @@ export const appShellMachine = setup({
     sidebarCollapsed: false,
     detailTarget: null,
     drawerSnap: 'hidden' as const,
+    dockMode: 'auto' as const,
   }),
   on: {
     'preset.swap': { actions: 'setPreset' },
@@ -102,6 +114,7 @@ export const appShellMachine = setup({
     'detail.open': { actions: 'openDetail' },
     'detail.close': { actions: 'closeDetail' },
     'drawer.snap': { actions: 'setDrawerSnap' },
+    'dock.setMode': { actions: 'setDockMode' },
   },
 });
 
