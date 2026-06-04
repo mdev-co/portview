@@ -59,7 +59,7 @@ export function GeofenceToaster(): React.JSX.Element {
 
   return (
     <Toaster
-      position="top-right"
+      position="bottom-right"
       richColors
       closeButton
       visibleToasts={5}
@@ -67,6 +67,8 @@ export function GeofenceToaster(): React.JSX.Element {
       // map content under the toast stack; collapse keeps the badge
       // density bounded.
       expand={false}
+      // Lift above the dock peek pill so toasts do not park under it.
+      offset={{ bottom: 64, right: 16 }}
     />
   );
 }
