@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { type MotionValue, motion, useMotionValue, useSpring, useTransform } from 'framer-motion';
 import { Activity, Hexagon, type LucideIcon, Ship } from 'lucide-react';
 import { useAppShell } from './app-shell-context';
@@ -16,7 +16,7 @@ const ITEMS: readonly DockItem[] = [
   { view: 'events', icon: Activity, label: 'Events' },
 ];
 
-const TRIGGER_HEIGHT_PX = 96;
+const TRIGGER_HEIGHT_PX = 110;
 const TRIGGER_HIDE_HYSTERESIS_PX = 40;
 const ICON_BASE_PX = 44;
 const ICON_MAX_PX = 64;
@@ -25,69 +25,43 @@ const MAGNIFY_RADIUS_PX = 130;
 /**
  * macOS-style auto-hiding dock for sidebar view switching.
  *
- * Visibility rules:
- *   - Hidden by default (translateY 120%).
- *   - Slides in when the mouse enters the bottom trigger zone
- *     (TRIGGER_HEIGHT_PX above the viewport bottom).
- *   - Stays visible while the sidebar is open - operator is
- *     actively working a view, hiding the dock under their cursor
- *     would steal context.
- *   - Slides out only when the mouse moves clearly above the
- *     trigger zone (hysteresis prevents the dock flickering when
- *     the cursor sits on the trigger edge).
+ * Visibility:
+ *   - Hidden by default. Slides in when the cursor enters the
+ *     bottom trigger band (TRIGGER_HEIGHT_PX from the viewport
+ *     bottom). Hysteresis (TRIGGER_HIDE_HYSTERESIS_PX) prevents
+ *     flicker when the cursor sits on the edge.
+ *   - Force-visible during the first 1.5 s after mount so the
+ *     operator sees the dock exists on a fresh load.
  *
  * Magnification: each icon's distance from the live mouse X is
  * mapped through a spring-smoothed transform to a width between
- * ICON_BASE_PX and ICON_MAX_PX. Items within MAGNIFY_RADIUS_PX
- * scale; outside that radius they stay at base size.
+ * ICON_BASE_PX and ICON_MAX_PX.
  */
 export function BottomDock(): React.JSX.Element {
   const { state, send } = useAppShell();
   const mouseX = useMotionValue<number>(Number.POSITIVE_INFINITY);
-  const visibleRef = useRef(false);
-  const animVisible = useMotionValue(0);
+  const [cursorNearBottom, setCursorNearBottom] = useState(false);
+  const [introVisible, setIntroVisible] = useState(true);
 
   useEffect(() => {
-    function update() {
-      const sidebarOpen = !state.sidebarCollapsed;
-      animVisible.set(visibleRef.current || sidebarOpen ? 1 : 0);
-    }
+    const introTimer = window.setTimeout(() => setIntroVisible(false), 1_500);
+    return () => window.clearTimeout(introTimer);
+  }, []);
 
+  useEffect(() => {
     function onMouseMove(e: MouseEvent) {
       const fromBottom = window.innerHeight - e.clientY;
       if (fromBottom < TRIGGER_HEIGHT_PX) {
-        if (!visibleRef.current) {
-          visibleRef.current = true;
-          update();
-        }
+        setCursorNearBottom(true);
       } else if (fromBottom > TRIGGER_HEIGHT_PX + TRIGGER_HIDE_HYSTERESIS_PX) {
-        if (visibleRef.current) {
-          visibleRef.current = false;
-          update();
-        }
+        setCursorNearBottom(false);
       }
     }
-
-    function onMouseLeave() {
-      mouseX.set(Number.POSITIVE_INFINITY);
-      visibleRef.current = false;
-      update();
-    }
-
-    update();
     window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseleave', onMouseLeave);
-    return () => {
-      window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseleave', onMouseLeave);
-    };
-  }, [state.sidebarCollapsed, animVisible, mouseX]);
+    return () => window.removeEventListener('mousemove', onMouseMove);
+  }, []);
 
-  const translateY = useSpring(useTransform(animVisible, [0, 1], [120, 0]), {
-    stiffness: 380,
-    damping: 32,
-  });
-  const opacity = useSpring(animVisible, { stiffness: 380, damping: 32 });
+  const visible = cursorNearBottom || introVisible;
 
   function handleClick(view: SidebarView): void {
     if (state.sidebarView === view && !state.sidebarCollapsed) {
@@ -103,10 +77,12 @@ export function BottomDock(): React.JSX.Element {
       role="navigation"
       onMouseMove={e => mouseX.set(e.clientX)}
       onMouseLeave={() => mouseX.set(Number.POSITIVE_INFINITY)}
-      style={{ y: translateY, opacity }}
+      initial={{ y: 120, opacity: 0 }}
+      animate={{ y: visible ? 0 : 120, opacity: visible ? 1 : 0 }}
+      transition={{ type: 'spring', stiffness: 380, damping: 32 }}
       className="pointer-events-auto fixed bottom-4 left-1/2 z-40 -translate-x-1/2"
     >
-      <div className="border-border/40 bg-background/70 flex items-end gap-2 rounded-2xl border px-3 py-2 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-xl">
+      <div className="border-border/40 bg-background/80 flex items-end gap-2 rounded-2xl border px-3 py-2 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5),inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-xl">
         {ITEMS.map(item => (
           <DockButton
             key={item.view}
