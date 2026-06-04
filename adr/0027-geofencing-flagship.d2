@@ -1,0 +1,201 @@
+direction: down
+vars: {
+  d2-config: {
+    theme-id: 8
+    pad: 40
+  }
+}
+
+title: "ADR-0027 Geofencing flagship\ndwell-time hysteresis + ghost handling + GeoJSON-throughout" {
+  near: top-center
+  shape: text
+  style: {
+    font-size: 22
+    bold: true
+  }
+}
+
+ais: "AIS frame from\nvessels store\n(lng, lat, timestampUnix)" {
+  shape: cylinder
+  style: {
+    fill: "#fef3c7"
+    stroke: "#92400e"
+    bold: true
+  }
+}
+
+zones: "geofenceZones\natom of GeoJSON\nFeatureCollection\n(Szczecin hard-coded\n+ terra-draw additions)" {
+  shape: cylinder
+  style: {
+    fill: "#dbeafe"
+    stroke: "#1e40af"
+    bold: true
+  }
+}
+
+tick: "tickGeofence\npure function\ntime as parameter\nno Date.now() inside" {
+  shape: hexagon
+  style: {
+    fill: "#dcfce7"
+    stroke: "#166534"
+    bold: true
+    font-size: 14
+  }
+}
+
+pip: "isInsideZone\n@turf/boolean-point-in-polygon\nGeoJSON contract" {
+  shape: rectangle
+  style: {
+    fill: "#ede9fe"
+    stroke: "#5b21b6"
+  }
+}
+
+dwell: "Dwell-time machine\nper (mmsi, zoneId)\ninsideSince / outsideSince\nDEFAULT_DWELL_MS = 30s" {
+  shape: rectangle
+  style: {
+    fill: "#dcfce7"
+    stroke: "#166534"
+    bold: true
+  }
+}
+
+membership: "geofenceMembership\nMap<mmsi|zoneId, Entry>\nbounded by active engagement" {
+  shape: cylinder
+  style: {
+    fill: "#dbeafe"
+    stroke: "#1e40af"
+  }
+}
+
+events: "geofenceEvents\nring buffer last 100\nGeofenceEvent union" {
+  shape: cylinder
+  style: {
+    fill: "#fce7f3"
+    stroke: "#831843"
+  }
+}
+
+presence: "geofencePresence\ncomputed derivation\nMmsi -> Set<ZoneId>\n(confirmed only)" {
+  shape: cylinder
+  style: {
+    fill: "#dbeafe"
+    stroke: "#1e40af"
+  }
+}
+
+ghost: "sweepGhosts\n60s interval\nemit ghost-exit on\nlastSeenAt > 10 min" {
+  shape: hexagon
+  style: {
+    fill: "#fef3c7"
+    stroke: "#92400e"
+    bold: true
+    font-size: 14
+  }
+}
+
+eviction: "forceExitVessel\non vessels eviction\n(diff prev vs current ids)\nemit Exit + drop keys" {
+  shape: hexagon
+  style: {
+    fill: "#fee2e2"
+    stroke: "#991b1b"
+    bold: true
+    font-size: 14
+  }
+}
+
+ui_toast: "Sonner toast\nEnter / Exit / GhostExit" {
+  shape: rectangle
+  style: {
+    fill: "#fce7f3"
+    stroke: "#831843"
+  }
+}
+
+ui_map: "MapLibre overlay layer\nzone polygon fill + outline\nper-zone color by kind" {
+  shape: rectangle
+  style: {
+    fill: "#dcfce7"
+    stroke: "#166534"
+  }
+}
+
+ui_sidebar: "Sidebar badge\nper-vessel zone label\nsubscribed via per-key" {
+  shape: rectangle
+  style: {
+    fill: "#dbeafe"
+    stroke: "#1e40af"
+  }
+}
+
+ui_draw: "terra-draw\noperator drawing\nGeoJSON in/out\nwrites geofenceZones" {
+  shape: rectangle
+  style: {
+    fill: "#ede9fe"
+    stroke: "#5b21b6"
+  }
+}
+
+ais -> tick: "per frame" {
+  style.stroke-width: 3
+}
+zones -> tick: "current polygons" {
+  style.stroke-width: 2
+}
+zones -> ui_map: "render" {
+  style.stroke-width: 2
+}
+tick -> pip: "per zone PIP" {
+  style.stroke-width: 2
+}
+pip -> dwell: "inside / outside" {
+  style.stroke-width: 2
+}
+dwell -> membership: "update entries\ndelete on confirmed Exit" {
+  style.stroke-width: 3
+  style.stroke: "#166534"
+}
+dwell -> events: "emit Enter / Exit\nat dwell threshold" {
+  style.stroke-width: 3
+  style.stroke: "#831843"
+}
+
+ais -.-> eviction: "evicted by\nTTL sweep" {
+  style.stroke-dash: 4
+  style.stroke: "#991b1b"
+}
+eviction -> membership: "drop vessel keys" {
+  style.stroke-dash: 4
+  style.stroke: "#991b1b"
+}
+eviction -> events: "synthesised Exit" {
+  style.stroke-dash: 4
+  style.stroke: "#991b1b"
+}
+
+ghost -> membership: "sweep silent\nentries" {
+  style.stroke-dash: 4
+  style.stroke: "#92400e"
+}
+ghost -> events: "ghost-exit for\nconfirmed silent" {
+  style.stroke-dash: 4
+  style.stroke: "#92400e"
+}
+
+membership -> presence: "computed\nfilter confirmed=true" {
+  style.stroke-width: 2
+}
+presence -> ui_sidebar: "per-vessel badge" {
+  style.stroke-width: 2
+}
+presence -> ui_map: "selected highlight" {
+  style.stroke-width: 2
+}
+events -> ui_toast: "tail subscription" {
+  style.stroke-width: 2
+}
+
+ui_draw -> zones: "save FeatureCollection\nsame GeoJSON shape" {
+  style.stroke-width: 2
+  style.stroke: "#5b21b6"
+}
