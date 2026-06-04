@@ -1,0 +1,181 @@
+direction: down
+vars: {
+  d2-config: {
+    theme-id: 8
+    pad: 40
+  }
+}
+
+title: "ADR-0026 IngestSource FSM\nwarm-source bucket + SOURCE_RECLAIMED event" {
+  near: top-center
+  shape: text
+  style: {
+    font-size: 22
+    bold: true
+  }
+}
+
+idle: "idle" {
+  shape: circle
+  style: {
+    fill: "#fef3c7"
+    stroke: "#92400e"
+    bold: true
+  }
+}
+
+connecting: "connecting\ncurrentSource.start()" {
+  shape: rectangle
+  style: {
+    fill: "#dbeafe"
+    stroke: "#1e40af"
+    bold: true
+  }
+}
+
+active: "active\nframes flow through\ndecoder + DLQ" {
+  shape: rectangle
+  style: {
+    fill: "#dcfce7"
+    stroke: "#166534"
+    bold: true
+  }
+}
+
+degraded: "degraded\nno frame for\nHEALTHY_WINDOW_MS" {
+  shape: rectangle
+  style: {
+    fill: "#fef3c7"
+    stroke: "#92400e"
+    bold: true
+  }
+}
+
+switching: "switching\nadvanceToNextSource\n(skips tried + warm)" {
+  shape: rectangle
+  style: {
+    fill: "#ede9fe"
+    stroke: "#5b21b6"
+    bold: true
+  }
+}
+
+exhausted: "exhausted\nresetForRetry\nafter EXHAUSTED_RETRY_MS\nclears tried + warm" {
+  shape: rectangle
+  style: {
+    fill: "#fee2e2"
+    stroke: "#991b1b"
+    bold: true
+  }
+}
+
+tried: "triedSourceIds\nhard-failed sources\n(transport closed)" {
+  shape: cylinder
+  style: {
+    fill: "#fee2e2"
+    stroke: "#991b1b"
+  }
+}
+
+warm: "warmSourceIds\nsilent-timed-out sources\n(transport KEPT ALIVE\nby IngestService)" {
+  shape: cylinder
+  style: {
+    fill: "#dcfce7"
+    stroke: "#166534"
+    bold: true
+    font-size: 14
+  }
+}
+
+reclaim: "SOURCE_RECLAIMED\nfired by warm transport\non first frame past\nRECLAIM_THROTTLE_MS" {
+  shape: hexagon
+  style: {
+    fill: "#fce7f3"
+    stroke: "#831843"
+    bold: true
+    font-size: 14
+  }
+}
+
+guard: "canReclaim guard\nrank(reclaimed) < rank(current)\nAND reclaimed in warmSourceIds" {
+  shape: diamond
+  style: {
+    fill: "#fef9c3"
+    stroke: "#854d0e"
+    bold: true
+    font-size: 13
+  }
+}
+
+idle -> switching: "START" {
+  style.stroke-width: 2
+}
+switching -> connecting: "advanceToNextSource" {
+  style.stroke-width: 2
+}
+connecting -> active: "SOURCE_CONNECTED" {
+  style.stroke-width: 3
+  style.stroke: "#166534"
+}
+active -> degraded: "no FRAME_RECEIVED\nfor HEALTHY_WINDOW_MS" {
+  style.stroke: "#92400e"
+}
+degraded -> active: "FRAME_RECEIVED" {
+  style.stroke: "#166534"
+}
+degraded -> switching: "DEGRADED_GRACE_MS elapsed\nmarkCurrentSourceWarm" {
+  style.stroke: "#5b21b6"
+  style.stroke-width: 3
+}
+degraded -> warm: "source parked\n(transport stays alive)" {
+  style.stroke-dash: 4
+  style.stroke: "#166534"
+}
+active -> tried: "SOURCE_FAILED\nmarkCurrentSourceTried" {
+  style.stroke-dash: 4
+  style.stroke: "#991b1b"
+}
+connecting -> tried: "SOURCE_FAILED\nmarkCurrentSourceTried" {
+  style.stroke-dash: 4
+  style.stroke: "#991b1b"
+}
+switching -> exhausted: "no more sources" {
+  style.stroke: "#991b1b"
+}
+exhausted -> switching: "EXHAUSTED_RETRY_MS\nclears tried + warm" {
+  style.stroke-dash: 4
+  style.stroke: "#92400e"
+}
+
+warm -> reclaim: "warm source\nemits frame" {
+  style.stroke: "#831843"
+  style.stroke-width: 2
+}
+reclaim -> guard: "evaluate" {
+  style.stroke-width: 2
+}
+guard -> connecting: "guard PASS\nreclaimSource action:\nswap current <-> reclaimed" {
+  style.stroke-width: 3
+  style.stroke: "#166534"
+}
+guard -> warm: "guard FAIL\n(lower priority or\nnot warm)\nignored" {
+  style.stroke-dash: 4
+  style.stroke: "#991b1b"
+}
+
+active -> reclaim: "received in active\n(higher-priority recovery)" {
+  style.stroke-dash: 4
+  style.stroke: "#831843"
+}
+degraded -> reclaim: "received in degraded" {
+  style.stroke-dash: 4
+  style.stroke: "#831843"
+}
+switching -> reclaim: "received in switching" {
+  style.stroke-dash: 4
+  style.stroke: "#831843"
+}
+exhausted -> reclaim: "received in exhausted\n(skip retry timer)" {
+  style.stroke-dash: 4
+  style.stroke: "#831843"
+}
