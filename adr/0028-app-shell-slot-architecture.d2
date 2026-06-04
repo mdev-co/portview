@@ -1,0 +1,64 @@
+direction: down
+vars: {
+  d2-config: {
+    layout-engine: elk
+    theme-id: 8
+    pad: 20
+  }
+}
+
+# Top: data + state inputs
+preset: "📐 LayoutPreset\nclassic | detail-focus\nevents-focus | presentation" {
+  shape: rectangle
+  style: { fill: "#fef3c7"; stroke: "#f59e0b"; stroke-width: 2; font-color: "#92400e"; border-radius: 8 }
+}
+
+machine: "⚙ appShellMachine (XState)\npresetId · sidebarView\ndetailTarget · drawerSnap" {
+  shape: rectangle
+  style: { fill: "#dbeafe"; stroke: "#3b82f6"; stroke-width: 2; font-color: "#1e3a8a"; border-radius: 8 }
+}
+
+# Middle: the shell
+shell: "🧩 AppShell\nslot pattern + CSS Grid areas\nFramer Motion layout" {
+  shape: rectangle
+  style: { fill: "#ede9fe"; stroke: "#8b5cf6"; stroke-width: 2; font-color: "#5b21b6"; border-radius: 8 }
+}
+
+# Bottom: slot surfaces
+ab: "🎯 ActivityBar\nicon nav" {
+  shape: rectangle
+  style: { fill: "#d1fae5"; stroke: "#10b981"; stroke-width: 2; font-color: "#064e3b"; border-radius: 8 }
+}
+sidebar: "📋 Sidebar\nview content" {
+  shape: rectangle
+  style: { fill: "#d1fae5"; stroke: "#10b981"; stroke-width: 2; font-color: "#064e3b"; border-radius: 8 }
+}
+main: "🗺 Main\nMapLibre · 3D-ready" {
+  shape: rectangle
+  style: { fill: "#d1fae5"; stroke: "#10b981"; stroke-width: 2; font-color: "#064e3b"; border-radius: 8 }
+}
+detail: "🔍 Detail Panel\nvessel · zone" {
+  shape: rectangle
+  style: { fill: "#d1fae5"; stroke: "#10b981"; stroke-width: 2; font-color: "#064e3b"; border-radius: 8 }
+}
+drawer: "📊 Bottom Drawer\nevents · replay" {
+  shape: rectangle
+  style: { fill: "#d1fae5"; stroke: "#10b981"; stroke-width: 2; font-color: "#064e3b"; border-radius: 8 }
+}
+
+# Side: primitive
+glass: "💎 GlassPanel primitive\nHeader · Body · Footer" {
+  shape: rectangle
+  style: { fill: "#fce7f3"; stroke: "#ec4899"; stroke-width: 2; font-color: "#831843"; border-radius: 8 }
+}
+
+preset -> shell: "active preset" { style: { stroke-width: 2 } }
+machine -> shell: "layout state" { style: { stroke-width: 2 } }
+shell -> ab: "slot=activity-bar" { style: { stroke-dash: 3 } }
+shell -> sidebar: "slot=sidebar" { style: { stroke-dash: 3 } }
+shell -> main: "slot=main" { style: { stroke-dash: 3 } }
+shell -> detail: "slot=detail" { style: { stroke-dash: 3 } }
+shell -> drawer: "slot=drawer" { style: { stroke-dash: 3 } }
+glass -> sidebar: "compose" { style: { stroke-dash: 5; stroke: "#ec4899" } }
+glass -> detail: "compose" { style: { stroke-dash: 5; stroke: "#ec4899" } }
+glass -> drawer: "compose" { style: { stroke-dash: 5; stroke: "#ec4899" } }
