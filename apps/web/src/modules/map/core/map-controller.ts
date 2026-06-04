@@ -93,10 +93,22 @@ export class MapController {
   }
 
   private syncStateAtom(snapshot: MapMachineSnapshot): void {
-    $mapState.set({
-      status: snapshot.value as MapStatus,
-      engineType: snapshot.context.currentEngineType,
-      error: snapshot.context.error,
+    // XState fires the subscribe callback synchronously with the
+    // current snapshot the moment subscribe() is called. The first
+    // call to MapController.getInstance() happens inside the render
+    // of <MapView> (via useMapEngine), so writing to $mapState
+    // synchronously inside the callback notifies <MapStatusPill>
+    // mid-render and trips React's "Cannot update a component while
+    // rendering a different component" guard. Deferring the atom
+    // write to the next microtask lets the current render complete
+    // first; the status pill picks up the change on its very next
+    // tick, which is sub-millisecond and not visible to the user.
+    queueMicrotask(() => {
+      $mapState.set({
+        status: snapshot.value as MapStatus,
+        engineType: snapshot.context.currentEngineType,
+        error: snapshot.context.error,
+      });
     });
   }
 

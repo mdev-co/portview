@@ -59,6 +59,64 @@ export default defineConfig(({ command }) => ({
   build: {
     sourcemap: false,
     minify: 'esbuild',
+    /**
+     * Vendor chunking via Rolldown advanced groups. The point is
+     * stable cache keys: the React core and state libs change rarely
+     * (one entry per dependency bump), so a separate hashed chunk
+     * means repeat visits hit the browser cache. The maplibre-gl
+     * group naturally lands in the async chunk graph because its
+     * only importer (`<MapView>`) is now lazy - so the engine is
+     * NOT shipped at first paint anymore.
+     *
+     * `name` is a function so we can express disjoint groups inline:
+     * each returned label becomes its own chunk; returning `null`
+     * leaves the module to Rolldown's default placement (which keeps
+     * the route-level app code together with its Suspense-eager
+     * dependencies).
+     */
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [
+            {
+              name: id => {
+                if (
+                  /node_modules\/(react|react-dom|react-router|react-router-dom|scheduler)\//.test(
+                    id,
+                  )
+                ) {
+                  return 'vendor-react';
+                }
+                if (
+                  /node_modules\/(@xstate\/|xstate\/|@nanostores\/|nanostores\/|protobufjs\/|tslog\/)/.test(
+                    id,
+                  )
+                ) {
+                  return 'vendor-state';
+                }
+                if (/[\\/]packages[\\/]shared[\\/]/.test(id)) {
+                  return 'vendor-state';
+                }
+                if (/node_modules\/maplibre-gl\//.test(id)) {
+                  return 'vendor-map';
+                }
+                return null;
+              },
+            },
+          ],
+        },
+      },
+    },
+    /**
+     * maplibre-gl alone is ~1 MB raw / ~286 KB gzip. That is the
+     * library size, not a packaging mistake; further splitting would
+     * require dynamic style imports inside the engine which is not
+     * worth the complexity at this scale. The chunk lands in the
+     * async (lazy) part of the graph so it does not affect first
+     * paint. Raise the warning limit so the (now informational)
+     * size threshold stops firing on every build.
+     */
+    chunkSizeWarningLimit: 1100,
   },
   esbuild:
     command === 'build'
