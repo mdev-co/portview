@@ -14,18 +14,19 @@ const router = createBrowserRouter([
   {
     element: (
       <AppShell>
-        <AppShell.Header>
-          <Anchor className="text-primary size-4" />
-          <h1 className="text-sm font-semibold tracking-tight">Smart Port Szczecin</h1>
-          <div className="ml-auto flex items-center gap-2">
-            <MapStatusPill />
-            <MapStyleSwitcher />
-            <SeamarkToggle />
-            <TrailsToggle />
-            <ThemeToggle />
-          </div>
-        </AppShell.Header>
-        <AppShell.Main />
+        <AppShell.Slot name="header">
+          <header className="border-border bg-background flex h-full items-center gap-2 border-b px-4 py-3">
+            <Anchor className="text-primary size-4" />
+            <h1 className="text-sm font-semibold tracking-tight">Smart Port Szczecin</h1>
+            <div className="ml-auto flex items-center gap-2">
+              <MapStatusPill />
+              <MapStyleSwitcher />
+              <SeamarkToggle />
+              <TrailsToggle />
+              <ThemeToggle />
+            </div>
+          </header>
+        </AppShell.Slot>
       </AppShell>
     ),
     children: [{ index: true, element: <IndexRoute /> }],
