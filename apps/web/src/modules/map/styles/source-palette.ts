@@ -90,7 +90,18 @@ export const UNKNOWN_SOURCE_PALETTE: SourcePaletteEntry = {
   description: 'Source not recorded (pre sourceId tracking)',
 };
 
+/**
+ * Adapter boundary: `sourceId` originates from the WebSocket decoder
+ * and the database, both of which carry raw int32 that the type system
+ * cannot pin to {@link SourceId} at runtime. A legacy DB row written
+ * before sourceId tracking, a decoder edge case, or a future expansion
+ * of the enum can all surface a value that has no entry in
+ * {@link SOURCE_PALETTE}. The lookup MUST fall back rather than return
+ * `undefined` to the JSX consumer - the previous version crashed the
+ * sidebar tree in production when an out-of-range integer reached
+ * SourceDot.
+ */
 export function paletteFor(sourceId: SourceId | null | undefined): SourcePaletteEntry {
   if (sourceId === null || sourceId === undefined) return UNKNOWN_SOURCE_PALETTE;
-  return SOURCE_PALETTE[sourceId];
+  return SOURCE_PALETTE[sourceId] ?? UNKNOWN_SOURCE_PALETTE;
 }

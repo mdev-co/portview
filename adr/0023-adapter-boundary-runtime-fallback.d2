@@ -1,0 +1,176 @@
+direction: down
+vars: {
+  d2-config: {
+    theme-id: 8
+    pad: 40
+  }
+}
+
+title: "ADR-0023 Adapter boundary runtime fallback\nfor Record<Enum, T> indexed lookups" {
+  near: top-center
+  shape: text
+  style: {
+    font-size: 22
+    bold: true
+  }
+}
+
+sources: "External adapter inputs\n(outside TS type domain)" {
+  shape: rectangle
+  style: {
+    fill: "#fef3c7"
+    stroke: "#92400e"
+    bold: true
+  }
+
+  binary: "Binary position frame\nview.getU8 OFFSET_SOURCE_ID\npacked u8" {
+    shape: rectangle
+    style: {
+      fill: "#fde68a"
+      stroke: "#92400e"
+    }
+  }
+
+  protobuf: "Protobuf snapshot decoder\nentry.sourceId int32\noptional field" {
+    shape: rectangle
+    icon: https://icons.terrastruct.com/dev%2Ftypescript.svg
+  }
+
+  db: "PostgreSQL vessel row\nlastSourceId column\nnullable int" {
+    shape: cylinder
+    style: {
+      fill: "#dbeafe"
+      stroke: "#1e40af"
+    }
+  }
+
+  legacy: "Legacy rows seeded\npre sourceId tracking\nNULL or out of domain" {
+    shape: rectangle
+    style: {
+      fill: "#fee2e2"
+      stroke: "#991b1b"
+    }
+  }
+}
+
+decoders: "Adapter boundary cast layer\n(phantom brand, no runtime check)" {
+  shape: rectangle
+  style: {
+    fill: "#ede9fe"
+    stroke: "#5b21b6"
+    bold: true
+  }
+
+  vesselCodec: "vessel.codec.ts\nbyte as SourceId" {
+    shape: rectangle
+    icon: https://icons.terrastruct.com/dev%2Ftypescript.svg
+  }
+
+  snapshotCodec: "snapshot.codec.ts\nentry.sourceId as SourceId | null" {
+    shape: rectangle
+    icon: https://icons.terrastruct.com/dev%2Ftypescript.svg
+  }
+
+  snapshotBuilder: "snapshot-builder.ts\nv.lastSourceId as SourceId | null" {
+    shape: rectangle
+    icon: https://icons.terrastruct.com/dev%2Ftypescript.svg
+  }
+}
+
+guard: "paletteFor adapter\nSourceId | null | undefined -> SourcePaletteEntry\nfalls back to UNKNOWN_SOURCE_PALETTE when\nSOURCE_PALETTE has no entry" {
+  shape: hexagon
+  style: {
+    fill: "#dcfce7"
+    stroke: "#166534"
+    bold: true
+    font-size: 16
+  }
+}
+
+palette: "SOURCE_PALETTE\nRecord<SourceId, SourcePaletteEntry>\nstatic literal map\nno runtime totality guarantee" {
+  shape: rectangle
+  style: {
+    fill: "#dbeafe"
+    stroke: "#1e40af"
+  }
+}
+
+unknownEntry: "UNKNOWN_SOURCE_PALETTE\nsentinel SourcePaletteEntry\nfull shape, no throws" {
+  shape: rectangle
+  style: {
+    fill: "#fce7f3"
+    stroke: "#831843"
+  }
+}
+
+consumer: "Sidebar SourceDot\nreads .dotFilled .dotHex\n.label .description" {
+  shape: rectangle
+  icon: https://icons.terrastruct.com/dev%2Freact.svg
+}
+
+tsconfig: "apps/web tsconfig.app.json\nstrict: true\nnoUncheckedIndexedAccess: true\ncompile-time gate against\nfuture Record lookups\nwithout fallback" {
+  shape: rectangle
+  style: {
+    fill: "#fef3c7"
+    stroke: "#92400e"
+    bold: true
+    font-size: 14
+  }
+}
+
+incident: "Production regression 2026-06-03\nout-of-domain sourceId\nSOURCE_PALETTE[id] = undefined\nSourceDot read on undefined\nReact ErrorBoundary unwound\nsidebar subtree" {
+  shape: rectangle
+  style: {
+    fill: "#fee2e2"
+    stroke: "#991b1b"
+    font-size: 13
+  }
+}
+
+sources.binary -> decoders.vesselCodec: "u8 byte" {
+  style.stroke-width: 3
+}
+sources.protobuf -> decoders.snapshotCodec: "protobuf int32" {
+  style.stroke-width: 3
+}
+sources.db -> decoders.snapshotBuilder: "Prisma row" {
+  style.stroke-width: 3
+}
+sources.legacy -.-> sources.db: "historical writes" {
+  style.stroke-dash: 4
+}
+
+decoders.vesselCodec -> guard: "SourceId" {
+  style.stroke-width: 3
+}
+decoders.snapshotCodec -> guard: "SourceId | null" {
+  style.stroke-width: 3
+}
+decoders.snapshotBuilder -> guard: "SourceId | null\n(via WebSocket snapshot)" {
+  style.stroke-width: 3
+}
+
+guard -> palette: "lookup\nSOURCE_PALETTE[sourceId]" {
+  style.stroke-width: 2
+}
+palette -.-> unknownEntry: "?? fallback\nwhen undefined" {
+  style.stroke-dash: 4
+  style.stroke: "#991b1b"
+  style.stroke-width: 3
+}
+guard -> consumer: "non-nullable\nSourcePaletteEntry" {
+  style.stroke-width: 3
+  style.stroke: "#166534"
+}
+
+incident -.-> guard: "regression closed by\nfallback at adapter,\nnot at consumer" {
+  style.stroke-dash: 4
+  style.stroke: "#991b1b"
+  style.stroke-width: 2
+}
+
+tsconfig -.-> palette: "any future RECORD[key]\nfails typecheck without\nexplicit ?? FALLBACK or guard" {
+  style.stroke-dash: 4
+  style.stroke: "#92400e"
+  style.stroke-width: 2
+}

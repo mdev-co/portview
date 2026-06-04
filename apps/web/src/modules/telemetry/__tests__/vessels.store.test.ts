@@ -47,7 +47,7 @@ describe('vessels store setVessel', () => {
   it('keeps the previous fix when the inbound frame has null position', () => {
     setVessel(FULL);
     setVessel(STATIC_DATA_NULL);
-    const merged = $vessels.get()[FULL.mmsi];
+    const merged = $vessels.get()[FULL.mmsi]!;
     expect(merged.lng).toBe(FULL.lng);
     expect(merged.lat).toBe(FULL.lat);
     expect(merged.sog).toBe(FULL.sog);
@@ -60,7 +60,7 @@ describe('vessels store setVessel', () => {
   it('always promotes messageType and timestampUnix from the inbound frame', () => {
     setVessel(FULL);
     setVessel(STATIC_DATA_NULL);
-    const merged = $vessels.get()[FULL.mmsi];
+    const merged = $vessels.get()[FULL.mmsi]!;
     expect(merged.messageType).toBe(STATIC_DATA_NULL.messageType);
     expect(merged.timestampUnix).toBe(STATIC_DATA_NULL.timestampUnix);
   });
@@ -74,7 +74,7 @@ describe('vessels store setVessel', () => {
     // updates while non-position bits from the inbound frame still apply.
     setVessel(FULL);
     setVessel(STATIC_DATA_NULL);
-    const merged = $vessels.get()[FULL.mmsi];
+    const merged = $vessels.get()[FULL.mmsi]!;
     expect(merged.flags & VESSEL_FLAG_HAS_FIX).toBe(VESSEL_FLAG_HAS_FIX);
   });
 
@@ -89,7 +89,7 @@ describe('vessels store setVessel', () => {
       timestampUnix: FULL.timestampUnix + 30,
     };
     setVessel(moved);
-    const merged = $vessels.get()[FULL.mmsi];
+    const merged = $vessels.get()[FULL.mmsi]!;
     expect(merged.flags).toBe(newFlags);
   });
 
@@ -103,7 +103,7 @@ describe('vessels store setVessel', () => {
       timestampUnix: FULL.timestampUnix + 30,
     };
     setVessel(moved);
-    const merged = $vessels.get()[FULL.mmsi];
+    const merged = $vessels.get()[FULL.mmsi]!;
     expect(merged.lng).toBe(14.6);
     expect(merged.lat).toBe(53.5);
     expect(merged.sog).toBe(5.5);
@@ -114,7 +114,7 @@ describe('vessels store setVessel', () => {
     setVessel(FULL);
     const stopped: LiveVessel = { ...FULL, sog: 0, cog: 0, rateOfTurn: 0 };
     setVessel(stopped);
-    const merged = $vessels.get()[FULL.mmsi];
+    const merged = $vessels.get()[FULL.mmsi]!;
     expect(merged.sog).toBe(0);
     expect(merged.cog).toBe(0);
     expect(merged.rateOfTurn).toBe(0);
@@ -128,7 +128,7 @@ describe('vessels store setVessel', () => {
     setVessel(FULL);
     const drifting: LiveVessel = { ...FULL, sog: 0.4, flags: 0 };
     setVessel(drifting);
-    const merged = $vessels.get()[FULL.mmsi];
+    const merged = $vessels.get()[FULL.mmsi]!;
     expect(merged.flags & VESSEL_FLAG_IS_MOVING).toBe(VESSEL_FLAG_IS_MOVING);
   });
 
@@ -136,7 +136,7 @@ describe('vessels store setVessel', () => {
     setVessel(FULL);
     const stopped: LiveVessel = { ...FULL, sog: 0.2, flags: 0 };
     setVessel(stopped);
-    const merged = $vessels.get()[FULL.mmsi];
+    const merged = $vessels.get()[FULL.mmsi]!;
     expect(merged.flags & VESSEL_FLAG_IS_MOVING).toBe(0);
   });
 
@@ -148,7 +148,7 @@ describe('vessels store setVessel', () => {
       flags: VESSEL_FLAG_IS_MOVING,
     };
     setVessel(edging);
-    const merged = $vessels.get()[FULL.mmsi];
+    const merged = $vessels.get()[FULL.mmsi]!;
     expect(merged.flags & VESSEL_FLAG_IS_MOVING).toBe(0);
   });
 
@@ -156,14 +156,14 @@ describe('vessels store setVessel', () => {
     setVessel({ ...FULL, sog: 0, flags: FULL.flags & ~VESSEL_FLAG_IS_MOVING });
     const accel: LiveVessel = { ...FULL, sog: 0.6, flags: 0 };
     setVessel(accel);
-    const merged = $vessels.get()[FULL.mmsi];
+    const merged = $vessels.get()[FULL.mmsi]!;
     expect(merged.flags & VESSEL_FLAG_IS_MOVING).toBe(VESSEL_FLAG_IS_MOVING);
   });
 
   it('preserves IS_MOVING across static-only frames that carry no SOG', () => {
     setVessel(FULL);
     setVessel(STATIC_DATA_NULL);
-    const merged = $vessels.get()[FULL.mmsi];
+    const merged = $vessels.get()[FULL.mmsi]!;
     expect(merged.flags & VESSEL_FLAG_IS_MOVING).toBe(VESSEL_FLAG_IS_MOVING);
   });
 });

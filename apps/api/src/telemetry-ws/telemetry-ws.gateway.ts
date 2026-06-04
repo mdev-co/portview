@@ -1,7 +1,11 @@
 import { Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
 import { WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
-import { encodeVesselFrame } from '@sps/shared';
+import {
+  encodeSnapshot,
+  encodeStaticFrame,
+  encodeVesselFrame,
+} from '@sps/shared';
 import { WebSocket, WebSocketServer as WsServer } from 'ws';
 import {
   VESSEL_STATIC_EVENT,
@@ -82,7 +86,14 @@ export class TelemetryWsGateway {
     if (client.readyState !== WebSocket.OPEN) return;
     const frame = await this.snapshotBuilder.build();
     if (client.readyState !== WebSocket.OPEN) return;
-    client.send(JSON.stringify(frame), { binary: false });
+    // Snapshot is serialised through the shared Protobuf codec rather
+    // than JSON. The wire is a binary WebSocket message; the frontend
+    // dispatcher routes any binary frame whose length differs from the
+    // 40-byte position-update frame into `decodeSnapshot`. Stripping
+    // the JSON keys from the wire was an OpSec goal once the demo
+    // started attracting passive inspection from third parties.
+    const buffer = encodeSnapshot(frame);
+    client.send(buffer, { binary: true });
   }
 
   handleDisconnect(): void {
@@ -97,8 +108,12 @@ export class TelemetryWsGateway {
 
   @OnEvent(VESSEL_STATIC_EVENT)
   onVesselStatic(event: VesselStaticEvent): void {
-    const json = JSON.stringify(buildVesselStaticFrame(event));
-    this.broadcast(json, { binary: false });
+    // Static updates used to ship as JSON text with every field name
+    // (mmsi, vesselName, imo, callSign, shipType, dimensions, draught,
+    // destination, eta) readable in DevTools. The Protobuf wire keeps
+    // the same shape but strips the names from the wire.
+    const buffer = encodeStaticFrame(buildVesselStaticFrame(event));
+    this.broadcast(buffer, { binary: true });
   }
 
   private broadcast(

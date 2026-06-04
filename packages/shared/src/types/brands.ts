@@ -54,5 +54,14 @@ const SOURCE_ID_NAMES: Readonly<Record<SourceId, string>> = {
   [SourceId.EdgeBridge]: 'EdgeBridge',
 };
 
-/** Reverse-lookup helper for logs and DLQ rows. */
-export const sourceIdName = (id: SourceId): string => SOURCE_ID_NAMES[id];
+/**
+ * Reverse-lookup helper for logs and DLQ rows. Falls back to a
+ * stable `#<id>` token when the runtime value is outside the
+ * declared `SourceId` domain (legacy DB row pre source tracking,
+ * future enum expansion, decoder edge case) so consumers never
+ * render the literal `undefined`.
+ */
+export const sourceIdName = (id: SourceId | null | undefined): string => {
+  if (id === null || id === undefined) return 'Unknown';
+  return SOURCE_ID_NAMES[id] ?? `#${id}`;
+};
