@@ -19,16 +19,25 @@ const router = createBrowserRouter([
       <AppShell.Provider initialPreset="operator-ui">
         <AppShell>
           <AppShell.Slot name="header">
-            <header className="border-border/40 bg-background/60 flex h-full items-center gap-2 border-b px-4 py-2.5 backdrop-blur-xl">
-              <Anchor className="text-primary size-4" />
-              <h1 className="text-sm font-semibold tracking-tight">Smart Port Szczecin</h1>
-              <div className="ml-auto flex items-center gap-2">
+            <header className="border-border/40 bg-background/60 flex h-full items-center gap-3 border-b px-4 py-2.5 backdrop-blur-xl">
+              <div className="flex items-center gap-2">
+                <Anchor className="text-primary size-4" />
+                <h1 className="text-sm font-semibold tracking-tight">Smart Port Szczecin</h1>
+              </div>
+              <div className="ml-auto flex items-center gap-3">
                 <MapStatusPill />
+                <span className="bg-border/60 h-5 w-px" aria-hidden />
                 <MapStyleSwitcher />
-                <SeamarkToggle />
-                <TrailsToggle />
-                <DockVisibilityToggle />
-                <ThemeToggle />
+                <span className="bg-border/60 h-5 w-px" aria-hidden />
+                <div className="flex items-center gap-1.5">
+                  <SeamarkToggle />
+                  <TrailsToggle />
+                </div>
+                <span className="bg-border/60 h-5 w-px" aria-hidden />
+                <div className="flex items-center gap-1">
+                  <DockVisibilityToggle />
+                  <ThemeToggle />
+                </div>
               </div>
             </header>
           </AppShell.Slot>

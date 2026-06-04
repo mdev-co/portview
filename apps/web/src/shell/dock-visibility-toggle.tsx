@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { cn } from '@/lib/utils';
 import { Check, EyeOff, type LucideIcon, PanelBottom, PanelBottomDashed, Pin } from 'lucide-react';
 import { useAppShell } from './app-shell-context';
@@ -32,29 +33,40 @@ const OPTIONS: readonly ModeOption[] = [
   },
 ];
 
+const POPOVER_WIDTH = 224;
+const POPOVER_GAP = 6;
+
 /**
  * Header control that drives the bottom dock display mode.
  *
- * Clicking the trigger opens a small popover listing the three
- * modes (Auto, Pinned, Hidden) with descriptive labels. Cycling
- * through ambiguous icon-only states was confusing UX; the named
- * popover makes the operator's choice explicit.
- *
- * Trigger icon flips to a "dashed" variant when the dock is
- * hidden so the header surface telegraphs the current state at a
- * glance without forcing the operator to open the popover.
+ * The popover renders through a portal anchored to document.body
+ * so the map canvas's stacking context cannot push it under the
+ * map. Position is computed from the trigger's bounding rect each
+ * time the popover opens.
  */
 export function DockVisibilityToggle(): React.JSX.Element {
   const { state, send } = useAppShell();
   const [open, setOpen] = useState(false);
-  const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const [anchor, setAnchor] = useState<{ top: number; right: number } | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+
+  useLayoutEffect(() => {
+    if (!open || triggerRef.current === null) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    setAnchor({
+      top: rect.bottom + POPOVER_GAP,
+      right: window.innerWidth - rect.right,
+    });
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
     function onClickOutside(e: MouseEvent): void {
-      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      const target = e.target as Node;
+      if (triggerRef.current?.contains(target)) return;
+      const popover = document.getElementById('dock-control-popover');
+      if (popover?.contains(target)) return;
+      setOpen(false);
     }
     function onKey(e: KeyboardEvent): void {
       if (e.key === 'Escape') setOpen(false);
@@ -71,8 +83,9 @@ export function DockVisibilityToggle(): React.JSX.Element {
   const TriggerIcon = current === 'hidden' ? PanelBottomDashed : PanelBottom;
 
   return (
-    <div ref={wrapperRef} className="relative">
+    <>
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen(o => !o)}
         aria-label={`Dock display: ${current}. Click to change.`}
@@ -85,46 +98,51 @@ export function DockVisibilityToggle(): React.JSX.Element {
           strokeWidth={1.6}
         />
       </button>
-      {open && (
-        <div
-          role="menu"
-          className="border-border bg-popover absolute top-full right-0 z-50 mt-1.5 w-56 rounded-md border p-1 shadow-lg"
-        >
-          <p className="text-muted-foreground px-2 pt-1 pb-1.5 text-[10px] font-semibold tracking-wider uppercase">
-            Bottom dock
-          </p>
-          {OPTIONS.map(opt => {
-            const Icon = opt.icon;
-            const active = current === opt.value;
-            return (
-              <button
-                key={opt.value}
-                type="button"
-                role="menuitem"
-                onClick={() => {
-                  send({ type: 'dock.setMode', mode: opt.value });
-                  setOpen(false);
-                }}
-                className={cn(
-                  'hover:bg-accent/50 flex w-full items-start gap-2.5 rounded px-2 py-1.5 text-left transition-colors',
-                  active && 'bg-accent/40',
-                )}
-              >
-                <Icon className="text-muted-foreground mt-0.5 size-3.5" strokeWidth={1.6} />
-                <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-medium">{opt.label}</span>
-                  <span className="text-muted-foreground block text-[11px] leading-snug">
-                    {opt.hint}
+      {open &&
+        anchor !== null &&
+        createPortal(
+          <div
+            id="dock-control-popover"
+            role="menu"
+            style={{ top: anchor.top, right: anchor.right, width: POPOVER_WIDTH }}
+            className="border-border bg-popover fixed z-[200] rounded-md border p-1 shadow-2xl backdrop-blur-xl"
+          >
+            <p className="text-muted-foreground px-2 pt-1 pb-1.5 text-[10px] font-semibold tracking-wider uppercase">
+              Bottom dock
+            </p>
+            {OPTIONS.map(opt => {
+              const Icon = opt.icon;
+              const active = current === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    send({ type: 'dock.setMode', mode: opt.value });
+                    setOpen(false);
+                  }}
+                  className={cn(
+                    'hover:bg-accent/50 flex w-full items-start gap-2.5 rounded px-2 py-1.5 text-left transition-colors',
+                    active && 'bg-accent/40',
+                  )}
+                >
+                  <Icon className="text-muted-foreground mt-0.5 size-3.5" strokeWidth={1.6} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-medium">{opt.label}</span>
+                    <span className="text-muted-foreground block text-[11px] leading-snug">
+                      {opt.hint}
+                    </span>
                   </span>
-                </span>
-                {active && (
-                  <Check className="text-foreground mt-1 size-3.5 shrink-0" strokeWidth={2} />
-                )}
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
+                  {active && (
+                    <Check className="text-foreground mt-1 size-3.5 shrink-0" strokeWidth={2} />
+                  )}
+                </button>
+              );
+            })}
+          </div>,
+          document.body,
+        )}
+    </>
   );
 }
