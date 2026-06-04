@@ -134,3 +134,88 @@ body,
     @apply font-sans;
   }
 }
+
+/*
+ * MapLibre attribution control - minimalist restyling.
+ *
+ * Default rendering is a chunky white pill that dominates the
+ * bottom-right corner. Operator UI prefers a tiny circular badge
+ * that the user clicks only when they want to read credits.
+ * Closed state is a glyph; open state reveals the attribution
+ * text inside our glass surface.
+ */
+.maplibregl-ctrl-bottom-right {
+  pointer-events: none;
+}
+.maplibregl-ctrl-bottom-right > * {
+  pointer-events: auto;
+}
+.maplibregl-ctrl-attrib.maplibregl-ctrl {
+  background: transparent;
+  box-shadow: none;
+  margin: 0 8px 8px 0 !important;
+  padding: 0;
+}
+.maplibregl-ctrl-attrib.maplibregl-ctrl summary.maplibregl-ctrl-attrib-button {
+  width: 22px;
+  height: 22px;
+  background: color-mix(in oklch, var(--background) 60%, transparent);
+  backdrop-filter: blur(12px);
+  border: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
+  border-radius: 9999px;
+  box-shadow:
+    0 4px 14px -4px rgb(0 0 0 / 0.35),
+    inset 0 1px 0 rgb(255 255 255 / 0.06);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  opacity: 0.65;
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease;
+  list-style: none;
+}
+.maplibregl-ctrl-attrib.maplibregl-ctrl
+  summary.maplibregl-ctrl-attrib-button::-webkit-details-marker {
+  display: none;
+}
+.maplibregl-ctrl-attrib.maplibregl-ctrl summary.maplibregl-ctrl-attrib-button:hover {
+  opacity: 1;
+  transform: scale(1.06);
+}
+.maplibregl-ctrl-attrib.maplibregl-ctrl summary.maplibregl-ctrl-attrib-button::before {
+  content: 'i';
+  font-family: ui-serif, Georgia, serif;
+  font-style: italic;
+  font-weight: 600;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--foreground);
+}
+.maplibregl-ctrl-attrib.maplibregl-ctrl summary.maplibregl-ctrl-attrib-button::after {
+  display: none;
+}
+.maplibregl-ctrl-attrib.maplibregl-ctrl .maplibregl-ctrl-attrib-inner {
+  display: none;
+}
+.maplibregl-ctrl-attrib.maplibregl-ctrl.maplibregl-compact-show .maplibregl-ctrl-attrib-inner {
+  display: block;
+  margin-left: 30px;
+  padding: 6px 10px;
+  background: color-mix(in oklch, var(--background) 80%, transparent);
+  backdrop-filter: blur(12px);
+  border: 1px solid color-mix(in oklch, var(--border) 70%, transparent);
+  border-radius: 6px;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  box-shadow: 0 8px 20px -8px rgb(0 0 0 / 0.4);
+}
+.maplibregl-ctrl-attrib.maplibregl-ctrl.maplibregl-compact-show .maplibregl-ctrl-attrib-inner a {
+  color: var(--foreground);
+  text-decoration: none;
+}
+.maplibregl-ctrl-attrib.maplibregl-ctrl.maplibregl-compact-show
+  .maplibregl-ctrl-attrib-inner
+  a:hover {
+  text-decoration: underline;
+}
