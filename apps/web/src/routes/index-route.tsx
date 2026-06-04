@@ -1,7 +1,6 @@
 import { Suspense, lazy } from 'react';
+import { GeofenceToaster, useGeofencePipeline } from '@/modules/geofencing';
 import { MapSkeleton } from '@/modules/map/components/map-skeleton';
-import { VesselSidebar } from '@/modules/selection';
-import { MapLayout } from '@/shell/map-layout';
 
 /**
  * MapView pulls in MapLibre and the entire map module (~180 KB gzip).
@@ -15,16 +14,21 @@ const MapView = lazy(() =>
 );
 
 export function IndexRoute() {
+  // The geofence pipeline subscribes to `$vessels` and runs the
+  // dwell-time machine on every frame. It is mounted at the route
+  // level (not the App Shell) so the listener tears down cleanly
+  // when the user navigates away and re-mounts when they come back.
+  // Idempotent under React Strict Mode double-mount in dev.
+  useGeofencePipeline();
+
   return (
-    <MapLayout>
-      <MapLayout.Sidebar>
-        <VesselSidebar />
-      </MapLayout.Sidebar>
-      <MapLayout.Main>
-        <Suspense fallback={<MapSkeleton />}>
-          <MapView />
-        </Suspense>
-      </MapLayout.Main>
-    </MapLayout>
+    <>
+      <Suspense fallback={<MapSkeleton />}>
+        <MapView />
+      </Suspense>
+      {/* Sonner Toaster portal mounts at route boundary so it paints
+          above the shell. Owns the $geofenceEvents subscription. */}
+      <GeofenceToaster />
+    </>
   );
 }

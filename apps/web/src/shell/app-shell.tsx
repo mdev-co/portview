@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AppShellProvider, useAppShell } from './app-shell-context';
 import { resolvePreset } from './app-shell.machine';
-import { SLOT_NAMES, type SlotName } from './layout-presets';
+import { type PresetId, SLOT_NAMES, type SlotName } from './layout-presets';
 
 type SlotProps = {
   readonly name: SlotName;
@@ -50,24 +50,43 @@ function collectSlots(children: ReactNode): Partial<Record<SlotName, ReactNode>>
   return slots;
 }
 
+const OPERATOR_UI_SIDEBAR_PX = 320;
+const OPERATOR_UI_DETAIL_PX = 380;
+
 function AppShellLayout({ children }: { children: ReactNode }) {
   const { state } = useAppShell();
   const preset = resolvePreset(state.presetId);
   const slots = collectSlots(children);
+
+  const sidebarOpen = !state.sidebarCollapsed;
+  const detailOpen = state.detailTarget !== null;
+
+  const gridTemplateColumns =
+    state.presetId === 'operator-ui'
+      ? `${sidebarOpen ? `${OPERATOR_UI_SIDEBAR_PX}px` : '0px'} 1fr ${detailOpen ? `${OPERATOR_UI_DETAIL_PX}px` : '0px'}`
+      : preset.gridTemplateColumns;
+
+  const effectiveVisibility: Record<SlotName, boolean> = {
+    header: preset.slots.header.visible,
+    'activity-bar': preset.slots['activity-bar'].visible,
+    sidebar: state.presetId === 'operator-ui' ? sidebarOpen : preset.slots.sidebar.visible,
+    main: preset.slots.main.visible,
+    detail: state.presetId === 'operator-ui' ? detailOpen : preset.slots.detail.visible,
+    drawer: preset.slots.drawer.visible,
+  };
 
   return (
     <div
       className="bg-background text-foreground grid h-dvh w-full overflow-hidden"
       style={{
         gridTemplateAreas: preset.gridTemplateAreas,
-        gridTemplateColumns: preset.gridTemplateColumns,
+        gridTemplateColumns,
         gridTemplateRows: preset.gridTemplateRows,
       }}
     >
       <AnimatePresence initial={false}>
         {SLOT_NAMES.map(name => {
-          const slotState = preset.slots[name];
-          if (!slotState.visible) return null;
+          if (!effectiveVisibility[name]) return null;
           const provided = slots[name];
           const content: ReactNode = provided ?? (name === 'main' ? <Outlet /> : null);
           if (content === null) return null;
@@ -91,9 +110,15 @@ function AppShellLayout({ children }: { children: ReactNode }) {
   );
 }
 
-function AppShellRoot({ children }: { children: ReactNode }) {
+function AppShellRoot({
+  children,
+  initialPreset,
+}: {
+  children: ReactNode;
+  initialPreset?: PresetId;
+}) {
   return (
-    <AppShellProvider>
+    <AppShellProvider initialPreset={initialPreset}>
       <AppShellLayout>{children}</AppShellLayout>
     </AppShellProvider>
   );

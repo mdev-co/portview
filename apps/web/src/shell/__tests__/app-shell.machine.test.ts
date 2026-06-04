@@ -3,7 +3,7 @@ import { createActor } from 'xstate';
 import { appShellMachine } from '../app-shell.machine';
 
 function startActor() {
-  const actor = createActor(appShellMachine);
+  const actor = createActor(appShellMachine, { input: undefined });
   actor.start();
   return actor;
 }

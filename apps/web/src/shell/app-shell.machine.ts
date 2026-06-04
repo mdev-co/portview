@@ -6,7 +6,7 @@ import {
   type PresetId,
 } from './layout-presets';
 
-export const SIDEBAR_VIEWS = ['vessels', 'zones', 'layers', 'events'] as const;
+export const SIDEBAR_VIEWS = ['vessels', 'zones', 'events'] as const;
 export type SidebarView = (typeof SIDEBAR_VIEWS)[number];
 
 export const DRAWER_SNAPS = ['hidden', 'peek', 'mid', 'full'] as const;
@@ -33,10 +33,15 @@ export type AppShellEvent =
   | { type: 'detail.close' }
   | { type: 'drawer.snap'; snap: DrawerSnap };
 
+export type AppShellInput = {
+  readonly initialPreset?: PresetId;
+};
+
 export const appShellMachine = setup({
   types: {
     context: {} as AppShellContext,
     events: {} as AppShellEvent,
+    input: {} as AppShellInput | undefined,
   },
   actions: {
     setPreset: assign({
@@ -83,13 +88,13 @@ export const appShellMachine = setup({
   },
 }).createMachine({
   id: 'appShell',
-  context: {
-    presetId: DEFAULT_PRESET_ID,
-    sidebarView: 'vessels',
+  context: ({ input }) => ({
+    presetId: input?.initialPreset ?? DEFAULT_PRESET_ID,
+    sidebarView: 'vessels' as const,
     sidebarCollapsed: false,
     detailTarget: null,
-    drawerSnap: 'hidden',
-  },
+    drawerSnap: 'hidden' as const,
+  }),
   on: {
     'preset.swap': { actions: 'setPreset' },
     'sidebar.toggle': { actions: 'toggleSidebar' },

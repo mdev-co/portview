@@ -46,17 +46,16 @@ export const LAYOUT_PRESETS = {
   'operator-ui': {
     id: 'operator-ui',
     label: 'Operator UI',
-    description: 'Activity bar + sidebar + main + detail (PR #2 default)',
+    description: 'Header + macOS-style bottom dock; sidebar/detail collapse to 0 width when closed',
     gridTemplateAreas: `
-      "header header  header header"
-      "ab     sidebar main   detail"
-      "ab     sidebar drawer detail"
+      "header  header header"
+      "sidebar main   detail"
     `,
-    gridTemplateColumns: '48px 320px 1fr 0px',
-    gridTemplateRows: 'auto 1fr 0px',
+    gridTemplateColumns: '0px 1fr 0px',
+    gridTemplateRows: 'auto 1fr',
     slots: {
       header: { visible: true },
-      'activity-bar': { visible: true },
+      'activity-bar': { visible: false },
       sidebar: { visible: true },
       main: { visible: true },
       detail: { visible: false },

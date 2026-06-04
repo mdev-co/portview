@@ -2,6 +2,7 @@ import { type ReactNode, createContext, useContext, useMemo } from 'react';
 import { useMachine } from '@xstate/react';
 import type { ActorRefFrom, SnapshotFrom } from 'xstate';
 import { type AppShellContext, appShellMachine } from './app-shell.machine';
+import { DEFAULT_PRESET_ID, type PresetId } from './layout-presets';
 
 type AppShellActorRef = ActorRefFrom<typeof appShellMachine>;
 type AppShellSnapshot = SnapshotFrom<typeof appShellMachine>;
@@ -14,8 +15,16 @@ type AppShellContextValue = {
 
 const Ctx = createContext<AppShellContextValue | null>(null);
 
-export function AppShellProvider({ children }: { children: ReactNode }) {
-  const [snapshot, send] = useMachine(appShellMachine);
+export function AppShellProvider({
+  children,
+  initialPreset = DEFAULT_PRESET_ID,
+}: {
+  children: ReactNode;
+  initialPreset?: PresetId;
+}) {
+  const [snapshot, send] = useMachine(appShellMachine, {
+    input: { initialPreset },
+  });
   const value = useMemo<AppShellContextValue>(
     () => ({ state: snapshot.context, send, snapshot }),
     [snapshot, send],
