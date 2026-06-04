@@ -303,7 +303,7 @@ function Label() {
       </span>
       <span className={styles.statusLine}>
         {subtitle !== null && (
-          <span className="text-muted-foreground/70 mr-1.5 font-mono text-xs">{subtitle}</span>
+          <span className="text-muted-foreground mr-1.5 font-mono text-xs">{subtitle}</span>
         )}
         {STATUS_LABEL[status]}
         {speedSuffix}
