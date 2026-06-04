@@ -50,7 +50,7 @@ function collectSlots(children: ReactNode): Partial<Record<SlotName, ReactNode>>
   return slots;
 }
 
-const OPERATOR_UI_SIDEBAR_PX = 320;
+const OPERATOR_UI_SIDEBAR_PX = 400;
 const OPERATOR_UI_DETAIL_PX = 380;
 
 function AppShellLayout({ children }: { children: ReactNode }) {
