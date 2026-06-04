@@ -81,11 +81,22 @@ State size is therefore bounded by `O(active vessels currently engaged with zone
 - `pnpm --filter @sps/web typecheck` + lint clean.
 - Manual scenarios covered by tests: vessel oscillating 60 s on boundary produces zero events; sustained 30 s inside emits exactly one Enter; vessel eviction from `$vessels` fires synthetic Exit; ghost watchdog emits `ghost-exit` after 10 min silence; 1000-transient-vessel churn leaves zero residual state after the ghost window elapses.
 
+## Session 2 surface (UI layer)
+
+The second commit on this branch consumes the Session 1 contract above and adds the operator-facing surface:
+
+- `ZoneLayer` mounts a GeoJSON source seeded from `$geofenceZones` plus three MapLibre layers (fill, outline, label) ordered for correct paint depth. A subscription to `$geofenceZones` calls `source.setData` on every operator drawing save - same code path serves the hard-coded Szczecin set and live drawings without branching.
+- `GeofenceToaster` mounts the sonner Toaster portal and subscribes to `$geofenceEvents`. New events surface as `toast.info` (Enter), plain toast (Exit), or `toast.warning` (ghost-exit), keyed for deduplication so React Strict Mode double-render in dev never produces phantom duplicates.
+- `ZoneBadges` mounts inside the sidebar list item and reads `$geofencePresence` via `useStore($geofencePresence, { keys: [String(mmsi)] })`. The per-key subscription is exactly the L6 budget the Session 1 store shape bought - only the rows whose vessels actually flipped zone membership re-render.
+- `ZoneDrawToolbar` is a single header button that dynamically imports terra-draw + the MapLibre adapter on first click (chunked at ~42 KB gzip + ~3 KB adapter, kept off the initial bundle). Operator clicks vertices, double-click finishes; the resulting GeoJSON polygon folds into `$geofenceZones` with an auto-generated id + "Custom Zone N" label. terra-draw's `setGeofenceZones` validator rejects ids containing `|` so the membership map composite key parser cannot be confused by future input.
+- `useGeofencePipeline` mounts `startGeofencePipeline` at the index route; tear-down on unmount keeps Strict-Mode double-mount safe.
+
 ## What this does not address
 
-- The MapLibre overlay layer rendering the zones and the `terra-draw` operator drawing UI are scoped to the second commit of this PR (Session 2). The architecture above is the contract those UI pieces consume.
-- Persistence of operator-drawn zones beyond a page reload. Session 2 stores drawings in `localStorage`; a future ADR will cover the server-side persistence model.
+- Persistence of operator-drawn zones beyond a page reload. Drawn zones live in memory; a future ADR will cover the server-side persistence model.
+- Zone properties editor (rename, change kind, recolor). Drawn zones get auto-id + "Custom Zone N" label + the generic kind; a properties panel is a follow-up task.
 - Per-zone alerting rules ("notify only on Restricted Zone entries"). Today every zone fires the same Enter/Exit event surface; selective alerting is a follow-up.
+- Multi-mode drawing (rectangle, circle, line). terra-draw supports them but a single-button polygon flow is enough for MVP; widening to a ribbon happens when the second shape genuinely lands.
 
 ## Diagram
 
