@@ -100,6 +100,9 @@ export default defineConfig(({ command }) => ({
                 if (/node_modules\/maplibre-gl\//.test(id)) {
                   return 'vendor-map';
                 }
+                if (/node_modules\/(framer-motion|motion(-dom|-utils)?)\//.test(id)) {
+                  return 'vendor-motion';
+                }
                 return null;
               },
             },
