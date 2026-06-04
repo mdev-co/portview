@@ -4,7 +4,7 @@ import { cn } from '@/lib/utils';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AppShellProvider, useAppShell } from './app-shell-context';
 import { resolvePreset } from './app-shell.machine';
-import { type PresetId, SLOT_NAMES, type SlotName } from './layout-presets';
+import { SLOT_NAMES, type SlotName } from './layout-presets';
 
 type SlotProps = {
   readonly name: SlotName;
@@ -110,24 +110,15 @@ function AppShellLayout({ children }: { children: ReactNode }) {
   );
 }
 
-function AppShellRoot({
-  children,
-  initialPreset,
-}: {
-  children: ReactNode;
-  initialPreset?: PresetId;
-}) {
-  return (
-    <AppShellProvider initialPreset={initialPreset}>
-      <AppShellLayout>{children}</AppShellLayout>
-    </AppShellProvider>
-  );
+function AppShellRoot({ children }: { children: ReactNode }) {
+  return <AppShellLayout>{children}</AppShellLayout>;
 }
 
 AppShellRoot.displayName = 'AppShell';
 
 export const AppShell = Object.assign(AppShellRoot, {
   Slot: AppShellSlot,
+  Provider: AppShellProvider,
 });
 
 export { useAppShell };

@@ -15,8 +15,8 @@ import { Anchor } from 'lucide-react';
 const router = createBrowserRouter([
   {
     element: (
-      <>
-        <AppShell initialPreset="operator-ui">
+      <AppShell.Provider initialPreset="operator-ui">
+        <AppShell>
           <AppShell.Slot name="header">
             <header className="border-border/40 bg-background/60 flex h-full items-center gap-2 border-b px-4 py-2.5 backdrop-blur-xl">
               <Anchor className="text-primary size-4" />
@@ -35,7 +35,7 @@ const router = createBrowserRouter([
           </AppShell.Slot>
         </AppShell>
         <BottomDock />
-      </>
+      </AppShell.Provider>
     ),
     children: [{ index: true, element: <IndexRoute /> }],
   },
