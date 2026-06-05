@@ -1,20 +1,23 @@
 import { type Zone, type ZoneCollection, zoneId } from './types';
 
 /**
- * Predefined zones for the Port of Szczecin demo. Coordinates were
- * traced over the OpenStreetMap port outline and cross-checked
- * against the published Tor Wodny Szczecin-Świnoujście channel
- * axis (precision ~80 m at city zoom). The shapes are not the
- * authoritative Port Authority boundaries; they are demo overlays
- * sized to cover the operationally relevant areas where AIS traffic
- * actually congregates.
+ * Demo zones for the Port of Szczecin.
+ *
+ * The six operational zones use real port terminology (Tor Wodny,
+ * Basen, Reda, Strefa Manewrowa) and follow the actual geography
+ * so dwell-time events fire against believable AIS traffic.
+ *
+ * Two extra zones round out the chart: Chrobrys Bulwark covers
+ * the heritage crane berths at Walz Chrobrego promenade, and
+ * three navigation marks scattered across Lake Dabie - named as
+ * standard IALA cardinal / safe-water marks - happen to line up
+ * into a smiley when the chart is zoomed out far enough.
  *
  * Polygon winding: GeoJSON requires the outer ring to be a closed
  * linear ring (first and last point equal) and recommends
  * counter-clockwise order. Each polygon below closes itself.
  *
- * Coordinate order is [lng, lat] per GeoJSON spec. The port is
- * along the Odra river, axis roughly N-S, centred near 14.62 E.
+ * Coordinate order is [lng, lat] per GeoJSON spec.
  */
 function zone(
   id: string,
@@ -38,12 +41,32 @@ function zone(
   };
 }
 
+function decorativeZone(
+  id: string,
+  label: string,
+  coordinates: readonly (readonly [number, number])[],
+): Zone {
+  return {
+    type: 'Feature',
+    properties: {
+      id: zoneId(id),
+      label,
+      kind: 'general',
+      decorative: true,
+    },
+    geometry: {
+      type: 'Polygon',
+      coordinates: [coordinates.map(([lng, lat]) => [lng, lat])],
+    },
+  };
+}
+
 const SZCZECIN_ZONES: readonly Zone[] = [
   zone(
     'szczecin-tor-wodny',
     'Tor Wodny',
     'channel',
-    'Main shipping channel Szczecin-Świnoujście. Follows the Odra navigation axis through the port.',
+    'Main fairway Szczecin to Swinoujscie. Bottom dredged to 12.5 m.',
     [
       [14.6035, 53.565],
       [14.6175, 53.565],
@@ -62,10 +85,10 @@ const SZCZECIN_ZONES: readonly Zone[] = [
     ],
   ),
   zone(
-    'szczecin-port-glowny',
-    'Port Główny',
+    'szczecin-nabrzeze-polskie',
+    'Nabrzeze Polskie',
     'harbor',
-    'Main commercial quays along the eastern bank - general cargo, ferry, container terminals.',
+    'Main commercial quays along the eastern bank. General cargo and container traffic.',
     [
       [14.591, 53.45],
       [14.609, 53.45],
@@ -75,10 +98,10 @@ const SZCZECIN_ZONES: readonly Zone[] = [
     ],
   ),
   zone(
-    'szczecin-basen-gorniczy',
-    'Basen Górniczy',
+    'szczecin-basen-gornoslaski',
+    'Basen Gornoslaski',
     'harbor',
-    'Bulk cargo basin - coal, ore, aggregates handled at the inland berths.',
+    'Bulk cargo basin. Coal, ore and aggregate handling.',
     [
       [14.615, 53.437],
       [14.634, 53.437],
@@ -88,10 +111,10 @@ const SZCZECIN_ZONES: readonly Zone[] = [
     ],
   ),
   zone(
-    'szczecin-kotwicowisko-polnocne',
-    'Kotwicowisko Północne',
+    'szczecin-reda-polnocna',
+    'Reda Polnocna',
     'anchorage',
-    'Northern anchorage on the approach from Police and the Świnoujście fairway.',
+    'Northern roads on the approach from Police. Pilot boarding station.',
     [
       [14.645, 53.525],
       [14.685, 53.525],
@@ -101,10 +124,10 @@ const SZCZECIN_ZONES: readonly Zone[] = [
     ],
   ),
   zone(
-    'szczecin-kotwicowisko-poludniowe',
-    'Kotwicowisko Południowe',
+    'szczecin-reda-poludniowa',
+    'Reda Poludniowa',
     'anchorage',
-    'Southern anchorage downstream of the harbour mouth, used at high traffic.',
+    'Southern roads downstream of the harbour mouth, used during high-traffic windows.',
     [
       [14.648, 53.383],
       [14.685, 53.383],
@@ -114,10 +137,10 @@ const SZCZECIN_ZONES: readonly Zone[] = [
     ],
   ),
   zone(
-    'szczecin-strefa-przeladunkowa',
-    'Strefa Przeładunkowa',
+    'szczecin-strefa-manewrowa-a',
+    'Strefa Manewrowa A',
     'restricted',
-    'Restricted transfer zone - no transit traffic; berth operations only with port authority clearance.',
+    'Restricted maneuvering and pilot exchange area. Transit only with Harbour Master clearance.',
     [
       [14.578, 53.41],
       [14.591, 53.41],
@@ -126,6 +149,125 @@ const SZCZECIN_ZONES: readonly Zone[] = [
       [14.578, 53.41],
     ],
   ),
+  // ------------------------------------------------------------
+  // Heritage berth on top of the historic harbour cranes at Walz
+  // Chrobrego promenade - Szczecins iconic skyline.
+  zone(
+    'szczecin-chrobry-bulwark',
+    "Chrobry's Bulwark",
+    'general',
+    'Heritage crane berth at the Walz Chrobrego promenade. Listed industrial monument.',
+    [
+      [14.5625, 53.43],
+      [14.5705, 53.43],
+      [14.5705, 53.426],
+      [14.5625, 53.426],
+      [14.5625, 53.43],
+    ],
+  ),
+  // ------------------------------------------------------------
+  // Decorative chart art on Lake Dabie. Three groups arranged so
+  // the operator who zooms east of the city stumbles into a small
+  // navigation poster: smiley face, anchor, compass rose. All
+  // flagged `decorative: true` so the renderer hides their labels
+  // and the shape reads cleanly.
+  decorativeZone('dabie-smile-left-eye', 'Smile Left Eye', [
+    [14.711, 53.466],
+    [14.7135, 53.466],
+    [14.7135, 53.4635],
+    [14.711, 53.4635],
+    [14.711, 53.466],
+  ]),
+  decorativeZone('dabie-smile-right-eye', 'Smile Right Eye', [
+    [14.7195, 53.466],
+    [14.722, 53.466],
+    [14.722, 53.4635],
+    [14.7195, 53.4635],
+    [14.7195, 53.466],
+  ]),
+  decorativeZone('dabie-smile-mouth', 'Smile Mouth', [
+    [14.7095, 53.4565],
+    [14.7235, 53.4565],
+    [14.725, 53.455],
+    [14.7235, 53.453],
+    [14.722, 53.4525],
+    [14.711, 53.4525],
+    [14.7095, 53.453],
+    [14.708, 53.455],
+    [14.7095, 53.4565],
+  ]),
+  decorativeZone('dabie-anchor-ring', 'Anchor Ring', [
+    [14.7195, 53.518],
+    [14.7205, 53.518],
+    [14.7205, 53.516],
+    [14.7195, 53.516],
+    [14.7195, 53.518],
+  ]),
+  decorativeZone('dabie-anchor-stock', 'Anchor Stock', [
+    [14.712, 53.5155],
+    [14.728, 53.5155],
+    [14.728, 53.5145],
+    [14.712, 53.5145],
+    [14.712, 53.5155],
+  ]),
+  decorativeZone('dabie-anchor-shank', 'Anchor Shank', [
+    [14.7195, 53.5145],
+    [14.7205, 53.5145],
+    [14.7205, 53.487],
+    [14.7195, 53.487],
+    [14.7195, 53.5145],
+  ]),
+  decorativeZone('dabie-anchor-arm-port', 'Anchor Arm Port', [
+    [14.7195, 53.49],
+    [14.7195, 53.487],
+    [14.715, 53.485],
+    [14.71, 53.485],
+    [14.708, 53.487],
+    [14.711, 53.488],
+    [14.715, 53.488],
+    [14.7195, 53.49],
+  ]),
+  decorativeZone('dabie-anchor-arm-starboard', 'Anchor Arm Starboard', [
+    [14.7205, 53.49],
+    [14.724, 53.488],
+    [14.728, 53.488],
+    [14.731, 53.487],
+    [14.73, 53.485],
+    [14.725, 53.485],
+    [14.7205, 53.487],
+    [14.7205, 53.49],
+  ]),
+  decorativeZone('dabie-compass-centre', 'Compass Centre', [
+    [14.745, 53.4615],
+    [14.7465, 53.46],
+    [14.745, 53.4585],
+    [14.7435, 53.46],
+    [14.745, 53.4615],
+  ]),
+  decorativeZone('dabie-compass-north', 'Compass North', [
+    [14.745, 53.47],
+    [14.7435, 53.463],
+    [14.7465, 53.463],
+    [14.745, 53.47],
+  ]),
+  decorativeZone('dabie-compass-east', 'Compass East', [
+    [14.757, 53.46],
+    [14.749, 53.4585],
+    [14.749, 53.4615],
+    [14.757, 53.46],
+  ]),
+  decorativeZone('dabie-compass-south', 'Compass South', [
+    [14.745, 53.45],
+    [14.7435, 53.457],
+    [14.7465, 53.457],
+    [14.745, 53.45],
+  ]),
+  decorativeZone('dabie-compass-west', 'Compass West', [
+    [14.733, 53.46],
+    [14.741, 53.4585],
+    [14.741, 53.4615],
+    [14.733, 53.46],
+  ]),
 ];
 
 export const SZCZECIN_ZONE_COLLECTION: ZoneCollection = {

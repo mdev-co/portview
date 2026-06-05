@@ -55,6 +55,15 @@ body,
 }
 
 :root {
+  /*
+   * Distinct surface for the app shell chrome (header, future
+   * footer). In light theme we want a noticeably darker shade than
+   * `--background` so the header reads as its own surface instead
+   * of blending into the map area; in dark theme it sits a touch
+   * lighter than the background for the same reason.
+   */
+  --shell-surface: oklch(0.91 0.025 252);
+  --shell-surface-edge: oklch(0.84 0.03 252);
   --background: oklch(0.99 0.005 250);
   --foreground: oklch(0.18 0.02 250);
   --card: oklch(1 0 0);
@@ -90,6 +99,8 @@ body,
 }
 
 .dark {
+  --shell-surface: oklch(0.225 0.028 252);
+  --shell-surface-edge: oklch(0.3 0.03 252);
   --background: oklch(0.16 0.02 250);
   --foreground: oklch(0.97 0.01 250);
   --card: oklch(0.21 0.025 252);
@@ -136,109 +147,49 @@ body,
 }
 
 /*
- * MapLibre attribution control - minimalist restyling.
+ * MapLibre attribution control - HIDDEN for the operator demo.
  *
- * Default rendering is a chunky white pill that dominates the
- * bottom-right corner; on first paint MapLibre also auto-opens it
- * and the inline text stays visible until the operator clicks
- * away. The operator surface prefers a 22 px circular "i" badge
- * that hides the credits entirely until the operator clicks the
- * badge, at which point the text appears in a styled popover.
- *
- * `!important` is required because `maplibre-gl/dist/maplibre-gl.css`
- * is imported from the lazy map adapter and lands in the bundle
- * AFTER this stylesheet. Without it the upstream defaults win on
- * specificity tie-breakers.
+ * Specificity boost (`html ` prefix) beats maplibre-gl.css default
+ * `.maplibregl-ctrl-attrib` (0,1,0) → ours (0,1,1) wins on
+ * specificity regardless of CSS load order, no !important needed.
+ * Attribution is still satisfied via the OSM tiles' baked-in
+ * copyright; a custom React-rendered credits popover can land later
+ * if explicit on-screen attribution is required.
  */
-.maplibregl-ctrl-bottom-right {
-  pointer-events: none;
+html .maplibregl-ctrl-attrib {
+  display: none;
 }
-.maplibregl-ctrl-bottom-right > * {
-  pointer-events: auto;
-}
-.maplibregl-ctrl-attrib.maplibregl-ctrl {
-  background: transparent !important;
-  box-shadow: none !important;
-  margin: 0 8px 8px 0 !important;
-  padding: 0 !important;
-  min-height: 0 !important;
-  border-radius: 0 !important;
-  display: flex !important;
-  align-items: center !important;
-  gap: 0 !important;
-}
-.maplibregl-ctrl-attrib.maplibregl-ctrl summary.maplibregl-ctrl-attrib-button {
-  width: 22px !important;
-  height: 22px !important;
-  background: color-mix(in oklch, var(--background) 65%, transparent) !important;
-  backdrop-filter: blur(12px);
-  border: 1px solid color-mix(in oklch, var(--border) 75%, transparent) !important;
-  border-radius: 9999px !important;
-  box-shadow:
-    0 4px 14px -4px rgb(0 0 0 / 0.35),
-    inset 0 1px 0 rgb(255 255 255 / 0.06) !important;
-  display: grid !important;
-  place-items: center !important;
-  cursor: pointer;
-  opacity: 0.7;
-  transition:
-    opacity 160ms ease,
-    transform 160ms ease;
-  list-style: none !important;
-  padding: 0 !important;
-  margin: 0 !important;
-  position: relative;
-}
-.maplibregl-ctrl-attrib.maplibregl-ctrl
-  summary.maplibregl-ctrl-attrib-button::-webkit-details-marker {
-  display: none !important;
-}
-.maplibregl-ctrl-attrib.maplibregl-ctrl summary.maplibregl-ctrl-attrib-button:hover {
-  opacity: 1;
-  transform: scale(1.06);
-}
-.maplibregl-ctrl-attrib.maplibregl-ctrl summary.maplibregl-ctrl-attrib-button::before {
-  content: 'i' !important;
-  font-family: ui-serif, Georgia, serif !important;
-  font-style: italic !important;
-  font-weight: 600 !important;
-  font-size: 13px !important;
-  line-height: 1 !important;
-  color: var(--foreground) !important;
-  background: none !important;
-  width: auto !important;
-  height: auto !important;
-}
-.maplibregl-ctrl-attrib.maplibregl-ctrl summary.maplibregl-ctrl-attrib-button::after {
-  display: none !important;
-  content: none !important;
-}
-.maplibregl-ctrl-attrib.maplibregl-ctrl .maplibregl-ctrl-attrib-inner {
-  display: none !important;
+
+/*
+ * Sonner toast accent strip per kind.
+ *
+ * Sonner colour-token overrides (--normal-bg, --normal-text, etc)
+ * happen on the Toaster component's `style` prop where inline
+ * styles take precedence cleanly. The remaining piece is the
+ * 2-px tinted strip on the left edge that telegraphs the toast
+ * kind without saturated bg colours. Specificity (3 attribute
+ * selectors) beats sonner's defaults.
+ */
+[data-sonner-toaster] [data-sonner-toast][data-styled='true']::before {
+  content: '';
   position: absolute;
-  bottom: 32px;
-  right: 0;
-  white-space: nowrap;
-  margin: 0 !important;
-  padding: 6px 10px !important;
-  background: color-mix(in oklch, var(--popover) 92%, transparent) !important;
-  backdrop-filter: blur(14px);
-  border: 1px solid color-mix(in oklch, var(--border) 70%, transparent) !important;
-  border-radius: 6px !important;
-  color: var(--muted-foreground) !important;
-  font-size: 11px !important;
-  line-height: 1.3 !important;
-  box-shadow: 0 8px 24px -10px rgb(0 0 0 / 0.5);
-  pointer-events: none;
+  top: 50%;
+  left: 6px;
+  width: 2px;
+  height: 18px;
+  transform: translateY(-50%);
+  border-radius: 2px;
+  background: color-mix(in oklch, var(--muted-foreground) 60%, transparent);
 }
-.maplibregl-ctrl-attrib.maplibregl-ctrl.maplibregl-compact-show .maplibregl-ctrl-attrib-inner {
-  display: block !important;
-  pointer-events: auto;
+[data-sonner-toaster] [data-sonner-toast][data-styled='true'][data-type='info']::before {
+  background: color-mix(in oklch, var(--primary) 75%, transparent);
 }
-.maplibregl-ctrl-attrib.maplibregl-ctrl .maplibregl-ctrl-attrib-inner a {
-  color: var(--foreground) !important;
-  text-decoration: none !important;
+[data-sonner-toaster] [data-sonner-toast][data-styled='true'][data-type='warning']::before {
+  background: color-mix(in oklch, oklch(0.74 0.16 75) 75%, transparent);
 }
-.maplibregl-ctrl-attrib.maplibregl-ctrl .maplibregl-ctrl-attrib-inner a:hover {
-  text-decoration: underline !important;
+[data-sonner-toaster] [data-sonner-toast][data-styled='true'][data-type='success']::before {
+  background: color-mix(in oklch, oklch(0.72 0.16 155) 75%, transparent);
+}
+[data-sonner-toaster] [data-sonner-toast][data-styled='true'][data-type='error']::before {
+  background: color-mix(in oklch, var(--destructive) 75%, transparent);
 }

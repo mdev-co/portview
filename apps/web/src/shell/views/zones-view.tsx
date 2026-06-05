@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { cn } from '@/lib/utils';
 import { ZoneDrawToolbar } from '@/modules/geofencing/components/zone-draw-toolbar';
 import { $geofenceZones, setGeofenceZones } from '@/modules/geofencing/state/geofence-zones.atom';
 import { useStore } from '@nanostores/react';
@@ -13,6 +14,14 @@ const KIND_STYLE = {
   anchorage: 'bg-amber-500/20 text-amber-300 ring-amber-500/40',
   restricted: 'bg-red-500/20 text-red-300 ring-red-500/40',
   general: 'bg-slate-500/20 text-slate-300 ring-slate-500/40',
+} satisfies Record<ZoneKind, string>;
+
+const KIND_ACCENT = {
+  channel: 'bg-blue-400/70',
+  harbor: 'bg-emerald-400/70',
+  anchorage: 'bg-amber-400/70',
+  restricted: 'bg-red-400/70',
+  general: 'bg-slate-400/70',
 } satisfies Record<ZoneKind, string>;
 
 const KIND_ORDER: readonly ZoneKind[] = ['channel', 'harbor', 'anchorage', 'restricted', 'general'];
@@ -113,8 +122,19 @@ function ZoneRow({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, x: 12 }}
       transition={{ type: 'spring', stiffness: 320, damping: 26 }}
-      className="hover:bg-accent/30 group rounded-md px-2 py-2 transition-colors"
+      className={cn(
+        'group relative rounded-lg px-3 py-2 transition-colors',
+        zone.properties.visible === false ? 'opacity-55' : 'hover:bg-accent/40',
+      )}
     >
+      <span
+        aria-hidden
+        className={cn(
+          'absolute inset-y-2 left-1 w-[2px] rounded-full opacity-70 transition-opacity group-hover:opacity-100',
+          KIND_ACCENT[zone.properties.kind],
+          zone.properties.visible === false && 'opacity-30',
+        )}
+      />
       <div className="flex items-center gap-2">
         <KindSelector value={zone.properties.kind} onChange={kind => onPatch({ kind })} />
         <div className="min-w-0 flex-1">

@@ -16,7 +16,7 @@ export {
   RECENT_EVENT_BUFFER_SIZE,
   setGeofenceZones,
 } from './state';
-export { GeofenceToaster } from './components/geofence-toaster';
+export { GeofenceToasterPortal } from './components/geofence-toaster';
 export { ZoneBadges } from './components/zone-badges';
 export { ZoneDrawToolbar } from './components/zone-draw-toolbar';
 export { ZoneLayer } from './components/zone-layer';

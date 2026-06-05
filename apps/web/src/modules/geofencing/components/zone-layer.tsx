@@ -126,6 +126,12 @@ export function ZoneLayer(): null {
         id: ZONE_LABEL_LAYER_ID,
         type: 'symbol',
         source: ZONE_SOURCE_ID,
+        // Skip labels on decorative chart art (anchor outline,
+        // compass rose, smiley) - the shape reads cleaner without
+        // text plastered over the geometry. MapLibre treats a
+        // missing property as false-y, so the `!=` test catches
+        // both `undefined` and explicit `false`.
+        filter: ['!=', ['get', 'decorative'], true],
         layout: {
           'text-field': ['get', 'label'],
           'text-size': 11,

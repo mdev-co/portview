@@ -51,12 +51,22 @@ type EventRowProps = {
 };
 
 function EventRow({ event, vesselName, zoneLabel }: EventRowProps): React.JSX.Element {
-  const { tone, Icon, verb } =
+  const { accent, ringTone, Icon, verb } =
     event.kind === 'enter'
-      ? { tone: 'text-emerald-400', Icon: ArrowDownRight, verb: 'entered' }
+      ? {
+          accent: 'bg-emerald-500/70',
+          ringTone: 'text-emerald-300',
+          Icon: ArrowDownRight,
+          verb: 'entered',
+        }
       : event.kind === 'exit'
-        ? { tone: 'text-zinc-400', Icon: ArrowUpRight, verb: 'left' }
-        : { tone: 'text-amber-400', Icon: AlertTriangle, verb: 'silent in' };
+        ? { accent: 'bg-zinc-500/50', ringTone: 'text-zinc-300', Icon: ArrowUpRight, verb: 'left' }
+        : {
+            accent: 'bg-amber-500/70',
+            ringTone: 'text-amber-300',
+            Icon: AlertTriangle,
+            verb: 'silent in',
+          };
 
   return (
     <motion.button
@@ -67,16 +77,26 @@ function EventRow({ event, vesselName, zoneLabel }: EventRowProps): React.JSX.El
       exit={{ opacity: 0 }}
       transition={{ type: 'spring', stiffness: 320, damping: 26 }}
       onClick={() => zoomToVessel(event.mmsi)}
-      className="hover:bg-accent/30 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left transition-colors"
+      className="group hover:bg-accent/40 relative flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left transition-colors"
     >
-      <Icon className={`size-3.5 shrink-0 ${tone}`} strokeWidth={2} />
+      <span
+        aria-hidden
+        className={`absolute inset-y-2 left-1 w-[2px] rounded-full ${accent} opacity-70 transition-opacity group-hover:opacity-100`}
+      />
+      <span
+        className={`bg-background/60 grid size-6 shrink-0 place-items-center rounded-md ring-1 ring-white/5 ${ringTone}`}
+      >
+        <Icon className="size-3" strokeWidth={2} />
+      </span>
       <div className="min-w-0 flex-1">
-        <p className="truncate text-xs">
+        <p className="truncate text-[12px] leading-tight">
           <span className="font-medium">{vesselName}</span>
-          <span className="text-muted-foreground"> {verb} </span>
+          <span className="text-muted-foreground/80"> {verb} </span>
           <span className="font-medium">{zoneLabel}</span>
         </p>
-        <p className="text-muted-foreground/70 font-mono text-[10px]">{formatRelative(event.at)}</p>
+        <p className="text-muted-foreground/60 mt-0.5 font-mono text-[10px] tabular-nums">
+          {formatRelative(event.at)}
+        </p>
       </div>
     </motion.button>
   );

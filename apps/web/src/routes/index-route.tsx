@@ -1,5 +1,5 @@
 import { Suspense, lazy } from 'react';
-import { GeofenceToaster, useGeofencePipeline } from '@/modules/geofencing';
+import { useGeofencePipeline } from '@/modules/geofencing';
 import { MapSkeleton } from '@/modules/map/components/map-skeleton';
 
 /**
@@ -22,13 +22,8 @@ export function IndexRoute() {
   useGeofencePipeline();
 
   return (
-    <>
-      <Suspense fallback={<MapSkeleton />}>
-        <MapView />
-      </Suspense>
-      {/* Sonner Toaster portal mounts at route boundary so it paints
-          above the shell. Owns the $geofenceEvents subscription. */}
-      <GeofenceToaster />
-    </>
+    <Suspense fallback={<MapSkeleton />}>
+      <MapView />
+    </Suspense>
   );
 }

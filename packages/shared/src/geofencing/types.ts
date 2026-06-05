@@ -45,6 +45,15 @@ export type ZoneProperties = {
    * flag is a rendering preference, not a logic gate.
    */
   readonly visible?: boolean;
+  /**
+   * Mark a zone as decorative chart art (anchor outline, compass
+   * rose, smiley face). The map renderer omits the label for
+   * decorative zones so the shape reads cleanly without text
+   * occluding the geometry. The dwell-time pipeline ignores this
+   * flag - decorative zones still take part in PIP checks but
+   * vessels rarely sit there in practice.
+   */
+  readonly decorative?: boolean;
 };
 
 /**

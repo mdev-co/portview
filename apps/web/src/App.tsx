@@ -1,4 +1,5 @@
 import { RouterProvider, createBrowserRouter } from 'react-router-dom';
+import { GeofenceToasterPortal } from '@/modules/geofencing';
 import { MapStatusPill } from '@/modules/map/components/map-status-pill';
 import { MapStyleSwitcher } from '@/modules/map/components/map-style-switcher';
 import { SeamarkToggle } from '@/modules/map/components/seamark-toggle';
@@ -19,22 +20,47 @@ const router = createBrowserRouter([
       <AppShell.Provider initialPreset="operator-ui">
         <AppShell>
           <AppShell.Slot name="header">
-            <header className="border-border/40 bg-background/60 flex h-full items-center gap-3 border-b px-4 py-2.5 backdrop-blur-xl">
+            <header
+              className="relative flex h-full items-center gap-3 border-b px-4 py-2.5 backdrop-blur-xl"
+              style={{
+                background:
+                  'linear-gradient(to bottom, color-mix(in oklch, var(--shell-surface) 92%, transparent), color-mix(in oklch, var(--shell-surface) 78%, transparent))',
+                borderBottomColor:
+                  'color-mix(in oklch, var(--shell-surface-edge) 80%, transparent)',
+              }}
+            >
               <div className="flex items-center gap-2">
-                <Anchor className="text-primary size-4" />
-                <h1 className="text-sm font-semibold tracking-tight">Smart Port Szczecin</h1>
+                <Anchor className="text-primary size-[15px]" strokeWidth={2} />
+                <h1 className="text-[13px] font-semibold tracking-tight">Smart Port Szczecin</h1>
+                <span
+                  aria-hidden
+                  className="text-muted-foreground/60 ml-1 font-mono text-[10px] tracking-widest uppercase select-none"
+                >
+                  Operator
+                </span>
               </div>
-              <div className="ml-auto flex items-center gap-3">
+              <div className="ml-auto flex items-center gap-2">
                 <MapStatusPill />
-                <span className="bg-border/60 h-5 w-px" aria-hidden />
                 <MapStyleSwitcher />
-                <span className="bg-border/60 h-5 w-px" aria-hidden />
-                <div className="flex items-center gap-1.5">
+                <div className="border-border bg-background inline-flex h-9 items-center gap-1 rounded-md border px-2 text-xs">
+                  <span
+                    aria-hidden
+                    className="text-muted-foreground font-mono text-[10px] font-semibold tracking-widest uppercase select-none"
+                  >
+                    Overlays
+                  </span>
+                  <span aria-hidden className="bg-border mx-1 h-4 w-px" />
                   <SeamarkToggle />
                   <TrailsToggle />
                 </div>
-                <span className="bg-border/60 h-5 w-px" aria-hidden />
-                <div className="flex items-center gap-1">
+                <div className="border-border bg-background inline-flex h-9 items-center gap-1 rounded-md border px-2 text-xs">
+                  <span
+                    aria-hidden
+                    className="text-muted-foreground font-mono text-[10px] font-semibold tracking-widest uppercase select-none"
+                  >
+                    View
+                  </span>
+                  <span aria-hidden className="bg-border mx-1 h-4 w-px" />
                   <DockVisibilityToggle />
                   <ThemeToggle />
                 </div>
@@ -46,6 +72,7 @@ const router = createBrowserRouter([
           </AppShell.Slot>
         </AppShell>
         <BottomDock />
+        <GeofenceToasterPortal />
       </AppShell.Provider>
     ),
     children: [{ index: true, element: <IndexRoute /> }],

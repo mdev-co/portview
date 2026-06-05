@@ -98,7 +98,18 @@ function AppShellLayout({ children }: { children: ReactNode }) {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ type: 'spring', stiffness: 220, damping: 26 }}
-              className={cn('min-h-0 min-w-0 overflow-hidden', name === 'main' && 'relative')}
+              className={cn(
+                'min-h-0 min-w-0',
+                name !== 'header' && 'overflow-hidden',
+                // Header lifts above the main slot (z-10) and keeps
+                // overflow visible so its tooltips / dropdowns can
+                // extend below the strip without being clipped by
+                // the slot bbox OR painted under the map canvas
+                // (which has its own translate3d-induced stacking
+                // context).
+                name === 'header' && 'relative z-10',
+                name === 'main' && 'relative',
+              )}
               style={{ gridArea: SLOT_GRID_AREA[name] }}
             >
               {content}

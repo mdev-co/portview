@@ -49,6 +49,12 @@ let previousVesselIds: Set<Mmsi> = new Set();
  *
  * Stopping is symmetric: `stopGeofencePipeline` is exposed for
  * tests and the React Strict-Mode double-effect guard.
+ *
+ * Every confirmed transition is appended to `$geofenceEvents`
+ * unconditionally so the sidebar timeline reflects full history
+ * including boot-time presence resolutions. UX-level silencing of
+ * "I was here when you opened the app" enters lives in the toaster
+ * (`geofence-toaster.tsx`), keeping the pipeline a pure log writer.
  */
 export function startGeofencePipeline(): void {
   if (unsubscribe !== null) return;

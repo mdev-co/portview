@@ -1,7 +1,15 @@
 import { atom } from 'nanostores';
 import { SZCZECIN_ZONE_COLLECTION, type ZoneCollection } from '@sps/shared';
 
-const STORAGE_KEY = 'sps:geofence-zones:v1';
+const STORAGE_KEY = 'sps:geofence-zones:v7';
+const LEGACY_STORAGE_KEYS = [
+  'sps:geofence-zones:v1',
+  'sps:geofence-zones:v2',
+  'sps:geofence-zones:v3',
+  'sps:geofence-zones:v4',
+  'sps:geofence-zones:v5',
+  'sps:geofence-zones:v6',
+] as const;
 const MAX_ZONES = 50;
 const MAX_STORAGE_BYTES = 500_000;
 
@@ -79,6 +87,13 @@ function persist(serialized: string): void {
 
 function hydrateOrDefault(): ZoneCollection {
   if (typeof window === 'undefined') return SZCZECIN_ZONE_COLLECTION;
+  // Discard legacy versions on read: bumping the storage key means
+  // we want a clean slate of the new seeded set, not whatever the
+  // operator had cached under the old schema (which referred to a
+  // different zone label/coordinate set we no longer ship).
+  for (const legacyKey of LEGACY_STORAGE_KEYS) {
+    window.localStorage.removeItem(legacyKey);
+  }
   const raw = window.localStorage.getItem(STORAGE_KEY);
   if (raw === null) return SZCZECIN_ZONE_COLLECTION;
   try {
