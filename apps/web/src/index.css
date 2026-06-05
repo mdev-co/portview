@@ -147,17 +147,39 @@ body,
 }
 
 /*
- * MapLibre attribution control - HIDDEN for the operator demo.
+ * MapLibre attribution control - compact "i" badge in the corner.
  *
- * Specificity boost (`html ` prefix) beats maplibre-gl.css default
- * `.maplibregl-ctrl-attrib` (0,1,0) → ours (0,1,1) wins on
- * specificity regardless of CSS load order, no !important needed.
- * Attribution is still satisfied via the OSM tiles' baked-in
- * copyright; a custom React-rendered credits popover can land later
- * if explicit on-screen attribution is required.
+ * Required by the OpenStreetMap Tile Usage Policy: any application
+ * serving OSM tiles MUST display attribution to "OpenStreetMap
+ * contributors". CARTO, Esri, MapTiler and OpenSeaMap require the
+ * same. Hiding the control would be a licence violation, so the
+ * default MapLibre badge stays visible. `attributionMode: 'compact'`
+ * (configured in map-canvas.tsx) renders a 22 px "i" button that
+ * expands to the full text on click; the styles below soften it
+ * (rounded, semi-transparent, low contrast) so it does not compete
+ * with operator UI for attention while remaining legible.
  */
-html .maplibregl-ctrl-attrib {
-  display: none;
+html .maplibregl-ctrl-attrib.maplibregl-compact {
+  background: color-mix(in oklch, var(--background) 65%, transparent);
+  backdrop-filter: blur(6px);
+  border-radius: 9999px;
+  min-height: 22px;
+}
+html .maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-button {
+  background-color: transparent;
+  background-image: none;
+  color: var(--muted-foreground);
+  font:
+    600 13px/1 ui-sans-serif,
+    system-ui,
+    sans-serif;
+}
+html .maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-button::before {
+  content: 'i';
+}
+html .maplibregl-ctrl-attrib.maplibregl-compact-show .maplibregl-ctrl-attrib-inner {
+  color: var(--foreground);
+  font-size: 11px;
 }
 
 /*
