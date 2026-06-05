@@ -2,10 +2,44 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'node:path';
+import { visualizer } from 'rollup-plugin-visualizer';
 import { defineConfig } from 'vite';
+import checker from 'vite-plugin-checker';
 
 export default defineConfig(({ command }) => ({
-  plugins: [react(), tailwindcss()],
+  plugins: [
+    react(),
+    tailwindcss(),
+    // Surfaces tsc + eslint errors in the Vite browser overlay so
+    // the developer cannot ignore them between save and visual
+    // refresh. Disabled during the build pass (CI runs the same
+    // checks already and the plugin's overhead doubles build time).
+    ...(command === 'serve'
+      ? [
+          checker({
+            typescript: true,
+            eslint: {
+              lintCommand: 'eslint . --max-warnings=0',
+              useFlatConfig: true,
+            },
+          }),
+        ]
+      : []),
+    // Bundle composition treemap emitted to dist/stats.html after a
+    // production build. Validates that manualChunks actually split
+    // the way the config intends (vendor-react / vendor-state /
+    // vendor-map / vendor-motion) and that lazy chunks remain lazy.
+    ...(command === 'build'
+      ? [
+          visualizer({
+            filename: 'dist/stats.html',
+            template: 'treemap',
+            gzipSize: true,
+            brotliSize: true,
+          }),
+        ]
+      : []),
+  ],
   // Project rule: single .env at repo root. Without this, Vite would
   // look for .env in apps/web/ and silently miss VITE_API_URL,
   // VITE_WS_URL, VITE_MAPTILER_KEY etc., shipping an empty-string

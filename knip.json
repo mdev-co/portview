@@ -1,0 +1,20 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "workspaces": {
+    "apps/web": {
+      "project": ["src/**/*.{ts,tsx}"],
+      "ignore": ["src/api/generated/**"]
+    },
+    "apps/api": {
+      "project": ["src/**/*.ts"]
+    },
+    "apps/edge-bridge": {
+      "project": ["src/**/*.ts"]
+    },
+    "packages/shared": {
+      "project": ["src/**/*.ts"]
+    }
+  },
+  "ignoreDependencies": ["@statelyai/inspect", "tw-animate-css"],
+  "ignoreExportsUsedInFile": true
+}
