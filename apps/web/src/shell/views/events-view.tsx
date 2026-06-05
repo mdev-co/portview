@@ -22,7 +22,7 @@ export function EventsView(): React.JSX.Element {
           <span className="text-muted-foreground font-mono text-[11px]">{events.length}</span>
         </GlassPanel.Actions>
       </GlassPanel.Header>
-      <GlassPanel.Body className="p-1">
+      <GlassPanel.Body className="flex flex-col gap-1.5 p-2">
         {events.length === 0 ? (
           <p className="text-muted-foreground p-4 text-sm">
             No geofence events yet. Vessels crossing a zone boundary appear here.
@@ -77,7 +77,7 @@ function EventRow({ event, vesselName, zoneLabel }: EventRowProps): React.JSX.El
       exit={{ opacity: 0 }}
       transition={{ type: 'spring', stiffness: 320, damping: 26 }}
       onClick={() => zoomToVessel(event.mmsi)}
-      className="group hover:bg-accent/40 relative flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left transition-colors"
+      className="group border-border/40 bg-card/40 hover:bg-accent/40 hover:border-border/70 relative flex w-full items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-colors"
     >
       <span
         aria-hidden
@@ -95,6 +95,7 @@ function EventRow({ event, vesselName, zoneLabel }: EventRowProps): React.JSX.El
           <span className="font-medium">{zoneLabel}</span>
         </p>
         <p className="text-muted-foreground/60 mt-0.5 font-mono text-[10px] tabular-nums">
+          {formatClockTime(event.at)} <span className="text-muted-foreground/40">·</span>{' '}
           {formatRelative(event.at)}
         </p>
       </div>
@@ -133,4 +134,14 @@ function formatRelative(timestampMs: number): string {
   if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
   if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`;
   return new Date(timestampMs).toISOString().slice(0, 16).replace('T', ' ');
+}
+
+/** HH:MM:SS local time of the AIS frame that triggered the event. */
+function formatClockTime(timestampMs: number): string {
+  const d = new Date(timestampMs);
+  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+}
+
+function pad2(n: number): string {
+  return n < 10 ? `0${n}` : `${n}`;
 }

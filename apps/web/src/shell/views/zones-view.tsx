@@ -59,7 +59,7 @@ export function ZonesView(): React.JSX.Element {
           <ZoneDrawToolbar />
         </GlassPanel.Actions>
       </GlassPanel.Header>
-      <GlassPanel.Body className="p-2">
+      <GlassPanel.Body className="flex flex-col gap-1.5 p-2">
         <AnimatePresence initial={false}>
           {collection.features.map(zone => (
             <ZoneRow
@@ -123,8 +123,10 @@ function ZoneRow({
       exit={{ opacity: 0, x: 12 }}
       transition={{ type: 'spring', stiffness: 320, damping: 26 }}
       className={cn(
-        'group relative rounded-lg px-3 py-2 transition-colors',
-        zone.properties.visible === false ? 'opacity-55' : 'hover:bg-accent/40',
+        'group border-border/40 bg-card/40 relative rounded-lg border px-3 py-2 transition-colors',
+        zone.properties.visible === false
+          ? 'opacity-55'
+          : 'hover:bg-accent/40 hover:border-border/70',
       )}
     >
       <span
