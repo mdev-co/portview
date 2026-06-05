@@ -172,7 +172,7 @@ function ZoneRow({
           ) : (
             <>
               <IconButton
-                onClick={() => onPatch({ visible: zone.properties.visible === false })}
+                onClick={() => onPatch({ visible: !(zone.properties.visible ?? true) })}
                 label={
                   zone.properties.visible === false
                     ? `Show ${zone.properties.label} on map`

@@ -49,6 +49,7 @@ export function DockVisibilityToggle(): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const [anchor, setAnchor] = useState<{ top: number; right: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const popoverRef = useRef<HTMLDivElement | null>(null);
 
   useLayoutEffect(() => {
     if (!open || triggerRef.current === null) return;
@@ -64,8 +65,7 @@ export function DockVisibilityToggle(): React.JSX.Element {
     function onClickOutside(e: MouseEvent): void {
       const target = e.target as Node;
       if (triggerRef.current?.contains(target)) return;
-      const popover = document.getElementById('dock-control-popover');
-      if (popover?.contains(target)) return;
+      if (popoverRef.current?.contains(target)) return;
       setOpen(false);
     }
     function onKey(e: KeyboardEvent): void {
@@ -102,7 +102,7 @@ export function DockVisibilityToggle(): React.JSX.Element {
         anchor !== null &&
         createPortal(
           <div
-            id="dock-control-popover"
+            ref={popoverRef}
             role="menu"
             style={{ top: anchor.top, right: anchor.right, width: POPOVER_WIDTH }}
             className="border-border bg-popover fixed z-[200] rounded-md border p-1 shadow-2xl backdrop-blur-xl"

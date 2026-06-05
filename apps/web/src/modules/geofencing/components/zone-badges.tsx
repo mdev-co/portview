@@ -1,5 +1,6 @@
+import { useMemo } from 'react';
 import { useStore } from '@nanostores/react';
-import type { ZoneId } from '@sps/shared';
+import type { Zone, ZoneId } from '@sps/shared';
 import { $geofencePresence } from '../state/geofence-membership.store';
 import { $geofenceZones } from '../state/geofence-zones.atom';
 
@@ -21,21 +22,37 @@ import { $geofenceZones } from '../state/geofence-zones.atom';
 export function ZoneBadges({ mmsi }: { readonly mmsi: number }): React.JSX.Element | null {
   const key = String(mmsi);
   const presence = useStore($geofencePresence, { keys: [key] });
+  // Subscribe to the zone collection ONCE per parent badge row
+  // instead of once per badge. Without this hoist a 100-vessel
+  // fleet sitting in 2 zones each subscribes 200 times to the same
+  // store, so a single zone rename triggers a 200-component re-
+  // render cascade. The Map lookup also collapses the per-badge
+  // O(N) `find` to O(1).
+  const zonesCollection = useStore($geofenceZones);
+  const zoneIndex = useMemo<ReadonlyMap<ZoneId, Zone>>(
+    () => new Map(zonesCollection.features.map(z => [z.properties.id, z])),
+    [zonesCollection],
+  );
   const zones = presence[key];
   if (zones === undefined || zones.length === 0) return null;
 
   return (
     <span className="flex flex-wrap items-center gap-1">
       {zones.map(id => (
-        <ZoneBadge key={id} zoneId={id} />
+        <ZoneBadge key={id} zoneId={id} zoneIndex={zoneIndex} />
       ))}
     </span>
   );
 }
 
-function ZoneBadge({ zoneId }: { readonly zoneId: ZoneId }): React.JSX.Element {
-  const zones = useStore($geofenceZones).features;
-  const zone = zones.find(z => z.properties.id === zoneId);
+function ZoneBadge({
+  zoneId,
+  zoneIndex,
+}: {
+  readonly zoneId: ZoneId;
+  readonly zoneIndex: ReadonlyMap<ZoneId, Zone>;
+}): React.JSX.Element {
+  const zone = zoneIndex.get(zoneId);
   if (zone === undefined) {
     return (
       <span className="border-border text-muted-foreground rounded border px-1 py-px font-mono text-[10px] tracking-wide">

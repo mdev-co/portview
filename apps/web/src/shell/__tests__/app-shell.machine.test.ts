@@ -89,4 +89,76 @@ describe('appShellMachine', () => {
     actor.send({ type: 'drawer.snap', snap: 'peek' });
     expect(actor.getSnapshot().context.presetId).toBe('classic');
   });
+
+  it('drawer.snap full also switches preset to events-focus', () => {
+    const actor = startActor();
+    actor.send({ type: 'drawer.snap', snap: 'full' });
+    const ctx = actor.getSnapshot().context;
+    expect(ctx.drawerSnap).toBe('full');
+    expect(ctx.presetId).toBe('events-focus');
+  });
+
+  it('drawer.snap hidden from classic stays classic (no preset thrash)', () => {
+    const actor = startActor();
+    actor.send({ type: 'drawer.snap', snap: 'hidden' });
+    const ctx = actor.getSnapshot().context;
+    expect(ctx.drawerSnap).toBe('hidden');
+    expect(ctx.presetId).toBe('classic');
+  });
+
+  it('drawer.snap hidden from a non-events-focus preset keeps that preset', () => {
+    const actor = startActor();
+    actor.send({ type: 'preset.swap', presetId: 'presentation' });
+    actor.send({ type: 'drawer.snap', snap: 'hidden' });
+    expect(actor.getSnapshot().context.presetId).toBe('presentation');
+  });
+
+  it('drawer.snap full -> mid keeps events-focus across both snaps', () => {
+    const actor = startActor();
+    actor.send({ type: 'drawer.snap', snap: 'full' });
+    actor.send({ type: 'drawer.snap', snap: 'mid' });
+    const ctx = actor.getSnapshot().context;
+    expect(ctx.drawerSnap).toBe('mid');
+    expect(ctx.presetId).toBe('events-focus');
+  });
+
+  it('detail.open while drawer is at mid keeps events-focus (drawer wins)', () => {
+    // Detail opening from events-focus is a parallel concern - the
+    // detail target gets stored but the preset stays at events-focus
+    // because detail-focus override fires only from `classic`.
+    const actor = startActor();
+    actor.send({ type: 'drawer.snap', snap: 'mid' });
+    actor.send({ type: 'detail.open', target: { kind: 'vessel', id: 261200870 } });
+    const ctx = actor.getSnapshot().context;
+    expect(ctx.presetId).toBe('events-focus');
+    expect(ctx.detailTarget).toEqual({ kind: 'vessel', id: 261200870 });
+    expect(ctx.drawerSnap).toBe('mid');
+  });
+
+  it('drawer.snap mid while detail-focus is active switches preset to events-focus', () => {
+    // Drawer transitions to mid/full unconditionally swap the preset
+    // to events-focus, even when detail-focus was the active preset.
+    // The detail target is preserved so the operator can re-open the
+    // detail surface by closing the drawer.
+    const actor = startActor();
+    actor.send({ type: 'detail.open', target: { kind: 'zone', id: 'anchorage-a' } });
+    expect(actor.getSnapshot().context.presetId).toBe('detail-focus');
+    actor.send({ type: 'drawer.snap', snap: 'mid' });
+    const ctx = actor.getSnapshot().context;
+    expect(ctx.presetId).toBe('events-focus');
+    expect(ctx.detailTarget).toEqual({ kind: 'zone', id: 'anchorage-a' });
+  });
+
+  it('detail.close after drawer.snap mid leaves events-focus untouched', () => {
+    // detail.close only reverts to classic when the active preset is
+    // detail-focus. After a drawer.snap to mid (which set events-focus),
+    // detail.close just clears the target without preset thrash.
+    const actor = startActor();
+    actor.send({ type: 'detail.open', target: { kind: 'vessel', id: 1 } });
+    actor.send({ type: 'drawer.snap', snap: 'mid' });
+    actor.send({ type: 'detail.close' });
+    const ctx = actor.getSnapshot().context;
+    expect(ctx.detailTarget).toBeNull();
+    expect(ctx.presetId).toBe('events-focus');
+  });
 });

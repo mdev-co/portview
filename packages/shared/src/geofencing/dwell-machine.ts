@@ -201,8 +201,18 @@ export function computePresence(state: MembershipState): GeofencePresence {
   return presence;
 }
 
+/**
+ * Subset of `GeofenceEvent['kind']` that the transition path can
+ * actually produce. `ghost-exit` is excluded because the dwell
+ * transition state machine has no way to compute the `silentForMs`
+ * dimension that ghost-exit carries - those events come exclusively
+ * from `sweepGhosts`. Narrowing this here keeps the emitter total
+ * and free of an unreachable branch.
+ */
+type TransitionEventKind = 'enter' | 'exit';
+
 type TransitionResult = {
-  readonly event: GeofenceEvent['kind'] | null;
+  readonly event: TransitionEventKind | null;
   readonly entry: MembershipEntry | null;
 };
 
@@ -304,10 +314,7 @@ function computeTransition(
   };
 }
 
-function emitEvent(kind: GeofenceEvent['kind'], mmsi: Mmsi, id: ZoneId, at: number): GeofenceEvent {
+function emitEvent(kind: TransitionEventKind, mmsi: Mmsi, id: ZoneId, at: number): GeofenceEvent {
   if (kind === 'enter') return { kind: 'enter', mmsi, zoneId: id, at };
-  if (kind === 'exit') return { kind: 'exit', mmsi, zoneId: id, at };
-  // 'ghost-exit' is emitted only from sweepGhosts; the transition
-  // path never produces it directly. Keep the union total.
-  return { kind: 'ghost-exit', mmsi, zoneId: id, at, silentForMs: 0 };
+  return { kind: 'exit', mmsi, zoneId: id, at };
 }

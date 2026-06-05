@@ -105,7 +105,15 @@ export function membershipKey(mmsi: Mmsi, id: ZoneId): MembershipKey {
 }
 
 export function parseMembershipKey(key: MembershipKey): { mmsi: Mmsi; zoneId: ZoneId } | null {
-  const [mmsiStr, idStr] = key.split('|');
+  // Defensive parse for keys that may have arrived from storage,
+  // network, or replay - not just freshly built via membershipKey().
+  // The atom validator (setGeofenceZones) rejects zone ids containing
+  // "|", so a well-formed key has exactly one separator. Anything
+  // else is corruption that should be skipped rather than silently
+  // truncated.
+  const parts = key.split('|');
+  if (parts.length !== 2) return null;
+  const [mmsiStr, idStr] = parts;
   if (mmsiStr === undefined || idStr === undefined) return null;
   const mmsiNum = Number(mmsiStr);
   if (!Number.isFinite(mmsiNum)) return null;
