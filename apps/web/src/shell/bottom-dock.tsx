@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { motion } from 'framer-motion';
 import { Activity, Hexagon, type LucideIcon, Ship } from 'lucide-react';
@@ -38,6 +38,19 @@ export function BottomDock(): React.JSX.Element | null {
   const { state, send } = useAppShell();
   const [hoverExpanded, setHoverExpanded] = useState(false);
   const collapseTimerRef = useRef<number | null>(null);
+
+  // Clear the pending collapse timeout if the dock unmounts mid-hover
+  // (preset swap to `presentation` flips dockMode to `hidden`, the
+  // component returns null at the top, and the timer would otherwise
+  // fire `setHoverExpanded(false)` against a torn-down instance).
+  useEffect(() => {
+    return () => {
+      if (collapseTimerRef.current !== null) {
+        window.clearTimeout(collapseTimerRef.current);
+        collapseTimerRef.current = null;
+      }
+    };
+  }, []);
 
   if (state.dockMode === 'hidden') return null;
 
