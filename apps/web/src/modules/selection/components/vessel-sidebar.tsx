@@ -36,7 +36,7 @@ const SIDEBAR_TEXT = {
 
 const styles = {
   sidebar:
-    'bg-card text-card-foreground border-border flex h-full w-[400px] shrink-0 flex-col overflow-hidden border-r [scrollbar-gutter:stable]',
+    'bg-card text-card-foreground border-border flex h-full w-full min-w-0 shrink-0 flex-col overflow-hidden border-r [scrollbar-gutter:stable]',
   outerScroll:
     'flex-1 overflow-y-auto [scrollbar-gutter:stable] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-border/60 [&::-webkit-scrollbar-track]:bg-transparent',
   list: 'divide-border/50 divide-y',

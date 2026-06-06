@@ -1,6 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import { type ReactNode, createContext, memo, useContext, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
+import { ZoneBadges } from '@/modules/geofencing';
 import { useMapEngine } from '@/modules/map/hooks/use-map-engine';
 import { getVesselDisplayPosition } from '@/modules/map/lib/vessel-display-position';
 import { toggleTrailForVessel } from '@/modules/map/state/trail-visibility';
@@ -309,6 +310,7 @@ function Label() {
         {speedSuffix}
         {courseSuffix}
       </span>
+      <ZoneBadges mmsi={vessel.mmsi} />
     </span>
   );
 }

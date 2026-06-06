@@ -55,6 +55,15 @@ body,
 }
 
 :root {
+  /*
+   * Distinct surface for the app shell chrome (header, future
+   * footer). In light theme we want a noticeably darker shade than
+   * `--background` so the header reads as its own surface instead
+   * of blending into the map area; in dark theme it sits a touch
+   * lighter than the background for the same reason.
+   */
+  --shell-surface: oklch(0.91 0.025 252);
+  --shell-surface-edge: oklch(0.84 0.03 252);
   --background: oklch(0.99 0.005 250);
   --foreground: oklch(0.18 0.02 250);
   --card: oklch(1 0 0);
@@ -90,6 +99,8 @@ body,
 }
 
 .dark {
+  --shell-surface: oklch(0.225 0.028 252);
+  --shell-surface-edge: oklch(0.3 0.03 252);
   --background: oklch(0.16 0.02 250);
   --foreground: oklch(0.97 0.01 250);
   --card: oklch(0.21 0.025 252);
@@ -133,4 +144,74 @@ body,
   html {
     @apply font-sans;
   }
+}
+
+/*
+ * MapLibre attribution control - compact "i" badge in the corner.
+ *
+ * Required by the OpenStreetMap Tile Usage Policy: any application
+ * serving OSM tiles MUST display attribution to "OpenStreetMap
+ * contributors". CARTO, Esri, MapTiler and OpenSeaMap require the
+ * same. Hiding the control would be a licence violation, so the
+ * default MapLibre badge stays visible. `attributionMode: 'compact'`
+ * (configured in map-canvas.tsx) renders a 22 px "i" button that
+ * expands to the full text on click; the styles below soften it
+ * (rounded, semi-transparent, low contrast) so it does not compete
+ * with operator UI for attention while remaining legible.
+ */
+html .maplibregl-ctrl-attrib.maplibregl-compact {
+  background: color-mix(in oklch, var(--background) 65%, transparent);
+  backdrop-filter: blur(6px);
+  border-radius: 9999px;
+  min-height: 22px;
+}
+html .maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-button {
+  background-color: transparent;
+  background-image: none;
+  color: var(--muted-foreground);
+  font:
+    600 13px/1 ui-sans-serif,
+    system-ui,
+    sans-serif;
+}
+html .maplibregl-ctrl-attrib.maplibregl-compact .maplibregl-ctrl-attrib-button::before {
+  content: 'i';
+}
+html .maplibregl-ctrl-attrib.maplibregl-compact-show .maplibregl-ctrl-attrib-inner {
+  color: var(--foreground);
+  font-size: 11px;
+}
+
+/*
+ * Sonner toast accent strip per kind.
+ *
+ * Sonner colour-token overrides (--normal-bg, --normal-text, etc)
+ * happen on the Toaster component's `style` prop where inline
+ * styles take precedence cleanly. The remaining piece is the
+ * 2-px tinted strip on the left edge that telegraphs the toast
+ * kind without saturated bg colours. Specificity (3 attribute
+ * selectors) beats sonner's defaults.
+ */
+[data-sonner-toaster] [data-sonner-toast][data-styled='true']::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 6px;
+  width: 2px;
+  height: 18px;
+  transform: translateY(-50%);
+  border-radius: 2px;
+  background: color-mix(in oklch, var(--muted-foreground) 60%, transparent);
+}
+[data-sonner-toaster] [data-sonner-toast][data-styled='true'][data-type='info']::before {
+  background: color-mix(in oklch, var(--primary) 75%, transparent);
+}
+[data-sonner-toaster] [data-sonner-toast][data-styled='true'][data-type='warning']::before {
+  background: color-mix(in oklch, oklch(0.74 0.16 75) 75%, transparent);
+}
+[data-sonner-toaster] [data-sonner-toast][data-styled='true'][data-type='success']::before {
+  background: color-mix(in oklch, oklch(0.72 0.16 155) 75%, transparent);
+}
+[data-sonner-toaster] [data-sonner-toast][data-styled='true'][data-type='error']::before {
+  background: color-mix(in oklch, var(--destructive) 75%, transparent);
 }

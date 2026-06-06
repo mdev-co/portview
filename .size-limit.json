@@ -1,0 +1,25 @@
+[
+  {
+    "name": "initial paint bundle (index + vendor-react + vendor-state + vendor-motion)",
+    "path": [
+      "apps/web/dist/assets/index-*.js",
+      "apps/web/dist/assets/vendor-react-*.js",
+      "apps/web/dist/assets/vendor-state-*.js",
+      "apps/web/dist/assets/vendor-motion-*.js"
+    ],
+    "limit": "300 KB",
+    "gzip": true
+  },
+  {
+    "name": "vendor-map lazy chunk (maplibre engine, only loaded on /)",
+    "path": "apps/web/dist/assets/vendor-map-*.js",
+    "limit": "320 KB",
+    "gzip": true
+  },
+  {
+    "name": "tailwind CSS",
+    "path": "apps/web/dist/assets/index-*.css",
+    "limit": "15 KB",
+    "gzip": true
+  }
+]

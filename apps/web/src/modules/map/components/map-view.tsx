@@ -1,3 +1,4 @@
+import { ZoneLayer } from '@/modules/geofencing/components/zone-layer';
 import type { MapStatus } from '../core/map-state';
 import { useMapState } from '../hooks/use-map-state';
 import { useMapStyleSync } from '../hooks/use-map-style-sync';
@@ -24,6 +25,7 @@ export function MapView() {
   return (
     <div className="relative h-full w-full">
       <MapCanvas />
+      <ZoneLayer />
       <VesselLayer />
       {label !== null && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
