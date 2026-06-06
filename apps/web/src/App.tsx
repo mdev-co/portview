@@ -1,4 +1,6 @@
+import { useEffect } from 'react';
 import { RouterProvider, createBrowserRouter } from 'react-router-dom';
+import { DemoToggleButton, installDemoController, uninstallDemoController } from '@/modules/demo';
 import { GeofenceToasterPortal } from '@/modules/geofencing';
 import { MapStatusPill } from '@/modules/map/components/map-status-pill';
 import { MapStyleSwitcher } from '@/modules/map/components/map-style-switcher';
@@ -54,6 +56,7 @@ const router = createBrowserRouter([
                   <SeamarkToggle />
                   <TrailsToggle />
                   <ThreeDToggleButton />
+                  <DemoToggleButton />
                 </div>
                 <div className="border-border bg-background inline-flex h-9 items-center gap-1 rounded-md border px-2 text-xs">
                   <span
@@ -82,6 +85,10 @@ const router = createBrowserRouter([
 ]);
 
 function App() {
+  useEffect(() => {
+    installDemoController();
+    return () => uninstallDemoController();
+  }, []);
   return (
     <>
       <RouterProvider router={router} />
