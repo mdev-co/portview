@@ -3,10 +3,12 @@ import {
   BASE_BACKDROP_LAYER_ID,
   BASE_OSM_DARK_LAYER_ID,
   BASE_OSM_LIGHT_LAYER_ID,
+  BASE_PRESENTATION_LAYER_ID,
   BASE_SATELLITE_LAYER_ID,
   BASE_TACTICAL_LAYER_ID,
   BASE_USGS_IMAGERY_TOPO_LAYER_ID,
   BASE_USGS_TOPO_LAYER_ID,
+  PRESENTATION_GRID_LAYER_ID,
   SEAMARK_OVERLAY_LAYER_ID,
 } from '../styles/osm-raster-style';
 
@@ -40,6 +42,7 @@ export const MAP_STYLE_IDS = [
   'tactical',
   'backdrop',
   'satellite',
+  'presentation',
 ] as const;
 export type MapStyleId = (typeof MAP_STYLE_IDS)[number];
 
@@ -106,6 +109,19 @@ export const MAP_STYLE_REGISTRY: Record<MapStyleId, MapStyleDescriptor> = {
     baseLayerId: BASE_SATELLITE_LAYER_ID,
     overlayLayerIds: [SEAMARK_OVERLAY_LAYER_ID],
   },
+  presentation: {
+    id: 'presentation',
+    label: 'Presentation',
+    description:
+      'CARTO Positron No Labels - greyscale chart with every street and place name stripped, plus a faint coordinate grid. Optimised for the Airspace-Intelligence-style demo view: the basemap reads as pure topology, zones keep their full colour, and the 3D flagship models pop on top.',
+    baseLayerId: BASE_PRESENTATION_LAYER_ID,
+    // Grid lines are exclusive to presentation; seamarks stay opt-in
+    // and follow the global `$seamarkVisible` toggle the same way they
+    // do on every other base style. The descriptor lists them so the
+    // sync hook can flip them visible when the operator asks - the
+    // visibility AND with the toggle still keeps them off by default.
+    overlayLayerIds: [PRESENTATION_GRID_LAYER_ID, SEAMARK_OVERLAY_LAYER_ID],
+  },
 };
 
 /** Every base layer the style spec declares; used for the off-toggle loop. */
@@ -122,7 +138,7 @@ export const ALL_OVERLAY_LAYER_IDS: readonly string[] = Array.from(
   new Set(MAP_STYLE_IDS.flatMap(id => MAP_STYLE_REGISTRY[id].overlayLayerIds)),
 );
 
-export const DEFAULT_MAP_STYLE: MapStyleId = 'osm-dark';
+export const DEFAULT_MAP_STYLE: MapStyleId = 'presentation';
 
 export const $activeMapStyle = atom<MapStyleId>(DEFAULT_MAP_STYLE);
 

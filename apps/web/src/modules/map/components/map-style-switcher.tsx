@@ -7,6 +7,7 @@ import {
   Map as MapIcon,
   Moon,
   MountainSnow,
+  Presentation,
   Satellite,
   TreePine,
 } from 'lucide-react';
@@ -37,6 +38,7 @@ const STYLE_ICONS: Record<MapStyleId, LucideIcon> = {
   tactical: Crosshair,
   backdrop: Layers,
   satellite: Satellite,
+  presentation: Presentation,
 };
 
 export function MapStyleSwitcher() {

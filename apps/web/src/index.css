@@ -183,6 +183,28 @@ html .maplibregl-ctrl-attrib.maplibregl-compact-show .maplibregl-ctrl-attrib-inn
 }
 
 /*
+ * Horizon background. With pitch enabled, the MapLibre canvas does
+ * not fill the area beyond the basemap extent (above the horizon
+ * line), revealing whatever is behind the canvas. The container
+ * `<div>` that wraps the canvas paints a deep-to-light blue
+ * atmospheric gradient so the sky reads as real haze rather than
+ * pure black, regardless of the active basemap (dark / light /
+ * presentation).
+ */
+html .maplibregl-map {
+  background: linear-gradient(
+    to bottom,
+    oklch(0.28 0.09 248) 0%,
+    oklch(0.45 0.11 238) 20%,
+    oklch(0.62 0.1 228) 40%,
+    oklch(0.78 0.08 220) 60%,
+    oklch(0.88 0.05 215) 78%,
+    oklch(0.92 0.025 95) 92%,
+    oklch(0.86 0.04 65) 100%
+  );
+}
+
+/*
  * Sonner toast accent strip per kind.
  *
  * Sonner colour-token overrides (--normal-bg, --normal-text, etc)
