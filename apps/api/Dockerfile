@@ -97,11 +97,18 @@ RUN chmod +x /docker-entrypoint.sh
 
 EXPOSE 3000
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+# start-period mirrors fly.toml grace_period - cold boot through
+# tailscale + cert + nest takes ~30 s on Fly's shared 1-vCPU machine
+# (prisma migrate moved to fly.toml [deploy].release_command and no
+# longer runs in the boot path). 60 s is 2x that floor; Fly itself
+# clamps the corresponding http_service.checks.grace_period to 60 s
+# so keeping them aligned avoids docker-side criticals firing while
+# fly-side checks are still patient.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 \
   CMD node -e "fetch('http://localhost:3000/').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
 
 # tini owns PID 1; docker-entrypoint.sh sets up certs + tailnet before
 # exec-ing the upstream CMD. Both run before the Node app starts so
 # /tmp/certs and the tailnet interface are in place when Nest boots.
 ENTRYPOINT ["/sbin/tini", "--", "/docker-entrypoint.sh"]
-CMD ["sh", "-c", "npx prisma migrate deploy --schema=prisma/schema.prisma && node dist/src/main.js"]
+CMD ["node", "dist/src/main.js"]
