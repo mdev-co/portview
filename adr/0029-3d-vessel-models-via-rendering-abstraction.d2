@@ -1,0 +1,64 @@
+# D2 source for ADR-0029 diagram. Render with:
+#   d2 adr/0029-3d-vessel-models-via-rendering-abstraction.d2 \
+#      adr/0029-3d-vessel-models-via-rendering-abstraction.png \
+#      --theme=8 --pad=20
+# GitHub does not render D2 natively; the .png next to this file is
+# the embed target.
+
+direction: down
+
+ws: WebSocket telemetry {
+  shape: cylinder
+}
+
+stores: Nano Stores hot path {
+  vessels: $vessels (map)
+  history: $vesselPositionHistory (map)
+}
+
+ws -> stores.vessels: AIS frames
+
+demo: Demo controller {
+  shape: hexagon
+}
+
+demo -> stores.vessels: synthetic\nrAF inject
+
+flagship: Flagship3DLayer (RAL consumer) {
+  shape: rectangle
+}
+
+stores.vessels -> flagship: per-key listen
+
+flagship -> engine: setVessels(RenderableVessel[])
+
+engine: IGeospatialRenderEngine {
+  shape: package
+  attach
+  setVessels
+  detach
+}
+
+deck: DeckGlEngine (concrete) {
+  shape: rectangle
+  overlay: MapboxOverlay\n(interleaved: false)
+  scenegraph: ScenegraphLayer\nper model URL
+}
+
+engine -> deck: only file that imports deck.gl
+
+map: MapLibre map {
+  shape: page
+  basemap: Raster basemap
+  vessels2d: 2D vessel symbols (circle, arrow, label, rings)
+  trails: Trail polyline
+}
+
+deck -> map: addControl(overlay)
+
+hider: Flagship2DHider {
+  shape: diamond
+}
+
+stores.vessels -> hider: 3D toggle on/off
+hider -> map.vessels2d: setPaintProperty\nopacity = case isFlagship 0 baseline
