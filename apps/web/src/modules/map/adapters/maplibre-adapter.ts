@@ -59,6 +59,11 @@ export class MapLibreAdapter implements IMapEngineAdapter {
       style: config.style as string | StyleSpecification,
       center: [longitude, latitude],
       zoom: config.view.zoom,
+      // Allow tilting the camera all the way to the horizon. Default
+      // MapLibre caps at 60 deg which forbids the Airspace Intelligence
+      // "looking across the harbour" perspective the operator demo
+      // wants. 85 keeps us shy of the singular case at 90.
+      maxPitch: 85,
       attributionControl: toAttributionControl(config.attributionMode),
     };
     if (config.view.bearing !== undefined) {

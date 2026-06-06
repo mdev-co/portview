@@ -125,7 +125,7 @@ function zoomToVessel(mmsi: number): void {
   const vessel = $vessels.get()[mmsi];
   if (vessel === undefined) return;
   if (vessel.lng === null || vessel.lat === null) return;
-  MapController.getInstance().flyTo([vessel.lng, vessel.lat], 14);
+  MapController.getInstance().flyTo([vessel.lng, vessel.lat], 17);
 }
 
 function formatRelative(timestampMs: number): string {

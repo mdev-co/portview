@@ -7,7 +7,7 @@ import { type GeofenceEvent, type ZoneId, isInsideZone } from '@sps/shared';
 import { $geofenceEvents } from '../state/geofence-events.store';
 import { $geofenceZones } from '../state/geofence-zones.atom';
 
-const ZOOM_TO_VESSEL_LEVEL = 15;
+const ZOOM_TO_VESSEL_LEVEL = 17;
 const EXIT_TOAST_DURATION_MS = 6_000;
 const SUMMARY_TOAST_DELAY_MS = 4_000;
 const SUMMARY_TOAST_DURATION_MS = 8_000;

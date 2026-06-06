@@ -134,6 +134,14 @@ export default defineConfig(({ command }) => ({
                 if (/node_modules\/maplibre-gl\//.test(id)) {
                   return 'vendor-map';
                 }
+                // deck.gl + loaders.gl + luma.gl get their own chunk
+                // so the 3D engine ships only when MapView lazy-loads
+                // AND only when the operator has the 3D toggle on.
+                // Keeping it OUT of vendor-map means switching 3D off
+                // can never recover bytes that were already shipped.
+                if (/node_modules\/(deck\.gl|@deck\.gl|@luma\.gl|@loaders\.gl)\//.test(id)) {
+                  return 'vendor-3d';
+                }
                 if (/node_modules\/(framer-motion|motion(-dom|-utils)?)\//.test(id)) {
                   return 'vendor-motion';
                 }

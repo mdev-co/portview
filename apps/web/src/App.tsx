@@ -1,8 +1,11 @@
+import { useEffect } from 'react';
 import { RouterProvider, createBrowserRouter } from 'react-router-dom';
+import { DemoToggleButton, installDemoController, uninstallDemoController } from '@/modules/demo';
 import { GeofenceToasterPortal } from '@/modules/geofencing';
 import { MapStatusPill } from '@/modules/map/components/map-status-pill';
 import { MapStyleSwitcher } from '@/modules/map/components/map-style-switcher';
 import { SeamarkToggle } from '@/modules/map/components/seamark-toggle';
+import { ThreeDToggleButton } from '@/modules/map/components/three-d-toggle-button';
 import { TrailsToggle } from '@/modules/map/components/trails-toggle';
 import { ThemeToggle } from '@/modules/theme';
 import { IndexRoute } from '@/routes/index-route';
@@ -52,6 +55,8 @@ const router = createBrowserRouter([
                   <span aria-hidden className="bg-border mx-1 h-4 w-px" />
                   <SeamarkToggle />
                   <TrailsToggle />
+                  <ThreeDToggleButton />
+                  <DemoToggleButton />
                 </div>
                 <div className="border-border bg-background inline-flex h-9 items-center gap-1 rounded-md border px-2 text-xs">
                   <span
@@ -80,6 +85,10 @@ const router = createBrowserRouter([
 ]);
 
 function App() {
+  useEffect(() => {
+    installDemoController();
+    return () => uninstallDemoController();
+  }, []);
   return (
     <>
       <RouterProvider router={router} />

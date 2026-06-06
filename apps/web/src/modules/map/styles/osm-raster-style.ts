@@ -37,6 +37,7 @@ export const BASE_USGS_TOPO_LAYER_ID = 'base-usgs-topo' as const;
 export const BASE_TACTICAL_LAYER_ID = 'base-tactical' as const;
 export const BASE_BACKDROP_LAYER_ID = 'base-backdrop' as const;
 export const BASE_SATELLITE_LAYER_ID = 'base-satellite' as const;
+export const BASE_PRESENTATION_LAYER_ID = 'base-presentation' as const;
 
 /**
  * OpenSeaMap raster overlay layer id. Declared once here next to the
@@ -46,6 +47,35 @@ export const BASE_SATELLITE_LAYER_ID = 'base-satellite' as const;
  * of the overlay now touches a single export, not four files.
  */
 export const SEAMARK_OVERLAY_LAYER_ID = 'overlay-seamark' as const;
+
+/**
+ * Grid overlay shown only in the Presentation map mode. Reads as a
+ * mission-control coordinate grid, reinforcing the Airspace
+ * Intelligence look without competing with the actual chart content.
+ * The lines themselves are generated below from a regular lat/lng
+ * raster covering the Szczecin operating area at ~0.005 deg spacing
+ * (~350 m at this latitude).
+ */
+export const PRESENTATION_GRID_SOURCE_ID = 'presentation-grid' as const;
+export const PRESENTATION_GRID_LAYER_ID = 'overlay-presentation-grid' as const;
+
+/**
+ * 3D port buildings overlay. Real OpenStreetMap building footprints
+ * (top 30 by height inside the Szczecin port bbox) baked into a
+ * static GeoJSON shipped from `public/port-buildings.geojson`. Source
+ * is the same OSM dataset that powers the basemap raster, so the
+ * fill-extrusion bases land pixel-perfect on the building outlines
+ * visible in the tile pyramid — no eye-balled coordinate drift. The
+ * height filter (>= 15 m after `building:levels * 3` fallback) keeps
+ * residential sheds out and leaves the tall skyline: Hanza Tower,
+ * Elewator Ewa, Wieża Węglowa and the riverfront landmark stack.
+ * Each feature carries a single property `h` (rounded metres) so the
+ * paint expression reads it directly without an OSM-tag fallback
+ * dance at draw time.
+ */
+export const PORT_BUILDINGS_SOURCE_ID = 'port-buildings' as const;
+export const PORT_BUILDINGS_LAYER_ID = 'overlay-port-buildings' as const;
+const PORT_BUILDINGS_DATA_URL = '/port-buildings.geojson' as const;
 
 /**
  * Age threshold above which a vessel's stroke colour shifts to the
@@ -211,8 +241,77 @@ const opacityByAge: ExpressionSpecification = [
  */
 const opacityCombined: ExpressionSpecification = ['*', opacityByAge, opacityBySource];
 
+/**
+ * Pre-baked GeoJSON grid covering the Szczecin operating area at a
+ * regular ~0.005 deg spacing (~350 m at this latitude). 22 horizontal
+ * + 22 vertical lines = 44 features; tiny payload, infinite zoom
+ * because they are vector lines, not raster.
+ *
+ * Bounds derived from the harbour centre +/- 0.06 deg so the grid
+ * comfortably covers everything from Reda Polnocna in the north to
+ * Reda Poludniowa in the south.
+ */
+function buildPresentationGrid(): GeoJSON.FeatureCollection<GeoJSON.LineString> {
+  const lat0 = 53.43 - 0.06;
+  const lat1 = 53.43 + 0.06;
+  const lng0 = 14.55 - 0.07;
+  const lng1 = 14.55 + 0.07;
+  const step = 0.005;
+  const features: GeoJSON.Feature<GeoJSON.LineString>[] = [];
+  for (let lat = lat0; lat <= lat1 + 1e-9; lat += step) {
+    features.push({
+      type: 'Feature',
+      properties: { axis: 'parallel' },
+      geometry: {
+        type: 'LineString',
+        coordinates: [
+          [lng0, lat],
+          [lng1, lat],
+        ],
+      },
+    });
+  }
+  for (let lng = lng0; lng <= lng1 + 1e-9; lng += step) {
+    features.push({
+      type: 'Feature',
+      properties: { axis: 'meridian' },
+      geometry: {
+        type: 'LineString',
+        coordinates: [
+          [lng, lat0],
+          [lng, lat1],
+        ],
+      },
+    });
+  }
+  return { type: 'FeatureCollection', features };
+}
+
+const PRESENTATION_GRID_GEOJSON = buildPresentationGrid();
+
 export const osmRasterStyle: StyleSpecification = {
   version: 8,
+  /**
+   * MapLibre 5 sky + fog. Renders behind the world geometry with full
+   * knowledge of the camera matrix (pitch, fov, zoom), so the horizon
+   * sits on the actual horizon line of the projection - NOT on a fixed
+   * fraction of the screen the way a CSS pseudo-element does. The
+   * fog-ground-blend value controls how far the haze creeps down onto
+   * the basemap tiles, softening the seam where the rendered world
+   * meets the rendered sky; the resulting gradient travels with the
+   * camera as the operator pitches or zooms. The container `<div>`
+   * keeps its CSS gradient as a backstop for the rare case where the
+   * sky paint pass is skipped (WebGL context lost, etc.).
+   */
+  sky: {
+    'sky-color': '#2c4068',
+    'sky-horizon-blend': 0.5,
+    'horizon-color': '#c7d2dc',
+    'horizon-fog-blend': 0.55,
+    'fog-color': '#e8eef3',
+    'fog-ground-blend': 0.25,
+    'atmosphere-blend': 0.85,
+  },
   /**
    * Eight raster sources cover seven map style modes plus the seamark
    * overlay. Four are public XYZ endpoints with no key (OpenStreetMap
@@ -233,6 +332,33 @@ export const osmRasterStyle: StyleSpecification = {
       tileSize: 256,
       attribution: '\u00a9 OpenStreetMap contributors',
       maxzoom: 19,
+    },
+    /**
+     * Carto "Positron No Labels" - greyscale OSM raster with every
+     * place / road label stripped. Ideal Airspace-Intelligence-style
+     * presentation backdrop: the chart reads as topology only, all
+     * attention budget goes to the live actors (vessels, zones,
+     * flagship 3D models). Same EU CDN as the other CARTO tiles.
+     */
+    'carto-positron-nolabels': {
+      type: 'raster',
+      tiles: [
+        'https://a.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png',
+        'https://b.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png',
+        'https://c.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png',
+        'https://d.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png',
+      ],
+      tileSize: 256,
+      attribution: '\u00a9 OpenStreetMap contributors \u00a9 CARTO',
+      maxzoom: 20,
+    },
+    [PRESENTATION_GRID_SOURCE_ID]: {
+      type: 'geojson',
+      data: PRESENTATION_GRID_GEOJSON,
+    },
+    [PORT_BUILDINGS_SOURCE_ID]: {
+      type: 'geojson',
+      data: PORT_BUILDINGS_DATA_URL,
     },
     'carto-dark-matter': {
       type: 'raster',
@@ -321,16 +447,47 @@ export const osmRasterStyle: StyleSpecification = {
     /**
      * Base raster layers. Exactly one is `visible` per active mode;
      * the map-style sync hook toggles `layout.visibility` on switch.
-     * Initial state reflects DEFAULT_MAP_STYLE = 'osm-light' so the
-     * OpenStreetMap Mapnik base is the only one fetched on first paint.
+     * Initial state reflects DEFAULT_MAP_STYLE = 'presentation' so the
+     * CARTO Positron no-labels base is the only one fetched on first
+     * paint and the operator sees no OSM light flash before the sync
+     * hook lands.
      */
     makeBaseRasterLayer(BASE_OSM_DARK_LAYER_ID, 'carto-dark-matter', 'none'),
-    makeBaseRasterLayer(BASE_OSM_LIGHT_LAYER_ID, 'osm-mapnik', 'visible'),
+    makeBaseRasterLayer(BASE_OSM_LIGHT_LAYER_ID, 'osm-mapnik', 'none'),
     makeBaseRasterLayer(BASE_USGS_IMAGERY_TOPO_LAYER_ID, 'esri-world-imagery', 'none'),
     makeBaseRasterLayer(BASE_USGS_TOPO_LAYER_ID, 'esri-world-topo', 'none'),
     makeBaseRasterLayer(BASE_TACTICAL_LAYER_ID, 'maptiler-dataviz-dark', 'none'),
     makeBaseRasterLayer(BASE_BACKDROP_LAYER_ID, 'maptiler-backdrop-dark', 'none'),
     makeBaseRasterLayer(BASE_SATELLITE_LAYER_ID, 'maptiler-satellite', 'none'),
+    makeBaseRasterLayer(BASE_PRESENTATION_LAYER_ID, 'carto-positron-nolabels', 'visible'),
+    {
+      id: PRESENTATION_GRID_LAYER_ID,
+      type: 'line',
+      source: PRESENTATION_GRID_SOURCE_ID,
+      // Visible on initial paint to match DEFAULT_MAP_STYLE = 'presentation';
+      // the sync hook handles toggling on style switch.
+      layout: { visibility: 'visible' },
+      paint: {
+        'line-color': 'rgba(15, 23, 42, 0.22)',
+        'line-width': 1,
+        'line-dasharray': [4, 4],
+      },
+    },
+    {
+      id: PORT_BUILDINGS_LAYER_ID,
+      type: 'fill-extrusion',
+      source: PORT_BUILDINGS_SOURCE_ID,
+      paint: {
+        // Mid-slate fill that reads as built mass without competing
+        // for attention with vessels and zones. Vertical face shading
+        // is enabled by default in MapLibre, giving lit/shadow sides
+        // automatically based on the camera bearing.
+        'fill-extrusion-color': '#94a3b8',
+        'fill-extrusion-height': ['get', 'h'],
+        'fill-extrusion-base': 0,
+        'fill-extrusion-opacity': 0.85,
+      },
+    },
     /**
      * Seamark overlay. Drawn at reduced opacity and gated above zoom
      * 9 so the marker density at country / region zoom does not
@@ -364,8 +521,15 @@ export const osmRasterStyle: StyleSpecification = {
       },
       paint: {
         'line-color': fillColorByMovementAndCategory,
-        'line-width': ['interpolate', ['linear'], ['zoom'], 8, 1.2, 14, 1.8, 18, 2.4],
-        'line-opacity': ['case', isSelected, 0.85, 0.45],
+        // Thicker + zoom-aware: at port zoom (z=14-17) the trail is
+        // ~3-4 px so it reads cleanly on the desaturated Presentation
+        // basemap and against the pitched 3D view. Stays slim at low
+        // zoom to avoid clutter when the whole estuary is visible.
+        'line-width': ['interpolate', ['linear'], ['zoom'], 8, 1.8, 14, 3.2, 18, 4.5],
+        // Bumped baseline opacity; the selected trail still pops at
+        // 0.95. The jagged "stair-step" look on a faint trail goes
+        // away once the line is opaque enough to anti-alias cleanly.
+        'line-opacity': ['case', isSelected, 0.95, 0.7],
       },
     },
     /**
