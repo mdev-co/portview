@@ -1,0 +1,17 @@
+3D vessel models in this directory:
+
+- fairplay-xii.glb
+  Source: "Tugboat" by Poly by Google (Poly Pizza)
+  Page: https://poly.pizza/m/eEbXA8_6MeJ
+  License: CC-BY 3.0
+  Attribution required: "Tugboat by Poly by Google" with link.
+
+- queen-of-szczecin.glb
+  Source: "Cruise Ship" by Quaternius (Poly Pizza)
+  Page: https://poly.pizza/m/yq9EKmEmfC
+  License: CC0 / public domain
+  No attribution required, included here for completeness.
+
+Both models are used as visual stand-ins for the AIS-tracked vessels
+QUEEN OF SZCZECIN (MMSI 261182777) and FAIRPLAY XII (MMSI 261000536)
+in the sps-radar.pl 3D flagship layer.

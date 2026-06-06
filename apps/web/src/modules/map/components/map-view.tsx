@@ -1,4 +1,5 @@
 import { ZoneLayer } from '@/modules/geofencing/components/zone-layer';
+import { Flagship3DLayer } from '../3d/flagship-3d-layer';
 import type { MapStatus } from '../core/map-state';
 import { useMapState } from '../hooks/use-map-state';
 import { useMapStyleSync } from '../hooks/use-map-style-sync';
@@ -27,6 +28,7 @@ export function MapView() {
       <MapCanvas />
       <ZoneLayer />
       <VesselLayer />
+      <Flagship3DLayer />
       {label !== null && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <div

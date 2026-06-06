@@ -17,6 +17,12 @@
     "gzip": true
   },
   {
+    "name": "vendor-3d lazy chunk (deck.gl + luma.gl + loaders.gl)",
+    "path": "apps/web/dist/assets/vendor-3d-*.js",
+    "limit": "260 KB",
+    "gzip": true
+  },
+  {
     "name": "tailwind CSS",
     "path": "apps/web/dist/assets/index-*.css",
     "limit": "15 KB",
