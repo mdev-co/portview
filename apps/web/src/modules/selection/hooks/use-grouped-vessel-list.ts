@@ -40,9 +40,14 @@ export function useGroupedVesselList(): readonly VesselGroup[] {
     for (const status of GROUP_ORDER) {
       buckets[status].sort((a, b) => compareVesselsForSidebar(a, b, staticData));
     }
-    return GROUP_ORDER.flatMap(status => {
-      const items = buckets[status];
-      return items.length === 0 ? [] : [{ status, items }];
-    });
+    // Always return all four status groups, including empty ones,
+    // so the sidebar's section count is stable from first paint.
+    // Filtering empty buckets here causes a Cumulative Layout Shift:
+    // initial render returns [] while the AIS feed is still arriving,
+    // then sections appear progressively as buckets fill, pushing
+    // pixels around. Operators reading "Underway 0 / Anchored 0 /
+    // Stopped 0 / NUC 0" at boot is also more informative than four
+    // blank slots that pop into existence one by one.
+    return GROUP_ORDER.map(status => ({ status, items: buckets[status] }));
   }, [list, staticData]);
 }
