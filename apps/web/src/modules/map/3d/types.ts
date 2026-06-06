@@ -46,6 +46,16 @@ export type RenderableVessel = {
    * per-vessel override here.
    */
   readonly scale: number;
+  /**
+   * Vertical offset in metres applied to the rendered position. The
+   * Poly Pizza GLBs do not consistently put their internal origin at
+   * the hull's waterline - some sit "above sea level" by a few units
+   * after scaling. Negative values pull the hull down to the water
+   * plane. Trial range -1 .. -10 typically lands a believable
+   * waterline; per-model override because the offset depends on the
+   * specific GLB's geometry.
+   */
+  readonly altitude: number;
 };
 
 export type IGeospatialRenderEngine = {

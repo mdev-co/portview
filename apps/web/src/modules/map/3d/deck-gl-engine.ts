@@ -48,8 +48,15 @@ export class DeckGlEngine implements IGeospatialRenderEngine {
       // attachment so we don't leak the old overlay on the old map.
       this.detach();
     }
+    // `interleaved: false` runs deck.gl in OVERLAY mode: a single
+    // canvas painted ON TOP of the MapLibre canvas, not mixed into
+    // its render pass. Interleaved mode trips known compatibility
+    // bugs with maplibre-gl 5.x (custom-layer pipeline diverged from
+    // upstream Mapbox); overlay mode is the safer default and
+    // visually identical for a flat raster basemap. Switch back to
+    // true only when MapLibre 6 stabilises the interleaved API.
     this.overlay = new MapboxOverlay({
-      interleaved: true,
+      interleaved: false,
       layers: [],
     });
     // MapboxOverlay implements MapLibre's IControl contract but its
@@ -84,11 +91,35 @@ export class DeckGlEngine implements IGeospatialRenderEngine {
           data: items,
           scenegraph: url,
           sizeScale: 1,
-          getPosition: (d: RenderableVessel) => [d.lng, d.lat, 0],
-          getOrientation: (d: RenderableVessel) => [0, -d.heading, 90],
+          getPosition: (d: RenderableVessel) => [d.lng, d.lat, d.altitude],
+          // Orientation: the GLBs from Poly Pizza ship with the glTF
+          // default convention (+Y up, -Z forward). deck.gl's mercator
+          // world uses Z-up, so the `roll: 90` rotates the model 90
+          // deg around its longitudinal axis so the deck plane is
+          // parallel to the map plane (boat upright as seen from
+          // above). Yaw applies the heading; the `180 -` offset
+          // empirically points the bow in the direction of travel
+          // for our Poly Pizza models (their internal forward axis
+          // is the opposite of AIS COG convention). Pitch stays zero
+          // because we render on a flat plane, not a sloped one.
+          getOrientation: (d: RenderableVessel) => [0, 180 - d.heading, 90],
           getScale: (d: RenderableVessel) => [d.scale, d.scale, d.scale],
+          // Cool-grey tint multiplied onto the model's base texture.
+          // Mimics the desaturated military-grey palette used by
+          // Airspace Intelligence's mission control surface. PBR
+          // textures with saturated material colours (the Quaternius
+          // cruise ship hull, for example) will still leak some hue
+          // through this multiplier; if that reads wrong in demo we
+          // swap to a monochrome GLB rather than reach for a shader.
+          getColor: [180, 188, 200, 255],
           _lighting: 'pbr',
           pickable: false,
+          onError: (err: Error) => {
+            // Surface model load failures in dev console so we do not
+            // silently render nothing. In production console.warn is
+            // stripped by esbuild.drop; here it is the cheapest signal.
+            console.warn('[DeckGlEngine] ScenegraphLayer error for', url, err);
+          },
         }),
     );
     this.overlay.setProps({ layers });

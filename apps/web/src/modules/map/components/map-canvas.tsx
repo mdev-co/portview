@@ -9,7 +9,13 @@ const SZCZECIN_HARBOR_CENTER: LngLat = [14.5528, 53.4285];
 const MAP_CONFIG: MapEngineConfig = {
   view: {
     center: SZCZECIN_HARBOR_CENTER,
-    zoom: 12,
+    zoom: 13,
+    // Pitched view from first paint so the operator sees the harbour
+    // on an oblique angle (Airspace Intelligence "looking across the
+    // water" framing) instead of pure top-down. 60 deg keeps the
+    // horizon below the header without losing depth perception.
+    pitch: 60,
+    bearing: -20,
   },
   style: osmRasterStyle,
   attributionMode: 'compact',

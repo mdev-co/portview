@@ -55,9 +55,17 @@ export function Flagship3DLayer(): null {
           id: String(cfg.mmsi),
           lng: v.lng,
           lat: v.lat,
-          heading: v.cog ?? 0,
+          // Match `vesselsToGeoJSON`: AIS gives both COG (motion
+          // bearing) and trueHeading (compass bow direction). They
+          // diverge when a vessel is drifting, manoeuvring at slow
+          // speed, or moored on a current; the 2D arrow uses
+          // trueHeading-then-cog, the 3D model has to do the same or
+          // the bow and the arrow point in different directions on a
+          // manoeuvring tug.
+          heading: v.trueHeading ?? v.cog ?? 0,
           modelUrl: cfg.modelUrl,
           scale: cfg.scale,
+          altitude: cfg.altitudeOffset,
         });
       }
       engine.setVessels(out);
