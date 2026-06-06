@@ -4,6 +4,25 @@
 # Runs only changed tests per package via runner-native flags.
 # Vitest packages use --changed; Jest package uses --onlyChanged.
 
+# === HARD GATE: explicit user authorisation required for every push ===
+# Existence of `.git/PUSH_AUTHORIZED` is the one-shot token the user
+# creates to authorise a single push. The hook deletes the token after
+# reading it, so the next push needs a fresh authorisation. This is a
+# MECHANICAL bar against agents (or any tooling) bypassing the rule
+# that pushes require explicit per-action consent.
+GIT_DIR_REAL="$(git rev-parse --git-dir)"
+AUTH_TOKEN="$GIT_DIR_REAL/PUSH_AUTHORIZED"
+if [ ! -f "$AUTH_TOKEN" ]; then
+  printf '\n\033[41;37;1m PUSH BLOCKED \033[0m  No authorisation token at %s\n\n' "$AUTH_TOKEN"
+  printf '  To authorise a single push, create the token:\n'
+  printf '    \033[36;1mtouch %s\033[0m\n\n' "$AUTH_TOKEN"
+  printf '  The token is consumed (deleted) by the next push. Subsequent\n'
+  printf '  pushes require a fresh token, so every push is gated.\n\n'
+  exit 1
+fi
+rm -f "$AUTH_TOKEN"
+printf '\033[42;30m PUSH AUTHORISED \033[0m  Token consumed.\n\n'
+
 RED='\033[31;1m'
 GRN='\033[32;1m'
 YEL='\033[33;1m'
