@@ -15,6 +15,17 @@ primary_region = "fra"
 [build]
   dockerfile = "apps/api/Dockerfile"
 
+# Prisma migrations run ONCE per deploy in a temporary release VM
+# (Fly spins it from the freshly built image, waits for exit, only
+# promotes the image to the running machine on success). Keeping
+# migrate out of the runtime boot path is the single biggest win:
+# every machine restart skips the ~30 s prisma engine warmup + DB
+# round trip, taking cold-boot from ~70 s down to ~30 s. Failed
+# migrations abort the deploy without touching production - the
+# previously running machine keeps serving traffic.
+[deploy]
+  release_command = "npx prisma migrate deploy --schema=prisma/schema.prisma"
+
 [env]
   # Application-level config that is not a secret.
   NODE_ENV = "production"
@@ -32,8 +43,16 @@ primary_region = "fra"
   min_machines_running = 1
   processes = ["app"]
 
+  # Boot budget: tailscale handshake + cert materialisation + nest
+  # startup lands around ~30 s after migrate moved to release_command
+  # (was 60-70 s when migrate ran per boot). 60 s is 2x headroom on
+  # that floor and also the hard cap Fly enforces on HTTP service
+  # checks ("Service HTTP check has a grace period greater than 1
+  # minute; this will be lowered to 1 minute"); setting higher in
+  # config is silently clamped. If boot ever creeps back above 30 s
+  # we lower it at the source rather than fight the platform.
   [[http_service.checks]]
-    grace_period = "20s"
+    grace_period = "60s"
     interval = "30s"
     method = "GET"
     timeout = "5s"
