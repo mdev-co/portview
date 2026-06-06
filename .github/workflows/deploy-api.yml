@@ -24,6 +24,7 @@ on:
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
       - 'package.json'
+      - 'fly.toml'
       - '.github/workflows/deploy-api.yml'
 
 # Cancel an in-flight deploy if a newer commit lands on main. Fly
@@ -58,3 +59,23 @@ jobs:
         run: flyctl deploy --remote-only --app sps-api
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
+      - name: Verify deploy health
+        # Post-deploy gate. flyctl deploy returns when the rolling
+        # strategy reports a "healthy" machine, but Fly's own health
+        # probe runs against the internal port; an externally
+        # observable 200 from the public load balancer can still lag
+        # by several seconds (warm-up, CF cache settle, edge routing).
+        # We hit the public fly.dev origin directly so Cloudflare is
+        # bypassed - if this step fails the operator sees a red X in
+        # the Actions tab instead of finding out via "vessels gone".
+        # Retries cover the worst-case 90 s grace_period boot window
+        # plus settle: 6 attempts x 30 s = 3 min budget.
+        run: |
+          set -e
+          echo "Waiting 60 s for the rolling deploy to settle..."
+          sleep 60
+          curl --fail --max-time 10 --retry 5 --retry-delay 30 \
+               --retry-all-errors --silent --show-error \
+               -o /dev/null -w 'health probe: HTTP %{http_code} time=%{time_total}s\n' \
+               https://sps-api.fly.dev/
