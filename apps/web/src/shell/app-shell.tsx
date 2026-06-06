@@ -90,8 +90,14 @@ function AppShellLayout({ children }: { children: ReactNode }) {
           const provided = slots[name];
           const content: ReactNode = provided ?? (name === 'main' ? <Outlet /> : null);
           if (content === null) return null;
+          // Render the main slot as a real <main> landmark so screen
+          // readers and Lighthouse a11y see the page's primary
+          // content region. Header, sidebar, detail, drawer and
+          // activity-bar all stay as <section>: they are auxiliary
+          // regions, not the page focus.
+          const SlotElement = name === 'main' ? motion.main : motion.section;
           return (
-            <motion.section
+            <SlotElement
               key={name}
               layout
               initial={{ opacity: 0 }}
@@ -113,7 +119,7 @@ function AppShellLayout({ children }: { children: ReactNode }) {
               style={{ gridArea: SLOT_GRID_AREA[name] }}
             >
               {content}
-            </motion.section>
+            </SlotElement>
           );
         })}
       </AnimatePresence>

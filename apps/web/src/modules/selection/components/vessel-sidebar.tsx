@@ -67,11 +67,22 @@ export function VesselSidebar() {
           count={fullList.length}
         />
         <SidebarSection.Body>
-          {fullList.length === 0 ? (
-            <EmptyState icon={Ship} title={SIDEBAR_TEXT.emptyTitle} hint={SIDEBAR_TEXT.emptyHint} />
-          ) : (
-            <div className={styles.outerScroll}>
-              {groups.map(group => (
+          {/* CLS guard: the scrolling container always mounts and
+              takes the full flex-1 height, so the section's box
+              dimensions stay constant from first paint. When the
+              AIS feed has not arrived yet we render the empty state
+              INSIDE the same container - the visible content
+              changes but the layout does not, eliminating the
+              0.158 CLS the Vessels section was tripping. */}
+          <div className={styles.outerScroll}>
+            {fullList.length === 0 ? (
+              <EmptyState
+                icon={Ship}
+                title={SIDEBAR_TEXT.emptyTitle}
+                hint={SIDEBAR_TEXT.emptyHint}
+              />
+            ) : (
+              groups.map(group => (
                 <SidebarSection
                   key={group.status}
                   open={isOpen(group.status)}
@@ -103,9 +114,9 @@ export function VesselSidebar() {
                     </ul>
                   </SidebarSection.Body>
                 </SidebarSection>
-              ))}
-            </div>
-          )}
+              ))
+            )}
+          </div>
         </SidebarSection.Body>
       </SidebarSection>
 
