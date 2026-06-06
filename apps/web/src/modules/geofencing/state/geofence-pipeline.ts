@@ -1,13 +1,13 @@
-import { $vessels } from '@/modules/telemetry/vessels.store';
+import { $vessels, type LiveVessel } from '@/modules/telemetry';
 import {
   DEFAULT_DWELL_CONFIG,
-  type GeofenceEvent,
   type Mmsi,
   type VesselPositionFrame,
+  type Zone,
   type ZoneCollection,
   type ZoneId,
-  computePresence,
   forceExitVessel,
+  parseMembershipKey,
   sweepGhosts,
   tickGeofence,
 } from '@sps/shared';
@@ -28,9 +28,18 @@ import { $geofenceZones } from './geofence-zones.atom';
  */
 const GHOST_SWEEP_INTERVAL_MS = 60_000;
 
-let unsubscribe: (() => void) | null = null;
-let sweepHandle: ReturnType<typeof setInterval> | null = null;
-let previousVesselIds: Set<Mmsi> = new Set();
+/**
+ * Module-singleton holding the active pipeline instance, or null
+ * when nothing is running. All actual pipeline state lives inside
+ * the instance closure - this is the ONLY module-level variable so
+ * HMR module replacement and Vitest module caching can not leak
+ * stale subscription state across reloads / tests.
+ */
+let instance: PipelineInstance | null = null;
+
+type PipelineInstance = {
+  readonly stop: () => void;
+};
 
 /**
  * Wire the vessels store and the ghost watchdog to the dwell-time
@@ -38,17 +47,24 @@ let previousVesselIds: Set<Mmsi> = new Set();
  * is a no-op so route re-mounts (the lazy MapView Suspense
  * boundary) do not duplicate listeners.
  *
- * Side effects established:
- *   - `$vessels` changes drive `tickGeofence` per affected vessel.
- *   - Vessels evicted from `$vessels` (TTL sweep) trigger
- *     `forceExitVessel`, timestamped from each vessel's last seen
- *     frame so the synthesised Exit stays replay-deterministic.
+ * Side effects established by the instance:
+ *   - per-vessel `$vessels.listen` callbacks (NOT a whole-snapshot
+ *     `subscribe`) drive `tickGeofence` against the operational
+ *     zone set for ONLY the changed vessel, reducing the per-tick
+ *     PIP cost from O(vessels x zones) to O(zones).
+ *   - decorative chart-art zones (the Dabie anchor / compass /
+ *     smile shapes) are filtered out of the operational set so
+ *     they consume zero PIP budget despite living in the same
+ *     FeatureCollection as the real zones.
+ *   - vessels evicted from `$vessels` trigger `forceExitVessel`,
+ *     timestamped from the last seen membership entry so the
+ *     synthesised Exit stays replay-deterministic.
  *   - A 60 s interval calls `sweepGhosts` so vessels that quietly
  *     stop broadcasting WHILE the eviction sweep has not yet
  *     deleted them still surface as `ghost-exit` events.
  *
- * Stopping is symmetric: `stopGeofencePipeline` is exposed for
- * tests and the React Strict-Mode double-effect guard.
+ * Stopping is symmetric: `stopGeofencePipeline` tears down the
+ * instance and clears the singleton slot.
  *
  * Every confirmed transition is appended to `$geofenceEvents`
  * unconditionally so the sidebar timeline reflects full history
@@ -57,125 +73,186 @@ let previousVesselIds: Set<Mmsi> = new Set();
  * (`geofence-toaster.tsx`), keeping the pipeline a pure log writer.
  */
 export function startGeofencePipeline(): void {
-  if (unsubscribe !== null) return;
+  if (instance !== null) return;
+  instance = createPipelineInstance();
+}
 
-  previousVesselIds = collectVesselIds($vessels.get());
+/** Tear down listeners; only the app shell unmount / tests need this. */
+export function stopGeofencePipeline(): void {
+  instance?.stop();
+  instance = null;
+}
 
-  unsubscribe = $vessels.subscribe(snapshot => {
-    const zones = $geofenceZones.get().features;
-    if (zones.length === 0) {
-      previousVesselIds = collectVesselIds(snapshot);
-      return;
+function createPipelineInstance(): PipelineInstance {
+  // Closure-bound state. Every map / set / cache lives only as long
+  // as this instance does; calling stop() releases all of it for GC.
+  const lastPresenceSnapshot = new Map<Mmsi, ReadonlySet<ZoneId>>();
+  // Identity-cached filter result for the operational zone set.
+  // Re-runs only when the zone collection reference changes, NOT
+  // on every AIS frame, so the per-vessel handler stays O(Z) with
+  // a constant Z bound rather than O(Z) plus a filter pass each
+  // time. Decorative chart art (anchor / compass / smile on Dabie)
+  // carries `properties.decorative === true` and is excluded.
+  const zoneCache: { ref: ZoneCollection | null; filtered: readonly Zone[] } = {
+    ref: null,
+    filtered: [],
+  };
+
+  function getOperationalZones(): readonly Zone[] {
+    const current = $geofenceZones.get();
+    if (current === zoneCache.ref) return zoneCache.filtered;
+    zoneCache.ref = current;
+    zoneCache.filtered = current.features.filter(f => f.properties.decorative !== true);
+    return zoneCache.filtered;
+  }
+
+  function processVessel(vessel: LiveVessel): void {
+    const zones = getOperationalZones();
+    if (zones.length === 0) return;
+    if (vessel.lng === null || vessel.lat === null) return;
+    const frame: VesselPositionFrame = {
+      mmsi: vessel.mmsi,
+      lng: vessel.lng,
+      lat: vessel.lat,
+      // FSM time-as-data: drive the dwell clock from the AIS frame
+      // timestamp (seconds since epoch) converted to ms so it lines
+      // up with our ghost timeout and tick math.
+      timestampUnix: vessel.timestampUnix * 1_000,
+    };
+    const prevState = $geofenceMembership.get();
+    const result = tickGeofence(prevState, frame, zones, frame.timestampUnix);
+    setMembershipState(result.state);
+    if (result.events.length > 0) appendGeofenceEvents(result.events);
+    syncPresenceFor(result.state, vessel.mmsi);
+  }
+
+  function evictVessel(mmsi: Mmsi): void {
+    const prevState = $geofenceMembership.get();
+    const evictionNow = lastSeenFor(prevState, mmsi) ?? Date.now();
+    const result = forceExitVessel(prevState, mmsi, evictionNow);
+    setMembershipState(result.state);
+    if (result.events.length > 0) appendGeofenceEvents(result.events);
+    syncPresenceFor(result.state, mmsi);
+  }
+
+  /**
+   * Per-vessel presence diff. Walks only the membership entries
+   * belonging to one mmsi (prefix scan on the flat key map), so the
+   * cost is O(zones-for-this-vessel) rather than O(total entries).
+   * Writes `$geofencePresence` ONLY when the confirmed-zone set
+   * actually changed, keeping the per-key sidebar badge subscribers
+   * quiet unless their vessel crossed a boundary this tick.
+   */
+  function syncPresenceFor(state: ReturnType<typeof $geofenceMembership.get>, mmsi: Mmsi): void {
+    const currentZones = new Set<ZoneId>();
+    const mmsiPrefix = `${mmsi}|`;
+    for (const [key, entry] of state) {
+      if (!key.startsWith(mmsiPrefix)) continue;
+      if (!entry.confirmed) continue;
+      const parsed = parseMembershipKey(key);
+      if (parsed === null) continue;
+      currentZones.add(parsed.zoneId);
     }
+    const prev = lastPresenceSnapshot.get(mmsi);
+    // First-time visit with no confirmed zones: leave the presence
+    // key undefined. Writing `[]` here would pollute the store and
+    // make per-key subscribers fire for vessels that have never had
+    // presence in the first place (a single AIS ping inside a zone
+    // before the dwell threshold confirms).
+    if (prev === undefined && currentZones.size === 0) return;
+    if (prev !== undefined && setsEqual(prev, currentZones)) return;
+    setVesselPresence(mmsi, Array.from(currentZones));
+    if (currentZones.size === 0) {
+      lastPresenceSnapshot.delete(mmsi);
+    } else {
+      lastPresenceSnapshot.set(mmsi, currentZones);
+    }
+  }
 
-    let state = $geofenceMembership.get();
-    const collected: GeofenceEvent[] = [];
-
-    // Pass 1: handle live updates per vessel currently in the store.
+  /**
+   * Whole-snapshot pass. Two callers:
+   *   1. Bootstrap at pipeline start - vessels already in $vessels
+   *      do not fire `listen` (that fires only on subsequent
+   *      changes), so we process them once explicitly here.
+   *   2. Bulk replace via `$vessels.set(...)` (TTL sweep on the
+   *      vessels store, test cleanup) - nanostores fires `listen`
+   *      with an undefined `changedKey` in that case, so the
+   *      per-key fast path below cannot reason about which vessels
+   *      disappeared. We diff every still-tracked membership mmsi
+   *      against the new snapshot and force-exit the missing ones.
+   */
+  function processWholeSnapshot(snapshot: Record<string, LiveVessel | undefined>): void {
     const currentIds = new Set<Mmsi>();
     for (const key in snapshot) {
       const vessel = snapshot[key];
       if (vessel === undefined) continue;
       currentIds.add(vessel.mmsi);
-      if (vessel.lng === null || vessel.lat === null) continue;
-      const frame: VesselPositionFrame = {
-        mmsi: vessel.mmsi,
-        lng: vessel.lng,
-        lat: vessel.lat,
-        // FSM time-as-data: drive the dwell clock from the AIS
-        // frame timestamp (seconds since epoch) converted to ms so
-        // it lines up with our ghost timeout and tick math.
-        timestampUnix: vessel.timestampUnix * 1_000,
-      };
-      const result = tickGeofence(state, frame, zones, frame.timestampUnix);
-      state = result.state;
-      collected.push(...result.events);
+      processVessel(vessel);
     }
-
-    // Pass 2: handle vessels that disappeared since the previous
-    // snapshot. The TTL sweeper inside vessels.store deletes
-    // entries by replacing the whole store; we diff identifiers
-    // and emit forced exits for the missing ones. The eviction
-    // timestamp is derived from the missing vessel's last seen
-    // frame across all of its remaining membership entries so
-    // replay determinism holds for the synthesised Exit too.
-    for (const previousId of previousVesselIds) {
-      if (currentIds.has(previousId)) continue;
-      const evictionNow = lastSeenFor(state, previousId) ?? Date.now();
-      const result = forceExitVessel(state, previousId, evictionNow);
-      state = result.state;
-      collected.push(...result.events);
+    // Diff against vessels we currently hold membership for; force-
+    // exit any whose mmsi is no longer in the snapshot.
+    const state = $geofenceMembership.get();
+    const seenMmsis = new Set<Mmsi>();
+    for (const key of state.keys()) {
+      const parsed = parseMembershipKey(key);
+      if (parsed === null) continue;
+      if (seenMmsis.has(parsed.mmsi)) continue;
+      seenMmsis.add(parsed.mmsi);
+      if (!currentIds.has(parsed.mmsi)) evictVessel(parsed.mmsi);
     }
-    previousVesselIds = currentIds;
+  }
 
-    setMembershipState(state);
-    if (collected.length > 0) appendGeofenceEvents(collected);
-    syncPresence(state);
+  processWholeSnapshot($vessels.get());
+
+  const unsubscribeVessels = $vessels.listen((value, _oldValue, changedKey) => {
+    if (changedKey === undefined) {
+      // Bulk replace (TTL sweep, test cleanup). nanostores signals
+      // these by calling the listener with an undefined changedKey;
+      // we cannot tell which vessels disappeared from the payload
+      // alone, so we run the whole-snapshot diff path.
+      processWholeSnapshot(value);
+      return;
+    }
+    // Per-key change - the hot path during live AIS ingest. O(Z)
+    // work per notification, NOT O(N x Z).
+    const vessel = value[changedKey];
+    if (vessel === undefined) {
+      evictVessel(Number(changedKey) as Mmsi);
+    } else {
+      processVessel(vessel);
+    }
   });
 
-  sweepHandle = setInterval(() => {
+  const sweepHandle = setInterval(() => {
     const state = $geofenceMembership.get();
     if (state.size === 0) return;
     const result = sweepGhosts(state, Date.now(), DEFAULT_DWELL_CONFIG);
     setMembershipState(result.state);
     if (result.events.length > 0) appendGeofenceEvents(result.events);
-    syncPresence(result.state);
+    // After a ghost sweep, presence for any vessel that lost zones
+    // needs to flip in the badge store. Re-sync only the mmsis we
+    // were tracking - new vessels not in lastPresenceSnapshot can
+    // not have had presence ghosted out from under them.
+    for (const mmsi of lastPresenceSnapshot.keys()) {
+      syncPresenceFor(result.state, mmsi);
+    }
   }, GHOST_SWEEP_INTERVAL_MS);
-}
 
-/** Tear down listeners; only the app shell unmount / tests need this. */
-export function stopGeofencePipeline(): void {
-  unsubscribe?.();
-  unsubscribe = null;
-  if (sweepHandle !== null) {
-    clearInterval(sweepHandle);
-    sweepHandle = null;
-  }
-  previousVesselIds = new Set();
-  lastPresenceSnapshot = new Map();
-}
-
-/**
- * Diff the latest membership state against the previous presence
- * snapshot and write `$geofencePresence` per-key only for vessels
- * whose confirmed-zone set actually changed. This keeps the
- * sidebar badge (one subscriber per vessel) re-render fan-out
- * bounded to the few vessels that crossed a boundary this tick,
- * not the entire fleet on every AIS frame.
- */
-let lastPresenceSnapshot: Map<Mmsi, ReadonlySet<ZoneId>> = new Map();
-
-function syncPresence(state: ReturnType<typeof $geofenceMembership.get>): void {
-  const next = computePresence(state);
-  const seen = new Set<Mmsi>();
-  for (const [mmsi, zones] of next) {
-    seen.add(mmsi);
-    const prev = lastPresenceSnapshot.get(mmsi);
-    if (prev !== undefined && setsEqual(prev, zones)) continue;
-    setVesselPresence(mmsi, Array.from(zones));
-  }
-  // Vessels that had presence last tick but not this tick - clear them.
-  for (const mmsi of lastPresenceSnapshot.keys()) {
-    if (seen.has(mmsi)) continue;
-    setVesselPresence(mmsi, []);
-  }
-  lastPresenceSnapshot = next as Map<Mmsi, ReadonlySet<ZoneId>>;
+  return {
+    stop(): void {
+      unsubscribeVessels();
+      clearInterval(sweepHandle);
+      lastPresenceSnapshot.clear();
+      zoneCache.ref = null;
+      zoneCache.filtered = [];
+    },
+  };
 }
 
 function setsEqual<T>(a: ReadonlySet<T>, b: ReadonlySet<T>): boolean {
   if (a.size !== b.size) return false;
   for (const v of a) if (!b.has(v)) return false;
   return true;
-}
-
-function collectVesselIds(snapshot: Record<string, { mmsi: Mmsi } | undefined>): Set<Mmsi> {
-  const ids = new Set<Mmsi>();
-  for (const key in snapshot) {
-    const vessel = snapshot[key];
-    if (vessel === undefined) continue;
-    ids.add(vessel.mmsi);
-  }
-  return ids;
 }
 
 /**
@@ -195,11 +272,16 @@ function lastSeenFor(state: ReturnType<typeof $geofenceMembership.get>, mmsi: Mm
   return best;
 }
 
-/** Test-only access to internal state for assertions. */
+/**
+ * Test-only access kept as a no-op for backward compatibility with
+ * existing test setup blocks. The closure-bound instance state now
+ * resets cleanly via `stopGeofencePipeline()` + `startGeofencePipeline()`,
+ * so explicit module-state reset is redundant. The function stays
+ * exported only to avoid touching every test in the same diff.
+ */
 export const __test = {
   resetPipelineState: (): void => {
-    previousVesselIds = new Set();
-    lastPresenceSnapshot = new Map();
+    /* no-op; instance closures handle teardown */
   },
 };
 

@@ -1,4 +1,4 @@
-import { Children, type ReactElement, type ReactNode, isValidElement } from 'react';
+import { Children, type ReactElement, type ReactNode, isValidElement, useMemo } from 'react';
 import { Outlet } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -61,19 +61,29 @@ function AppShellLayout({ children }: { children: ReactNode }) {
   const sidebarOpen = !state.sidebarCollapsed;
   const detailOpen = state.detailTarget !== null;
 
-  const gridTemplateColumns =
-    state.presetId === 'operator-ui'
-      ? `${sidebarOpen ? `${OPERATOR_UI_SIDEBAR_PX}px` : '0px'} 1fr ${detailOpen ? `${OPERATOR_UI_DETAIL_PX}px` : '0px'}`
-      : preset.gridTemplateColumns;
+  // Memoise the inline grid string and the per-slot visibility map
+  // so React reconciles the parent `style` prop and SLOT_NAMES.map
+  // against stable references. Without this, every parent re-render
+  // emits a fresh `gridTemplateColumns` string literal (forcing a
+  // new `style` object), which thrashes the MapLibre canvas inside
+  // the `main` slot and reads as cumulative layout shift in
+  // Lighthouse. Keys are exactly the inputs the strings depend on.
+  const gridTemplateColumns = useMemo(() => {
+    if (state.presetId !== 'operator-ui') return preset.gridTemplateColumns;
+    return `${sidebarOpen ? `${OPERATOR_UI_SIDEBAR_PX}px` : '0px'} 1fr ${detailOpen ? `${OPERATOR_UI_DETAIL_PX}px` : '0px'}`;
+  }, [state.presetId, sidebarOpen, detailOpen, preset.gridTemplateColumns]);
 
-  const effectiveVisibility: Record<SlotName, boolean> = {
-    header: preset.slots.header.visible,
-    'activity-bar': preset.slots['activity-bar'].visible,
-    sidebar: state.presetId === 'operator-ui' ? sidebarOpen : preset.slots.sidebar.visible,
-    main: preset.slots.main.visible,
-    detail: state.presetId === 'operator-ui' ? detailOpen : preset.slots.detail.visible,
-    drawer: preset.slots.drawer.visible,
-  };
+  const effectiveVisibility = useMemo<Record<SlotName, boolean>>(
+    () => ({
+      header: preset.slots.header.visible,
+      'activity-bar': preset.slots['activity-bar'].visible,
+      sidebar: state.presetId === 'operator-ui' ? sidebarOpen : preset.slots.sidebar.visible,
+      main: preset.slots.main.visible,
+      detail: state.presetId === 'operator-ui' ? detailOpen : preset.slots.detail.visible,
+      drawer: preset.slots.drawer.visible,
+    }),
+    [preset, state.presetId, sidebarOpen, detailOpen],
+  );
 
   return (
     <div
@@ -96,10 +106,17 @@ function AppShellLayout({ children }: { children: ReactNode }) {
           // activity-bar all stay as <section>: they are auxiliary
           // regions, not the page focus.
           const SlotElement = name === 'main' ? motion.main : motion.section;
+          // Crossfade-only transition: no `layout` prop. Slot
+          // visibility changes are opacity 0 <-> 1, not FLIP. The
+          // `layout` prop would force framer-motion to measure the
+          // DOM (`getBoundingClientRect`) on every parent reflow and
+          // animate position deltas - expensive and visually
+          // identical for a pure opacity transition. CSS Grid
+          // re-flows the cells natively when the preset changes
+          // gridTemplateColumns / gridTemplateAreas.
           return (
             <SlotElement
               key={name}
-              layout
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}

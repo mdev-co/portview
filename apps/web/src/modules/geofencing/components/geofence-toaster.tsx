@@ -146,6 +146,14 @@ export function GeofenceToasterPortal(): React.JSX.Element {
           duration: SUMMARY_TOAST_DURATION_MS,
           description: 'Live AIS feed via EdgeBridge. Click Zones in the dock to manage areas.',
         });
+        // Summary is a one-shot toast for the whole session. The
+        // $vessels subscription only existed to wait for the first
+        // non-empty snapshot; once the toast has fired the listener
+        // would keep firing on every AIS frame for the rest of the
+        // session, paying nanostores notification cost just to short-
+        // circuit on `summaryFiredThisPage`. Self-unsubscribe so the
+        // subscription dies with its purpose.
+        unsubscribeVessels();
       }, SUMMARY_TOAST_DELAY_MS);
     });
 
