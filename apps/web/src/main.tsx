@@ -39,12 +39,28 @@ telemetry.start();
 // manual refresh. The persisted check guards the duplicate-start
 // case where pageshow also fires on the initial navigation; that
 // path already ran telemetry.start() above and must not run twice.
-window.addEventListener('pagehide', () => {
-  telemetry.stop();
-});
-window.addEventListener('pageshow', event => {
+//
+// Lifecycle: in production these listeners attach once per page
+// load, live for the entire window lifetime, and die with the
+// window on hard navigation. Module init runs exactly once so no
+// duplication risk. In dev under Vite HMR the module CAN reload
+// while window persists, so we expose named handlers and dispose
+// them via `import.meta.hot.dispose` to prevent stale telemetry
+// instances accumulating across reloads.
+const onPageHide = (): void => telemetry.stop();
+const onPageShow = (event: PageTransitionEvent): void => {
   if (event.persisted) telemetry.start();
-});
+};
+window.addEventListener('pagehide', onPageHide);
+window.addEventListener('pageshow', onPageShow);
+
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    window.removeEventListener('pagehide', onPageHide);
+    window.removeEventListener('pageshow', onPageShow);
+    telemetry.stop();
+  });
+}
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
