@@ -1,4 +1,4 @@
-# ADR 0018 - Map style engine with seven operator-facing modes
+# ADR 0030 - Map style engine with seven operator-facing modes
 
 - Status: accepted
 - Date: 2026-05-13 (initial), refined 2026-05-24 via #156
@@ -75,4 +75,8 @@ A quality follow-up landed via PR #157, behaviour-preserving:
 
 ## Flow
 
-See `0018-map-style-engine.d2` for the data flow from switcher click through the nanostore atom and sync hook to the engine adapter and MapLibre tile sources.
+See `0030-map-style-engine.d2` for the data flow from switcher click through the nanostore atom and sync hook to the engine adapter and MapLibre tile sources.
+
+![Map style engine flow](./0030-map-style-engine.png)
+
+> Render with: `d2 adr/0030-map-style-engine.d2 adr/0030-map-style-engine.png --theme=8 --pad=40`.
