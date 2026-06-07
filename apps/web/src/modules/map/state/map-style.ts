@@ -8,6 +8,9 @@ import {
   BASE_TACTICAL_LAYER_ID,
   BASE_USGS_IMAGERY_TOPO_LAYER_ID,
   BASE_USGS_TOPO_LAYER_ID,
+  PORT_GREEN_LAYER_ID,
+  PORT_WATER_LAYER_ID,
+  PORT_WATER_OUTLINE_LAYER_ID,
   PRESENTATION_GRID_LAYER_ID,
   SEAMARK_OVERLAY_LAYER_ID,
 } from '../styles/osm-raster-style';
@@ -120,7 +123,13 @@ export const MAP_STYLE_REGISTRY: Record<MapStyleId, MapStyleDescriptor> = {
     // do on every other base style. The descriptor lists them so the
     // sync hook can flip them visible when the operator asks - the
     // visibility AND with the toggle still keeps them off by default.
-    overlayLayerIds: [PRESENTATION_GRID_LAYER_ID, SEAMARK_OVERLAY_LAYER_ID],
+    overlayLayerIds: [
+      PORT_GREEN_LAYER_ID,
+      PORT_WATER_LAYER_ID,
+      PORT_WATER_OUTLINE_LAYER_ID,
+      PRESENTATION_GRID_LAYER_ID,
+      SEAMARK_OVERLAY_LAYER_ID,
+    ],
   },
 };
 

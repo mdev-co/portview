@@ -78,6 +78,39 @@ export const PORT_BUILDINGS_LAYER_ID = 'overlay-port-buildings' as const;
 const PORT_BUILDINGS_DATA_URL = '/port-buildings.geojson' as const;
 
 /**
+ * Water overlay exclusive to the Presentation map mode. Real OSM water
+ * polygons (`natural=water` + `waterway=riverbank` ways and relations)
+ * baked into a static GeoJSON shipped from `public/port-water.geojson`.
+ * Bbox covers the whole Szczecin–Świnoujście corridor (53.30–53.95 /
+ * 14.30–14.85) so the Odra channel, harbour basins, Dąbie lake, Zalew
+ * Szczeciński and the Świna delta all paint as water. Polygons under
+ * 50 000 m² are dropped and the rest are simplified with Douglas-
+ * Peucker at ~67 m tolerance, so the wire-size stays around 770 KB
+ * uncompressed / ~190 KB gzipped while every visually-meaningful
+ * basin survives. The sync hook gates visibility per mode via
+ * `MAP_STYLE_REGISTRY`.
+ */
+export const PORT_WATER_SOURCE_ID = 'port-water' as const;
+export const PORT_WATER_LAYER_ID = 'overlay-port-water' as const;
+export const PORT_WATER_OUTLINE_LAYER_ID = 'overlay-port-water-outline' as const;
+const PORT_WATER_DATA_URL = '/port-water.geojson' as const;
+
+/**
+ * Green-space overlay exclusive to the Presentation map mode. Real
+ * OSM polygons for parks, gardens, forests, woods, meadows,
+ * allotments and recreation grounds inside the port bbox shipped from
+ * `public/port-green.geojson`. Each feature carries a `k` property
+ * (`forest` | `park` | `green`) so the fill expression tints darker
+ * sage for tree cover, lighter sage for urban parks, neutral sage
+ * for the rest. Tiny `grass` roadside verges are filtered out
+ * upstream because 3000+ road-strip polygons would dominate the
+ * chart and overwhelm vessel layers.
+ */
+export const PORT_GREEN_SOURCE_ID = 'port-green' as const;
+export const PORT_GREEN_LAYER_ID = 'overlay-port-green' as const;
+const PORT_GREEN_DATA_URL = '/port-green.geojson' as const;
+
+/**
  * Age threshold above which a vessel's stroke colour shifts to the
  * dim slate tone, signalling "fix is past the dead-reckoning freshness
  * window". Sits between the dead-reckoning freeze (90 s) and the TTL
@@ -360,6 +393,14 @@ export const osmRasterStyle: StyleSpecification = {
       type: 'geojson',
       data: PORT_BUILDINGS_DATA_URL,
     },
+    [PORT_WATER_SOURCE_ID]: {
+      type: 'geojson',
+      data: PORT_WATER_DATA_URL,
+    },
+    [PORT_GREEN_SOURCE_ID]: {
+      type: 'geojson',
+      data: PORT_GREEN_DATA_URL,
+    },
     'carto-dark-matter': {
       type: 'raster',
       tiles: [
@@ -459,7 +500,86 @@ export const osmRasterStyle: StyleSpecification = {
     makeBaseRasterLayer(BASE_TACTICAL_LAYER_ID, 'maptiler-dataviz-dark', 'none'),
     makeBaseRasterLayer(BASE_BACKDROP_LAYER_ID, 'maptiler-backdrop-dark', 'none'),
     makeBaseRasterLayer(BASE_SATELLITE_LAYER_ID, 'maptiler-satellite', 'none'),
-    makeBaseRasterLayer(BASE_PRESENTATION_LAYER_ID, 'carto-positron-nolabels', 'visible'),
+    {
+      // Presentation base. Inlined instead of going through the
+      // `makeBaseRasterLayer` factory because it carries a tone-down
+      // raster paint: the Carto Positron no-labels tile is near-white
+      // out of the box, which reads as harsh on a pitched view next
+      // to the warm sky gradient. Capping `raster-brightness-max` at
+      // 0.90 knocks the brightest pixels down to a soft cream while
+      // leaving the existing greyscale ramp intact; a small negative
+      // contrast softens the line edges without flattening the chart.
+      id: BASE_PRESENTATION_LAYER_ID,
+      type: 'raster',
+      source: 'carto-positron-nolabels',
+      layout: { visibility: 'visible' },
+      paint: {
+        'raster-brightness-max': 0.9,
+        'raster-contrast': -0.02,
+      },
+    },
+    {
+      // Green-space overlay. Sage-toned fill that picks parks /
+      // forests / gardens out of the desaturated Positron base. The
+      // data-driven `fill-color` differentiates dense tree cover
+      // (darker), urban parks (lighter) and the everything-else
+      // bucket (neutral) so the chart reads as an actual map rather
+      // than a flat wash. Painted below the water layer so any
+      // riverside park that overlaps a riverbank polygon resolves to
+      // water on top (consistent with how the real shoreline looks).
+      id: PORT_GREEN_LAYER_ID,
+      type: 'fill',
+      source: PORT_GREEN_SOURCE_ID,
+      layout: { visibility: 'visible' },
+      paint: {
+        'fill-color': [
+          'match',
+          ['get', 'k'],
+          'forest',
+          '#b8caa8',
+          'park',
+          '#cfdec6',
+          'green',
+          '#c8d4bd',
+          '#c8d4bd',
+        ],
+        'fill-opacity': 0.65,
+        'fill-antialias': true,
+      },
+    },
+    {
+      // Water overlay paint. Mid-pale nautical blue over the toned-
+      // down Positron base, picking out the Odra channel and harbour
+      // basins so water reads as water at a glance. `fill-antialias`
+      // keeps the edge crisp on the pitched view; the companion line
+      // layer below paints a darker outline for shore definition.
+      id: PORT_WATER_LAYER_ID,
+      type: 'fill',
+      source: PORT_WATER_SOURCE_ID,
+      layout: { visibility: 'visible' },
+      paint: {
+        'fill-color': '#b3cbdc',
+        'fill-opacity': 0.8,
+        'fill-antialias': true,
+      },
+    },
+    {
+      // Water shoreline. Same source as the fill, drawn as line so
+      // the polygon outline reads as a soft coastal contour separate
+      // from the fill alpha. Visibility tracks the fill via the
+      // overlay registry (both ids land in the Presentation overlay
+      // list). A `line` layer over a polygon source renders each
+      // ring as a closed stroke.
+      id: PORT_WATER_OUTLINE_LAYER_ID,
+      type: 'line',
+      source: PORT_WATER_SOURCE_ID,
+      layout: { visibility: 'visible' },
+      paint: {
+        'line-color': '#7c98b0',
+        'line-width': 1.2,
+        'line-opacity': 0.6,
+      },
+    },
     {
       id: PRESENTATION_GRID_LAYER_ID,
       type: 'line',
