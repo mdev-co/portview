@@ -395,6 +395,33 @@
         "x-samchon-accessor": ["vessels", "byMmsi"],
         "x-samchon-controller": "VesselsController"
       }
+    },
+    "/healthz": {
+      "get": {
+        "tags": [],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "const": "ok",
+                      "readOnly": true
+                    }
+                  },
+                  "required": ["status"]
+                }
+              }
+            }
+          }
+        },
+        "x-samchon-accessor": ["healthz", "live"],
+        "x-samchon-controller": "HealthController"
+      }
     }
   },
   "tags": []
