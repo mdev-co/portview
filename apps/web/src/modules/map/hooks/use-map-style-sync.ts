@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useStore } from '@nanostores/react';
+import { $gridVisible } from '../state/grid-visibility';
 import {
   $activeMapStyle,
   ALL_BASE_LAYER_IDS,
@@ -7,7 +8,11 @@ import {
   MAP_STYLE_REGISTRY,
 } from '../state/map-style';
 import { $seamarkVisible } from '../state/seamark-visibility';
-import { SEAMARK_OVERLAY_LAYER_ID } from '../styles/osm-raster-style';
+import {
+  PRESENTATION_GRID_LAYER_ID,
+  PRESENTATION_GRID_MAJOR_LAYER_ID,
+  SEAMARK_OVERLAY_LAYER_ID,
+} from '../styles/osm-raster-style';
 import { useMapEngine } from './use-map-engine';
 import { useMapState } from './use-map-state';
 
@@ -30,6 +35,7 @@ import { useMapState } from './use-map-state';
 export function useMapStyleSync(): void {
   const activeStyle = useStore($activeMapStyle);
   const seamarkVisible = useStore($seamarkVisible);
+  const gridVisible = useStore($gridVisible);
   const { status } = useMapState();
   const controller = useMapEngine();
 
@@ -46,9 +52,23 @@ export function useMapStyleSync(): void {
     // keeps the hook fast even if the registry grows.
     const allowedOverlays = new Set(descriptor.overlayLayerIds);
     for (const overlayId of ALL_OVERLAY_LAYER_IDS) {
-      const descriptorAllows = allowedOverlays.has(overlayId);
-      const togglesAllow = overlayId === SEAMARK_OVERLAY_LAYER_ID ? seamarkVisible : true;
-      controller.setLayerVisibility(overlayId, descriptorAllows && togglesAllow);
+      // Per-overlay visibility rule:
+      //  - Seamark: descriptor-declared AND global seamark toggle on
+      //  - Grid: GLOBAL — visible on any map style when toggle is on,
+      //    independent of the descriptor's overlay list
+      //  - Anything else: descriptor decides
+      let visible: boolean;
+      if (overlayId === SEAMARK_OVERLAY_LAYER_ID) {
+        visible = allowedOverlays.has(overlayId) && seamarkVisible;
+      } else if (
+        overlayId === PRESENTATION_GRID_LAYER_ID ||
+        overlayId === PRESENTATION_GRID_MAJOR_LAYER_ID
+      ) {
+        visible = gridVisible;
+      } else {
+        visible = allowedOverlays.has(overlayId);
+      }
+      controller.setLayerVisibility(overlayId, visible);
     }
-  }, [activeStyle, controller, seamarkVisible, status]);
+  }, [activeStyle, controller, seamarkVisible, gridVisible, status]);
 }

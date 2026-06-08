@@ -10,6 +10,23 @@
     />
     <meta name="theme-color" content="#0f172a" />
 
+    <!--
+      Tile-origin connection hints. The Presentation basemap (default)
+      and every other map style fetch raster tiles from these CDNs as
+      soon as the map mounts. `preconnect` opens TCP + TLS before the
+      JS parses; `dns-prefetch` resolves DNS for origins only needed
+      on a style switch. `crossorigin` is required for preconnect to
+      reuse the connection on a CORS-fetched origin.
+    -->
+    <link rel="preconnect" href="https://a.basemaps.cartocdn.com" crossorigin />
+    <link rel="preconnect" href="https://b.basemaps.cartocdn.com" crossorigin />
+    <link rel="preconnect" href="https://c.basemaps.cartocdn.com" crossorigin />
+    <link rel="preconnect" href="https://d.basemaps.cartocdn.com" crossorigin />
+    <link rel="dns-prefetch" href="https://tile.openstreetmap.org" />
+    <link rel="dns-prefetch" href="https://api.maptiler.com" />
+    <link rel="dns-prefetch" href="https://server.arcgisonline.com" />
+    <link rel="dns-prefetch" href="https://tiles.openseamap.org" />
+
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />

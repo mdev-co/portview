@@ -58,6 +58,7 @@ export const SEAMARK_OVERLAY_LAYER_ID = 'overlay-seamark' as const;
  */
 export const PRESENTATION_GRID_SOURCE_ID = 'presentation-grid' as const;
 export const PRESENTATION_GRID_LAYER_ID = 'overlay-presentation-grid' as const;
+export const PRESENTATION_GRID_MAJOR_LAYER_ID = 'overlay-presentation-grid-major' as const;
 
 /**
  * 3D port buildings overlay. Real OpenStreetMap building footprints
@@ -75,7 +76,41 @@ export const PRESENTATION_GRID_LAYER_ID = 'overlay-presentation-grid' as const;
  */
 export const PORT_BUILDINGS_SOURCE_ID = 'port-buildings' as const;
 export const PORT_BUILDINGS_LAYER_ID = 'overlay-port-buildings' as const;
+export const PORT_BUILDINGS_SHADOW_LAYER_ID = 'overlay-port-buildings-shadow' as const;
 const PORT_BUILDINGS_DATA_URL = '/port-buildings.geojson' as const;
+
+/**
+ * Water overlay exclusive to the Presentation map mode. Real OSM water
+ * polygons (`natural=water` + `waterway=riverbank` ways and relations)
+ * baked into a static GeoJSON shipped from `public/port-water.geojson`.
+ * Bbox covers the whole Szczecin–Świnoujście corridor (53.30–53.95 /
+ * 14.30–14.85) so the Odra channel, harbour basins, Dąbie lake, Zalew
+ * Szczeciński and the Świna delta all paint as water. Polygons under
+ * 50 000 m² are dropped and the rest are simplified with Douglas-
+ * Peucker at ~67 m tolerance, so the wire-size stays around 770 KB
+ * uncompressed / ~190 KB gzipped while every visually-meaningful
+ * basin survives. The sync hook gates visibility per mode via
+ * `MAP_STYLE_REGISTRY`.
+ */
+export const PORT_WATER_SOURCE_ID = 'port-water' as const;
+export const PORT_WATER_LAYER_ID = 'overlay-port-water' as const;
+export const PORT_WATER_OUTLINE_LAYER_ID = 'overlay-port-water-outline' as const;
+const PORT_WATER_DATA_URL = '/port-water.geojson' as const;
+
+/**
+ * Green-space overlay exclusive to the Presentation map mode. Real
+ * OSM polygons for parks, gardens, forests, woods, meadows,
+ * allotments and recreation grounds inside the port bbox shipped from
+ * `public/port-green.geojson`. Each feature carries a `k` property
+ * (`forest` | `park` | `green`) so the fill expression tints darker
+ * sage for tree cover, lighter sage for urban parks, neutral sage
+ * for the rest. Tiny `grass` roadside verges are filtered out
+ * upstream because 3000+ road-strip polygons would dominate the
+ * chart and overwhelm vessel layers.
+ */
+export const PORT_GREEN_SOURCE_ID = 'port-green' as const;
+export const PORT_GREEN_LAYER_ID = 'overlay-port-green' as const;
+const PORT_GREEN_DATA_URL = '/port-green.geojson' as const;
 
 /**
  * Age threshold above which a vessel's stroke colour shifts to the
@@ -242,26 +277,50 @@ const opacityByAge: ExpressionSpecification = [
 const opacityCombined: ExpressionSpecification = ['*', opacityByAge, opacityBySource];
 
 /**
- * Pre-baked GeoJSON grid covering the Szczecin operating area at a
- * regular ~0.005 deg spacing (~350 m at this latitude). 22 horizontal
- * + 22 vertical lines = 44 features; tiny payload, infinite zoom
- * because they are vector lines, not raster.
- *
- * Bounds derived from the harbour centre +/- 0.06 deg so the grid
- * comfortably covers everything from Reda Polnocna in the north to
- * Reda Poludniowa in the south.
+ * Viewport-driven coordinate grid. The grid source is initialised
+ * empty here; `useDynamicGrid` regenerates the lines for the visible
+ * viewport on every `moveend`, picking a zoom-keyed step so the same
+ * overlay reads correctly from world view down to berth-level zoom.
+ * Each feature carries a `tier` property ('major' | 'minor') so two
+ * paint layers in the style spec can render one source with two
+ * weights — the classic ATC / operator chart look.
  */
-function buildPresentationGrid(): GeoJSON.FeatureCollection<GeoJSON.LineString> {
-  const lat0 = 53.43 - 0.06;
-  const lat1 = 53.43 + 0.06;
-  const lng0 = 14.55 - 0.07;
-  const lng1 = 14.55 + 0.07;
-  const step = 0.005;
+export type GridViewportParams = {
+  readonly west: number;
+  readonly south: number;
+  readonly east: number;
+  readonly north: number;
+  readonly minorStep: number;
+  readonly majorEvery: number;
+  readonly padding: number;
+};
+
+export function buildGridForViewport(
+  p: GridViewportParams,
+): GeoJSON.FeatureCollection<GeoJSON.LineString> {
+  const padW = (p.east - p.west) * p.padding;
+  const padH = (p.north - p.south) * p.padding;
+  const w = p.west - padW;
+  const e = p.east + padW;
+  const s = p.south - padH;
+  const n = p.north + padH;
+
+  const lat0 = Math.floor(s / p.minorStep) * p.minorStep;
+  const lat1 = Math.ceil(n / p.minorStep) * p.minorStep;
+  const lng0 = Math.floor(w / p.minorStep) * p.minorStep;
+  const lng1 = Math.ceil(e / p.minorStep) * p.minorStep;
+
   const features: GeoJSON.Feature<GeoJSON.LineString>[] = [];
-  for (let lat = lat0; lat <= lat1 + 1e-9; lat += step) {
+
+  for (let lat = lat0; lat <= lat1 + 1e-9; lat += p.minorStep) {
+    // Tier is keyed off absolute index from origin (not iteration
+    // count) so the SAME parallel always renders as major across pans
+    // — otherwise the major/minor pattern would shift each frame.
+    const idx = Math.round(lat / p.minorStep);
+    const tier = idx % p.majorEvery === 0 ? 'major' : 'minor';
     features.push({
       type: 'Feature',
-      properties: { axis: 'parallel' },
+      properties: { axis: 'parallel', tier },
       geometry: {
         type: 'LineString',
         coordinates: [
@@ -271,10 +330,12 @@ function buildPresentationGrid(): GeoJSON.FeatureCollection<GeoJSON.LineString> 
       },
     });
   }
-  for (let lng = lng0; lng <= lng1 + 1e-9; lng += step) {
+  for (let lng = lng0; lng <= lng1 + 1e-9; lng += p.minorStep) {
+    const idx = Math.round(lng / p.minorStep);
+    const tier = idx % p.majorEvery === 0 ? 'major' : 'minor';
     features.push({
       type: 'Feature',
-      properties: { axis: 'meridian' },
+      properties: { axis: 'meridian', tier },
       geometry: {
         type: 'LineString',
         coordinates: [
@@ -287,7 +348,10 @@ function buildPresentationGrid(): GeoJSON.FeatureCollection<GeoJSON.LineString> 
   return { type: 'FeatureCollection', features };
 }
 
-const PRESENTATION_GRID_GEOJSON = buildPresentationGrid();
+const EMPTY_GRID_GEOJSON: GeoJSON.FeatureCollection<GeoJSON.LineString> = {
+  type: 'FeatureCollection',
+  features: [],
+};
 
 export const osmRasterStyle: StyleSpecification = {
   version: 8,
@@ -304,13 +368,17 @@ export const osmRasterStyle: StyleSpecification = {
    * sky paint pass is skipped (WebGL context lost, etc.).
    */
   sky: {
-    'sky-color': '#2c4068',
-    'sky-horizon-blend': 0.5,
-    'horizon-color': '#c7d2dc',
-    'horizon-fog-blend': 0.55,
-    'fog-color': '#e8eef3',
-    'fog-ground-blend': 0.25,
-    'atmosphere-blend': 0.85,
+    // Calibrated to the dim base (brightness 0.65): deeper sky and
+    // horizon tones so the atmosphere does not visually outshine the
+    // chart. Fog blend pushes higher than the middle-ground variant
+    // to keep aerial perspective alive against the dim ground.
+    'sky-color': '#3e577a',
+    'sky-horizon-blend': 0.55,
+    'horizon-color': '#a8bbcb',
+    'horizon-fog-blend': 0.62,
+    'fog-color': '#c4d0db',
+    'fog-ground-blend': 0.4,
+    'atmosphere-blend': 0.9,
   },
   /**
    * Eight raster sources cover seven map style modes plus the seamark
@@ -354,11 +422,19 @@ export const osmRasterStyle: StyleSpecification = {
     },
     [PRESENTATION_GRID_SOURCE_ID]: {
       type: 'geojson',
-      data: PRESENTATION_GRID_GEOJSON,
+      data: EMPTY_GRID_GEOJSON,
     },
     [PORT_BUILDINGS_SOURCE_ID]: {
       type: 'geojson',
       data: PORT_BUILDINGS_DATA_URL,
+    },
+    [PORT_WATER_SOURCE_ID]: {
+      type: 'geojson',
+      data: PORT_WATER_DATA_URL,
+    },
+    [PORT_GREEN_SOURCE_ID]: {
+      type: 'geojson',
+      data: PORT_GREEN_DATA_URL,
     },
     'carto-dark-matter': {
       type: 'raster',
@@ -459,18 +535,150 @@ export const osmRasterStyle: StyleSpecification = {
     makeBaseRasterLayer(BASE_TACTICAL_LAYER_ID, 'maptiler-dataviz-dark', 'none'),
     makeBaseRasterLayer(BASE_BACKDROP_LAYER_ID, 'maptiler-backdrop-dark', 'none'),
     makeBaseRasterLayer(BASE_SATELLITE_LAYER_ID, 'maptiler-satellite', 'none'),
-    makeBaseRasterLayer(BASE_PRESENTATION_LAYER_ID, 'carto-positron-nolabels', 'visible'),
     {
+      // Presentation base. Inlined instead of going through the
+      // `makeBaseRasterLayer` factory because it carries a tone-down
+      // raster paint: the Carto Positron no-labels tile is near-white
+      // out of the box, which reads as harsh on a pitched view next
+      // to the warm sky gradient. Capping `raster-brightness-max` at
+      // 0.90 knocks the brightest pixels down to a soft cream while
+      // leaving the existing greyscale ramp intact; a small negative
+      // contrast softens the line edges without flattening the chart.
+      id: BASE_PRESENTATION_LAYER_ID,
+      type: 'raster',
+      source: 'carto-positron-nolabels',
+      layout: { visibility: 'visible' },
+      paint: {
+        // DARK base, LIGHT overlays — the decoupled aesthetic: drop
+        // basemap brightness to 0.65 so land reads as dim chart, and
+        // push saturation positive (+0.18) so any small patch of
+        // water in the source tile that our overlay does not cover
+        // still reads as blue rather than grey. The water / green /
+        // building overlays sit ON the dark base as light pastels
+        // for visible contrast.
+        'raster-brightness-max': 0.65,
+        'raster-contrast': -0.02,
+        'raster-saturation': 0.18,
+      },
+    },
+    {
+      // Green-space overlay. Sage-toned fill that picks parks /
+      // forests / gardens out of the desaturated Positron base. The
+      // data-driven `fill-color` differentiates dense tree cover
+      // (darker), urban parks (lighter) and the everything-else
+      // bucket (neutral) so the chart reads as an actual map rather
+      // than a flat wash. Painted below the water layer so any
+      // riverside park that overlaps a riverbank polygon resolves to
+      // water on top (consistent with how the real shoreline looks).
+      id: PORT_GREEN_LAYER_ID,
+      type: 'fill',
+      source: PORT_GREEN_SOURCE_ID,
+      layout: { visibility: 'visible' },
+      paint: {
+        // Light pastel sage ON the dark base — washed-out tones that
+        // contrast cleanly with the dimmed land. Forest is the
+        // darkest of the three to preserve tree-cover signal, park
+        // the lightest for urban green; neutral sage sits in between
+        // for allotments / meadow / cemetery / recreation.
+        'fill-color': [
+          'match',
+          ['get', 'k'],
+          'forest',
+          '#c5dcb8',
+          'park',
+          '#d8e6c6',
+          'green',
+          '#cedcc2',
+          '#cedcc2',
+        ],
+        'fill-opacity': 0.78,
+        'fill-antialias': true,
+      },
+    },
+    {
+      // Water overlay paint. Mid nautical blue over the toned-down
+      // Positron base, picking out the Odra channel and harbour basins
+      // so water reads as water at a glance. `fill-antialias` keeps
+      // the edge crisp on the pitched view; the companion line layer
+      // below paints a darker outline for shore definition.
+      id: PORT_WATER_LAYER_ID,
+      type: 'fill',
+      source: PORT_WATER_SOURCE_ID,
+      layout: { visibility: 'visible' },
+      paint: {
+        // Pale teal-cyan — sits in a different hue family from the
+        // cobalt trail (`#2563eb`) so the two don't compete or read
+        // as "same blue". The teal lean adds a fresh chart feel
+        // while staying low-saturation enough to feel washed out
+        // against the dim base.
+        'fill-color': '#c4dde0',
+        'fill-opacity': 0.85,
+        'fill-antialias': true,
+      },
+    },
+    {
+      // Water shoreline. Same source as the fill, drawn as line so
+      // the polygon outline reads as a soft coastal contour separate
+      // from the fill alpha. Visibility tracks the fill via the
+      // overlay registry (both ids land in the Presentation overlay
+      // list). A `line` layer over a polygon source renders each
+      // ring as a closed stroke.
+      id: PORT_WATER_OUTLINE_LAYER_ID,
+      type: 'line',
+      source: PORT_WATER_SOURCE_ID,
+      layout: { visibility: 'visible' },
+      paint: {
+        'line-color': '#5e85a0',
+        'line-width': 1.2,
+        'line-opacity': 0.7,
+      },
+    },
+    {
+      // MINOR grid lines (every 0.01° ≈ 700 m). Fine cross-hatch for
+      // local orientation; amber dashed, low alpha.
       id: PRESENTATION_GRID_LAYER_ID,
       type: 'line',
       source: PRESENTATION_GRID_SOURCE_ID,
-      // Visible on initial paint to match DEFAULT_MAP_STYLE = 'presentation';
-      // the sync hook handles toggling on style switch.
-      layout: { visibility: 'visible' },
+      filter: ['==', ['get', 'tier'], 'minor'],
+      // Initial visibility is `none` because grid is now a global
+      // overlay gated by `$gridVisible` (default off). The sync hook
+      // flips it visible when the operator clicks the grid toggle.
+      layout: { visibility: 'none' },
       paint: {
-        'line-color': 'rgba(15, 23, 42, 0.22)',
-        'line-width': 1,
-        'line-dasharray': [4, 4],
+        'line-color': 'rgba(251, 146, 60, 0.55)',
+        'line-width': 0.9,
+        'line-dasharray': [6, 6],
+      },
+    },
+    {
+      // MAJOR grid lines (every 0.05° ≈ 3.5 km). Bold solid amber,
+      // higher alpha — primary spatial-reference anchor. Sits on top
+      // of the minor cross-hatch in the same source via tier filter.
+      id: PRESENTATION_GRID_MAJOR_LAYER_ID,
+      type: 'line',
+      source: PRESENTATION_GRID_SOURCE_ID,
+      filter: ['==', ['get', 'tier'], 'major'],
+      layout: { visibility: 'none' },
+      paint: {
+        'line-color': 'rgba(251, 146, 60, 0.9)',
+        'line-width': 1.6,
+      },
+    },
+    {
+      // Building drop-shadow. A flat fill in the same footprint as the
+      // 3D building, translated 4-5 px south-east via `fill-translate`
+      // to simulate a sun angle. Drawn BEFORE the fill-extrusion so it
+      // sits underneath the rendered building mass on the map. Low
+      // alpha keeps the shadow subtle — operator reads it as "there's
+      // something dimensional here" without it shouting.
+      id: PORT_BUILDINGS_SHADOW_LAYER_ID,
+      type: 'fill',
+      source: PORT_BUILDINGS_SOURCE_ID,
+      paint: {
+        'fill-color': 'rgba(20, 24, 36, 0.28)',
+        'fill-translate': [5, 5],
+        'fill-translate-anchor': 'viewport',
+        'fill-antialias': true,
       },
     },
     {
@@ -478,14 +686,16 @@ export const osmRasterStyle: StyleSpecification = {
       type: 'fill-extrusion',
       source: PORT_BUILDINGS_SOURCE_ID,
       paint: {
-        // Mid-slate fill that reads as built mass without competing
-        // for attention with vessels and zones. Vertical face shading
-        // is enabled by default in MapLibre, giving lit/shadow sides
-        // automatically based on the camera bearing.
-        'fill-extrusion-color': '#94a3b8',
+        // Lighter pastel peach, same warm palette as before but lifted
+        // a few luminance points so the buildings read as architectural
+        // mass without going terracotta. Vertical face shading stays
+        // on (MapLibre default) — gives lit / shadow sides automatically
+        // based on the camera bearing for a soft 3D feel.
+        'fill-extrusion-color': '#eebf91',
         'fill-extrusion-height': ['get', 'h'],
         'fill-extrusion-base': 0,
-        'fill-extrusion-opacity': 0.85,
+        'fill-extrusion-opacity': 0.88,
+        'fill-extrusion-vertical-gradient': true,
       },
     },
     /**
@@ -520,7 +730,14 @@ export const osmRasterStyle: StyleSpecification = {
         'line-join': 'round',
       },
       paint: {
-        'line-color': fillColorByMovementAndCategory,
+        // Unified cobalt-blue trail across every vessel — matches
+        // the Airspace-style reference where a single blue line
+        // signals "vessel track" at-a-glance regardless of category.
+        // The vessel MARKER still carries the AIS category colour
+        // (cargo blue, tanker teal, passenger green, fishing indigo)
+        // so vessel-kind information is preserved at the head of
+        // each track, just not duplicated along its length.
+        'line-color': '#2563eb',
         // Thicker + zoom-aware: at port zoom (z=14-17) the trail is
         // ~3-4 px so it reads cleanly on the desaturated Presentation
         // basemap and against the pitched 3D view. Stays slim at low
