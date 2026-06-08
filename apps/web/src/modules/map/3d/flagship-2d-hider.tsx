@@ -8,7 +8,6 @@ import {
   VESSEL_LABEL_LAYER_ID,
   VESSEL_LAYER_ID,
   VESSEL_SELECTION_RING_LAYER_ID,
-  VESSEL_UNSELECTED_RING_LAYER_ID,
 } from '../styles/osm-raster-style';
 import { FLAGSHIP_MMSI_SET } from './flagships.config';
 import { $threeDMode } from './three-d-toggle.atom';
@@ -33,7 +32,13 @@ const HIDE_TARGETS: ReadonlyArray<HideTarget> = [
   { layerId: VESSEL_LAYER_ID, properties: ['circle-opacity', 'circle-stroke-opacity'] },
   { layerId: VESSEL_ARROW_LAYER_ID, properties: ['icon-opacity'] },
   { layerId: VESSEL_LABEL_LAYER_ID, properties: ['text-opacity', 'icon-opacity'] },
-  { layerId: VESSEL_UNSELECTED_RING_LAYER_ID, properties: ['icon-opacity'] },
+  // VESSEL_UNSELECTED_RING_LAYER deliberately NOT in the hide list:
+  // its paint already carries a zoom-driven `interpolate` that fades
+  // the ring to opacity 0 by z14, and wrapping/unwrapping it via
+  // setPaintProperty(null) was losing that interpolate on restore so
+  // the ring went constantly visible after the first 3D toggle. The
+  // ring is already invisible at port zoom where flagships are read,
+  // so leaving it untouched is harmless.
   { layerId: VESSEL_SELECTION_RING_LAYER_ID, properties: ['icon-opacity'] },
 ];
 
