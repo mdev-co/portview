@@ -514,8 +514,16 @@ export const osmRasterStyle: StyleSpecification = {
       source: 'carto-positron-nolabels',
       layout: { visibility: 'visible' },
       paint: {
-        'raster-brightness-max': 0.9,
-        'raster-contrast': -0.02,
+        // Tone shifted deeper toward a quiet operator chart: max
+        // brightness 0.78 caps the whitest pixels at a soft cool
+        // grey, negative saturation pulls any warm tint out of the
+        // tiles, and the small negative contrast keeps the line
+        // edges from biting. Reads as "minimally dark chart" without
+        // crossing into full dark mode; the water + green overlays
+        // sit on top and provide colour rather than the basemap.
+        'raster-brightness-max': 0.78,
+        'raster-contrast': -0.04,
+        'raster-saturation': -0.2,
       },
     },
     {
@@ -532,34 +540,38 @@ export const osmRasterStyle: StyleSpecification = {
       source: PORT_GREEN_SOURCE_ID,
       layout: { visibility: 'visible' },
       paint: {
+        // Deeper sage palette to match the darker basemap tone. The
+        // earlier pale-sage washed out once the Positron raster lost
+        // 12 % brightness; these mid-sage values keep the green/grey
+        // contrast roughly where it was.
         'fill-color': [
           'match',
           ['get', 'k'],
           'forest',
-          '#b8caa8',
+          '#9bb595',
           'park',
-          '#cfdec6',
+          '#b6c8aa',
           'green',
-          '#c8d4bd',
-          '#c8d4bd',
+          '#aebda1',
+          '#aebda1',
         ],
-        'fill-opacity': 0.65,
+        'fill-opacity': 0.7,
         'fill-antialias': true,
       },
     },
     {
-      // Water overlay paint. Mid-pale nautical blue over the toned-
-      // down Positron base, picking out the Odra channel and harbour
-      // basins so water reads as water at a glance. `fill-antialias`
-      // keeps the edge crisp on the pitched view; the companion line
-      // layer below paints a darker outline for shore definition.
+      // Water overlay paint. Mid nautical blue over the toned-down
+      // Positron base, picking out the Odra channel and harbour basins
+      // so water reads as water at a glance. `fill-antialias` keeps
+      // the edge crisp on the pitched view; the companion line layer
+      // below paints a darker outline for shore definition.
       id: PORT_WATER_LAYER_ID,
       type: 'fill',
       source: PORT_WATER_SOURCE_ID,
       layout: { visibility: 'visible' },
       paint: {
-        'fill-color': '#b3cbdc',
-        'fill-opacity': 0.8,
+        'fill-color': '#8fa9bf',
+        'fill-opacity': 0.82,
         'fill-antialias': true,
       },
     },
@@ -575,9 +587,9 @@ export const osmRasterStyle: StyleSpecification = {
       source: PORT_WATER_SOURCE_ID,
       layout: { visibility: 'visible' },
       paint: {
-        'line-color': '#7c98b0',
+        'line-color': '#5f7d96',
         'line-width': 1.2,
-        'line-opacity': 0.6,
+        'line-opacity': 0.7,
       },
     },
     {
