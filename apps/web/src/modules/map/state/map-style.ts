@@ -12,6 +12,7 @@ import {
   PORT_WATER_LAYER_ID,
   PORT_WATER_OUTLINE_LAYER_ID,
   PRESENTATION_GRID_LAYER_ID,
+  PRESENTATION_GRID_MAJOR_LAYER_ID,
   SEAMARK_OVERLAY_LAYER_ID,
 } from '../styles/osm-raster-style';
 
@@ -116,18 +117,18 @@ export const MAP_STYLE_REGISTRY: Record<MapStyleId, MapStyleDescriptor> = {
     id: 'presentation',
     label: 'Presentation',
     description:
-      'CARTO Positron No Labels - greyscale chart with every street and place name stripped, plus a faint coordinate grid. Optimised for the Airspace-Intelligence-style demo view: the basemap reads as pure topology, zones keep their full colour, and the 3D flagship models pop on top.',
+      'CARTO Positron No Labels - greyscale chart with every street and place name stripped. Optimised for the Airspace-Intelligence-style demo view: the basemap reads as pure topology, water and green overlays carry the colour budget, and 3D flagship models pop on top.',
     baseLayerId: BASE_PRESENTATION_LAYER_ID,
-    // Grid lines are exclusive to presentation; seamarks stay opt-in
-    // and follow the global `$seamarkVisible` toggle the same way they
-    // do on every other base style. The descriptor lists them so the
-    // sync hook can flip them visible when the operator asks - the
-    // visibility AND with the toggle still keeps them off by default.
+    // Grid was previously presentation-exclusive — now it is a global
+    // overlay gated by the `$gridVisible` atom and reachable from any
+    // map style via the dedicated toolbar button. Water and green
+    // overlays remain presentation-exclusive (their colour palette
+    // assumes the dim Positron base); seamarks follow the global
+    // `$seamarkVisible` toggle as on every other style.
     overlayLayerIds: [
       PORT_GREEN_LAYER_ID,
       PORT_WATER_LAYER_ID,
       PORT_WATER_OUTLINE_LAYER_ID,
-      PRESENTATION_GRID_LAYER_ID,
       SEAMARK_OVERLAY_LAYER_ID,
     ],
   },
@@ -139,12 +140,28 @@ export const ALL_BASE_LAYER_IDS: readonly string[] = MAP_STYLE_IDS.map(
 );
 
 /**
- * Every overlay layer the style spec declares; derived from the registry
- * so a new overlay added to any descriptor automatically lands in the
- * off-toggle loop without a second edit.
+ * Global overlays that are NOT tied to a specific map-style descriptor —
+ * the sync hook walks these alongside the descriptor's own overlay list
+ * so a toolbar toggle can flip them on/off regardless of the active
+ * style. Currently just the coordinate grid; add new entries here if
+ * future overlays should also live "outside" the style switcher.
+ */
+const GLOBAL_OVERLAY_LAYER_IDS: readonly string[] = [
+  PRESENTATION_GRID_LAYER_ID,
+  PRESENTATION_GRID_MAJOR_LAYER_ID,
+];
+
+/**
+ * Every overlay layer the style spec declares — descriptor-bound ones
+ * plus global ones. The off-toggle loop in `useMapStyleSync` walks
+ * this list so adding an overlay to any descriptor or to the global
+ * list above is a single-edit change.
  */
 export const ALL_OVERLAY_LAYER_IDS: readonly string[] = Array.from(
-  new Set(MAP_STYLE_IDS.flatMap(id => MAP_STYLE_REGISTRY[id].overlayLayerIds)),
+  new Set([
+    ...MAP_STYLE_IDS.flatMap(id => MAP_STYLE_REGISTRY[id].overlayLayerIds),
+    ...GLOBAL_OVERLAY_LAYER_IDS,
+  ]),
 );
 
 export const DEFAULT_MAP_STYLE: MapStyleId = 'presentation';

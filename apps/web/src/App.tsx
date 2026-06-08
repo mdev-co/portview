@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { RouterProvider, createBrowserRouter } from 'react-router-dom';
 import { DemoToggleButton, installDemoController, uninstallDemoController } from '@/modules/demo';
 import { GeofenceToasterPortal } from '@/modules/geofencing';
+import { GridToggle } from '@/modules/map/components/grid-toggle';
 import { MapStatusPill } from '@/modules/map/components/map-status-pill';
 import { MapStyleSwitcher } from '@/modules/map/components/map-style-switcher';
 import { SeamarkToggle } from '@/modules/map/components/seamark-toggle';
@@ -53,6 +54,7 @@ const router = createBrowserRouter([
                     Overlays
                   </span>
                   <span aria-hidden className="bg-border mx-1 h-4 w-px" />
+                  <GridToggle />
                   <SeamarkToggle />
                   <TrailsToggle />
                   <ThreeDToggleButton />

@@ -71,13 +71,13 @@ body,
    * card lightness each drop ~5-6 points on the oklch scale; chroma
    * unchanged so brand and accent colours stay calibrated.
    */
-  --shell-surface: oklch(0.86 0.025 252);
-  --shell-surface-edge: oklch(0.78 0.03 252);
-  --background: oklch(0.94 0.006 250);
+  --shell-surface: oklch(0.74 0.03 252);
+  --shell-surface-edge: oklch(0.62 0.04 252);
+  --background: oklch(0.86 0.012 250);
   --foreground: oklch(0.18 0.02 250);
-  --card: oklch(0.96 0.005 250);
+  --card: oklch(0.88 0.012 250);
   --card-foreground: oklch(0.18 0.02 250);
-  --popover: oklch(0.96 0.005 250);
+  --popover: oklch(0.88 0.012 250);
   --popover-foreground: oklch(0.18 0.02 250);
   --primary: oklch(0.55 0.2 264);
   --primary-foreground: oklch(0.985 0 0);
