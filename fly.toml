@@ -44,19 +44,34 @@ primary_region = "fra"
   processes = ["app"]
 
   # Boot budget: tailscale handshake + cert materialisation + nest
-  # startup lands around ~30 s after migrate moved to release_command
+  # startup lands around ~27 s after migrate moved to release_command
   # (was 60-70 s when migrate ran per boot). 60 s is 2x headroom on
   # that floor and also the hard cap Fly enforces on HTTP service
-  # checks ("Service HTTP check has a grace period greater than 1
-  # minute; this will be lowered to 1 minute"); setting higher in
-  # config is silently clamped. If boot ever creeps back above 30 s
-  # we lower it at the source rather than fight the platform.
+  # checks; setting higher in config is silently clamped. If boot
+  # ever creeps back above 30 s we lower it at the source rather
+  # than fight the platform.
+  #
+  # `path = "/healthz"` targets a dedicated NestJS controller that
+  # bypasses the global `/api` prefix, returns a constant 200 JSON
+  # body and is decorated with `@SkipThrottle` so the request takes
+  # the shortest possible event-loop path. The previous `/` check
+  # went through `AppController.getHello`, which is also DB-free
+  # but still queued behind the global throttler guard - under AIS
+  # upsert flood with a Prisma pool starved at default 3 connections
+  # the event loop blocked beyond the 5 s timeout and Fly's edge
+  # proxy marked the machine `critical`, returning 502 on the public
+  # listener.
+  #
+  # `timeout = "10s"` (was 5s) leaves room for a single GC-major
+  # stop-the-world pause without flipping the check critical. A real
+  # 10 s response failure remains catastrophic and still trips the
+  # check; this only suppresses transient flickers.
   [[http_service.checks]]
     grace_period = "60s"
     interval = "30s"
     method = "GET"
-    timeout = "5s"
-    path = "/"
+    timeout = "10s"
+    path = "/healthz"
 
 [[vm]]
   cpu_kind = "shared"

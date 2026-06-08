@@ -6,6 +6,7 @@
  * OpenAPI spec version: 1.0.0
  */
 
+export * from './getHealthz200';
 export * from './getVesselsParams';
 export * from './listVesselsQuery';
 export * from './vesselDimensions';

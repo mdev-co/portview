@@ -13,7 +13,13 @@ import {
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.useWebSocketAdapter(new WsAdapter(app));
-  app.setGlobalPrefix('api', { exclude: ['/'] });
+  // `/` keeps the legacy Hello-World handler so any tooling that hits
+  // the root still gets a response; `/healthz` is excluded from the
+  // global `/api` prefix so the Fly edge proxy can probe a path that
+  // takes the shortest possible code path through Nest (no module
+  // resolution beyond HealthController) and is always reachable
+  // regardless of operator-facing API version bumps.
+  app.setGlobalPrefix('api', { exclude: ['/', '/healthz'] });
 
   // CORS allowlist from env. Closed by default - if no origins are
   // configured the api refuses cross-origin browser requests. The

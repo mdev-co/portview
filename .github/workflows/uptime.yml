@@ -1,0 +1,55 @@
+name: uptime
+
+# Free uptime probe for the production API. GitHub Actions cron triggers
+# every 5 minutes (the platform minimum for scheduled workflows), pings
+# the dedicated `/healthz` endpoint, and on a non-200 response posts an
+# alert to a Discord webhook configured as a repository secret. The
+# webhook URL itself is opaque to the workflow - GitHub masks the secret
+# in logs, and the curl call sends the failure message only when the
+# probe fails.
+#
+# Why this lives in-repo rather than UptimeRobot or Better Uptime:
+# zero third-party dependency, zero billing relationship, version
+# control of the probe logic, and the Actions free tier on private
+# repos (2000 minutes/month) absorbs 12 runs/hour × 720 h × ~30 s per
+# run ≈ 100 minutes/month - 5 % of the budget.
+#
+# The 5-minute interval is GitHub's hard floor for `schedule`; the
+# platform also docs that scheduled workflows can be delayed during
+# peak load. For sub-minute alerting, pair this with a local probe
+# (Pi crontab `curl -fsS https://api.sps-radar.pl/healthz || webhook`)
+# so two independent monitors cover each other's failure modes.
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: probe sps-api healthz
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.UPTIME_DISCORD_WEBHOOK }}
+        run: |
+          set -uo pipefail
+          URL='https://api.sps-radar.pl/healthz'
+          # `-f` fails on HTTP >= 400, `-sS` silent but show errors,
+          # `-m 8` caps the whole transfer at 8 s so a hung TCP does
+          # not eat the runner budget. `-o /dev/null -w '%{http_code}'`
+          # surfaces just the status code to the script.
+          status=$(curl -fsS -m 8 -o /dev/null -w '%{http_code}' "$URL" 2>&1) && exit_code=$? || exit_code=$?
+          if [ "${exit_code:-0}" = "0" ] && [ "$status" = "200" ]; then
+            echo "ok $status"
+            exit 0
+          fi
+          msg="sps-api healthz FAILED status=$status curl_exit=$exit_code at $(date -u +%FT%TZ) ($URL)"
+          echo "$msg" >&2
+          if [ -n "${DISCORD_WEBHOOK:-}" ]; then
+            curl -sS -m 8 -H 'Content-Type: application/json' \
+              -d "$(jq -n --arg c "$msg" '{content: $c}')" \
+              "$DISCORD_WEBHOOK" || true
+          fi
+          exit 1

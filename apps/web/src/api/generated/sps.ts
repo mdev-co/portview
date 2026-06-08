@@ -6,7 +6,7 @@
  * OpenAPI spec version: 1.0.0
  */
 import { orvalFetcher } from '../../lib/orval-fetcher';
-import type { GetVesselsParams, VesselListResponse, VesselSummary } from './schemas';
+import type { GetHealthz200, GetVesselsParams, VesselListResponse, VesselSummary } from './schemas';
 
 export type getResponse200 = {
   data: string;
@@ -82,6 +82,27 @@ export const getVesselsMmsi = async (
   options?: RequestInit,
 ): Promise<getVesselsMmsiResponse> => {
   return orvalFetcher<getVesselsMmsiResponse>(getGetVesselsMmsiUrl(mmsi), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type getHealthzResponse200 = {
+  data: GetHealthz200;
+  status: 200;
+};
+
+export type getHealthzResponseSuccess = getHealthzResponse200 & {
+  headers: Headers;
+};
+export type getHealthzResponse = getHealthzResponseSuccess;
+
+export const getGetHealthzUrl = () => {
+  return `/healthz`;
+};
+
+export const getHealthz = async (options?: RequestInit): Promise<getHealthzResponse> => {
+  return orvalFetcher<getHealthzResponse>(getGetHealthzUrl(), {
     ...options,
     method: 'GET',
   });
