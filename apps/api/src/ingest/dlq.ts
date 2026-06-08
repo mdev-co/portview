@@ -1,4 +1,9 @@
-import { appendFileSync, mkdirSync, renameSync, statSync } from 'node:fs';
+import {
+  appendFile as appendFileAsync,
+  mkdirSync,
+  renameSync,
+  statSync,
+} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { type SourceId, sourceIdName } from '@sps/shared';
@@ -63,10 +68,15 @@ function defaultPath(): string {
  * which overwrites any previous rotation. Two-file retention keeps disk
  * usage bounded under any traffic profile and the rename is atomic.
  *
- * Synchronous append per call. Poison frames are rare in normal traffic;
- * the deterministic flush makes the file usable for live tailing during
- * development. Write failures latch the writer into a failed state
- * without throwing into the ingest hot path.
+ * Asynchronous append per call. The earlier implementation used
+ * `appendFileSync` for deterministic flush, which under sustained
+ * rejection bursts (Pi reconnect after a deploy flushes a queue that
+ * contains many out-of-spec frames) blocks the Node event loop long
+ * enough to starve `/healthz` of cycles and trip Fly's liveness check.
+ * The async form returns immediately; rotation still uses sync stat /
+ * rename because those run once per `rotateCheckEvery` writes (default
+ * 100) and their cost is amortised. Write failures latch the writer
+ * into a failed state without throwing into the ingest hot path.
  */
 export class DeadLetterWriter {
   private readonly filePath: string;
@@ -75,6 +85,8 @@ export class DeadLetterWriter {
   private dirEnsured = false;
   private failed = false;
   private writesSinceRotateCheck = 0;
+  private pending = 0;
+  private waiters: Array<() => void> = [];
 
   constructor(options: DeadLetterWriterOptions = {}) {
     this.filePath =
@@ -97,12 +109,36 @@ export class DeadLetterWriter {
       reason: params.reason,
       raw: params.raw,
     };
-    try {
-      appendFileSync(this.filePath, `${JSON.stringify(row)}\n`);
-      this.writesSinceRotateCheck += 1;
-    } catch {
-      this.failed = true;
-    }
+    this.writesSinceRotateCheck += 1;
+    this.pending += 1;
+    // Fire-and-forget. The callback only latches the failed flag and
+    // releases any `flush()` waiters so the hot path returns inside
+    // microseconds even when the underlying disk is slow. Lost
+    // rejection rows under a transient EIO are acceptable; a wedged
+    // event loop is not.
+    appendFileAsync(this.filePath, `${JSON.stringify(row)}\n`, (err) => {
+      if (err !== null) {
+        this.failed = true;
+      }
+      this.pending -= 1;
+      if (this.pending === 0 && this.waiters.length > 0) {
+        const toResolve = this.waiters;
+        this.waiters = [];
+        for (const resolve of toResolve) resolve();
+      }
+    });
+  }
+
+  /**
+   * Resolves once every write scheduled before the call has hit disk.
+   * Production never awaits this; tests use it to assert against the
+   * written file. Returns immediately when no writes are in flight.
+   */
+  flush(): Promise<void> {
+    if (this.pending === 0) return Promise.resolve();
+    return new Promise((resolve) => {
+      this.waiters.push(resolve);
+    });
   }
 
   close(): void {
