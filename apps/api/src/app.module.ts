@@ -41,10 +41,19 @@ import { VesselsModule } from './vessels/vessels.module';
     // is unaffected; it has its own connection cap and backpressure
     // in TelemetryWsGateway.
     ThrottlerModule.forRoot([
-      // Short window: catches burst floods (e.g. scripted scrape).
-      { name: 'short', ttl: 1_000, limit: 10 },
-      // Long window: catches sustained abuse (rolling minute).
-      { name: 'long', ttl: 60_000, limit: 100 },
+      // Short window: catches burst floods (e.g. scripted scrape). A
+      // browser hard-refresh fires ~4-6 parallel REST calls (Orval
+      // hydrate of /api/vessels plus a few resources) in under 200 ms,
+      // so the previous limit of 10 was hit by two consecutive reloads
+      // sharing one NAT IP. 30/s tolerates that natural cadence while
+      // still snapping shut on a real scrape loop.
+      { name: 'short', ttl: 1_000, limit: 30 },
+      // Long window: catches sustained abuse (rolling minute). 100/min
+      // was undersized for an operator who hits the page, clicks a few
+      // overlays, and triggers the tab-visibility refresh path; a real
+      // session burns 200-400 requests easily. 600/min keeps a single
+      // legitimate IP comfortable for ~ten minutes of active use.
+      { name: 'long', ttl: 60_000, limit: 600 },
     ]),
     PrismaModule,
     IngestModule,

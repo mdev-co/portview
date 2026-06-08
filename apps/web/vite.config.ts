@@ -94,6 +94,22 @@ export default defineConfig(({ command }) => ({
     sourcemap: false,
     minify: 'esbuild',
     /**
+     * Strip the vendor-3d chunk from <link rel="modulepreload"> in the
+     * built index.html. The `lazy(() => import('../3d/flagship-3d-layer'))`
+     * pattern is statically analysable, so Vite (helpfully but here
+     * unhelpfully) emits a modulepreload hint for the resulting deck.gl
+     * chunk. The browser fetches it during idle on first paint and
+     * Lighthouse counts the ~130 KB transfer as unused JS on operators
+     * who never click the 3D toggle. The lazy import itself stays — the
+     * first 3D click pays one network round trip, subsequent clicks hit
+     * the HTTP cache.
+     */
+    modulePreload: {
+      resolveDependencies(_filename, deps) {
+        return deps.filter(dep => !dep.includes('vendor-3d'));
+      },
+    },
+    /**
      * Vendor chunking via Rolldown advanced groups. The point is
      * stable cache keys: the React core and state libs change rarely
      * (one entry per dependency bump), so a separate hashed chunk
