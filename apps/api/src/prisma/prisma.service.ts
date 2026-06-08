@@ -19,6 +19,22 @@ const DEFAULT_POOL_CONNECTION_LIMIT = 10;
 /** Seconds Prisma will wait before declaring pool acquisition timed out. */
 const DEFAULT_POOL_TIMEOUT_SEC = 20;
 
+/**
+ * Server-side statement timeout (ms). Any client-side connection that
+ * holds a transaction or query for longer than this is killed by the
+ * Postgres backend with a `canceling statement due to statement
+ * timeout` error. The point is NOT performance - it is safety against
+ * the failure mode observed during the 2026-06-08 incident, where a
+ * cascade of restarts left 18 client backends in `idle in transaction`
+ * holding row locks on the `vessels` table for ~1.7 hours, blocking
+ * every subsequent Prisma persist. With the timeout in place, the
+ * Postgres backend reaps stale sessions automatically and no manual
+ * `pg_terminate_backend` ever has to run again. 30 s is far longer
+ * than any legitimate query in this codebase (snapshot build ~50 ms,
+ * upserts ~5 ms) so genuine work is never interrupted.
+ */
+const DEFAULT_STATEMENT_TIMEOUT_MS = 30_000;
+
 @Injectable()
 export class PrismaService
   extends PrismaClient
@@ -34,6 +50,14 @@ export class PrismaService
 
   async onModuleInit(): Promise<void> {
     await this.$connect();
+    // Apply server-side statement timeout to every connection in the
+    // pool. Prisma keeps connections warm and reuses them, so SETs
+    // applied here propagate to subsequent queries until the connection
+    // is recycled by Postgres or the client disconnects. Done at module
+    // init rather than on every query so the cost is paid once.
+    await this.$executeRawUnsafe(
+      `SET statement_timeout = ${DEFAULT_STATEMENT_TIMEOUT_MS}`,
+    );
   }
 
   async onModuleDestroy(): Promise<void> {

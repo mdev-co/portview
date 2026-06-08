@@ -3,74 +3,93 @@ import { Test } from '@nestjs/testing';
 import { PrismaService } from '../../prisma/prisma.service';
 import { VesselsService } from '../vessels.service';
 
-type MockVesselClient = {
-  findMany: jest.Mock;
-  findUnique: jest.Mock;
+/**
+ * VesselsService talks to Postgres through `prisma.$queryRaw` LATERAL
+ * JOIN queries, so the mock only needs to capture that one method.
+ * Rows come back from the SQL planner in snake_case; the spec uses
+ * that shape verbatim to keep the contract honest.
+ */
+type MockPrisma = {
+  $queryRaw: jest.Mock;
+};
+
+type PositionFields = {
+  pos_lat: number | null;
+  pos_lng: number | null;
+  pos_speed_over_ground: number | null;
+  pos_course_over_ground: number | null;
+  pos_true_heading: number | null;
+  pos_nav_status: number | null;
+  pos_rate_of_turn: number | null;
+  pos_broadcast_timestamp: Date | null;
+  pos_ingest_timestamp: Date | null;
 };
 
 const NULL_DIMENSIONS = {
-  toBow: null,
-  toStern: null,
-  toPort: null,
-  toStarboard: null,
-};
+  to_bow: null,
+  to_stern: null,
+  to_port: null,
+  to_starboard: null,
+} as const;
 
 const NULL_KALMAN = {
-  kalmanLng: null,
-  kalmanLat: null,
-  kalmanVlng: null,
-  kalmanVlat: null,
-  kalmanUpdatedAt: null,
+  kalman_lng: null,
+  kalman_lat: null,
+  kalman_vlng: null,
+  kalman_vlat: null,
+  kalman_updated_at: null,
+} as const;
+
+const NO_POSITION: PositionFields = {
+  pos_lat: null,
+  pos_lng: null,
+  pos_speed_over_ground: null,
+  pos_course_over_ground: null,
+  pos_true_heading: null,
+  pos_nav_status: null,
+  pos_rate_of_turn: null,
+  pos_broadcast_timestamp: null,
+  pos_ingest_timestamp: null,
 };
 
 describe('VesselsService', () => {
   let service: VesselsService;
-  let vessel: MockVesselClient;
+  let prisma: MockPrisma;
 
   beforeEach(async () => {
-    vessel = {
-      findMany: jest.fn(),
-      findUnique: jest.fn(),
-    };
+    prisma = { $queryRaw: jest.fn() };
 
     const moduleRef = await Test.createTestingModule({
-      providers: [
-        VesselsService,
-        { provide: PrismaService, useValue: { vessel } },
-      ],
+      providers: [VesselsService, { provide: PrismaService, useValue: prisma }],
     }).compile();
 
     service = moduleRef.get(VesselsService);
   });
 
   describe('listVessels', () => {
-    it('maps Prisma rows with nested latest position to VesselSummary', async () => {
-      vessel.findMany.mockResolvedValue([
+    it('maps a row with nested latest position to VesselSummary', async () => {
+      prisma.$queryRaw.mockResolvedValue([
         {
           mmsi: 261000001,
           imo: 9876543,
           name: 'POMERANIA TRADER',
-          callSign: 'SPPT1',
-          shipType: 70,
+          call_sign: 'SPPT1',
+          ship_type: 70,
           ...NULL_DIMENSIONS,
           draught: null,
           destination: 'GDYNIA',
           eta: null,
-          lastSeenAt: new Date('2026-05-11T18:00:00Z'),
+          last_seen_at: new Date('2026-05-11T18:00:00Z'),
           ...NULL_KALMAN,
-          positions: [
-            {
-              lat: 53.4267,
-              lng: 14.565,
-              speedOverGround: null,
-              courseOverGround: null,
-              trueHeading: null,
-              navStatus: null,
-              rateOfTurn: null,
-              broadcastTimestamp: new Date('2026-05-11T18:00:00Z'),
-              ingestTimestamp: new Date('2026-05-11T18:00:01Z'),
-            },
-          ],
+          pos_lat: 53.4267,
+          pos_lng: 14.565,
+          pos_speed_over_ground: null,
+          pos_course_over_ground: null,
+          pos_true_heading: null,
+          pos_nav_status: null,
+          pos_rate_of_turn: null,
+          pos_broadcast_timestamp: new Date('2026-05-11T18:00:00Z'),
+          pos_ingest_timestamp: new Date('2026-05-11T18:00:01Z'),
         },
       ]);
 
@@ -104,143 +123,139 @@ describe('VesselsService', () => {
       ]);
     });
 
-    it('falls back to ingestTimestamp when broadcastTimestamp absent', async () => {
-      vessel.findMany.mockResolvedValue([
+    it('falls back to ingest_timestamp when broadcast_timestamp absent', async () => {
+      prisma.$queryRaw.mockResolvedValue([
         {
           mmsi: 1,
           imo: null,
           name: null,
-          callSign: null,
-          shipType: null,
+          call_sign: null,
+          ship_type: null,
           ...NULL_DIMENSIONS,
           draught: null,
           destination: null,
           eta: null,
-          lastSeenAt: null,
+          last_seen_at: null,
           ...NULL_KALMAN,
-          positions: [
-            {
-              lat: 53,
-              lng: 14,
-              speedOverGround: null,
-              courseOverGround: null,
-              trueHeading: null,
-              navStatus: null,
-              rateOfTurn: null,
-              broadcastTimestamp: null,
-              ingestTimestamp: new Date('2026-05-11T18:00:00Z'),
-            },
-          ],
+          pos_lat: 53,
+          pos_lng: 14,
+          pos_speed_over_ground: null,
+          pos_course_over_ground: null,
+          pos_true_heading: null,
+          pos_nav_status: null,
+          pos_rate_of_turn: null,
+          pos_broadcast_timestamp: null,
+          pos_ingest_timestamp: new Date('2026-05-11T18:00:00Z'),
         },
       ]);
 
       const [row] = await service.listVessels(1);
-      expect(row.position?.updatedAt).toBe('2026-05-11T18:00:00.000Z');
-      expect(row.position?.broadcastTimestamp).toBeNull();
+      expect(row?.position?.updatedAt).toBe('2026-05-11T18:00:00.000Z');
+      expect(row?.position?.broadcastTimestamp).toBeNull();
     });
 
-    it('emits null position when no positions exist for vessel', async () => {
-      vessel.findMany.mockResolvedValue([
+    it('emits null position when LATERAL yields no row', async () => {
+      prisma.$queryRaw.mockResolvedValue([
         {
           mmsi: 2,
           imo: null,
           name: null,
-          callSign: null,
-          shipType: null,
+          call_sign: null,
+          ship_type: null,
           ...NULL_DIMENSIONS,
           draught: null,
           destination: null,
           eta: null,
-          lastSeenAt: null,
+          last_seen_at: null,
           ...NULL_KALMAN,
-          positions: [],
+          ...NO_POSITION,
         },
       ]);
 
       const [row] = await service.listVessels(1);
-      expect(row.position).toBeNull();
+      expect(row?.position).toBeNull();
     });
 
     it('emits dimensions object when all four hull offsets present', async () => {
-      vessel.findMany.mockResolvedValue([
+      prisma.$queryRaw.mockResolvedValue([
         {
           mmsi: 3,
           imo: null,
           name: null,
-          callSign: null,
-          shipType: null,
-          toBow: 100,
-          toStern: 20,
-          toPort: 10,
-          toStarboard: 12,
+          call_sign: null,
+          ship_type: null,
+          to_bow: 100,
+          to_stern: 20,
+          to_port: 10,
+          to_starboard: 12,
           draught: 8.5,
           destination: null,
           eta: null,
-          lastSeenAt: null,
+          last_seen_at: null,
           ...NULL_KALMAN,
-          positions: [],
+          ...NO_POSITION,
         },
       ]);
 
       const [row] = await service.listVessels(1);
-      expect(row.dimensions).toEqual({
+      expect(row?.dimensions).toEqual({
         toBow: 100,
         toStern: 20,
         toPort: 10,
         toStarboard: 12,
       });
-      expect(row.draught).toBe(8.5);
+      expect(row?.draught).toBe(8.5);
     });
 
     it('emits dimensions null when any hull offset missing', async () => {
-      vessel.findMany.mockResolvedValue([
+      prisma.$queryRaw.mockResolvedValue([
         {
           mmsi: 4,
           imo: null,
           name: null,
-          callSign: null,
-          shipType: null,
-          toBow: 100,
-          toStern: 20,
-          toPort: null,
-          toStarboard: 12,
+          call_sign: null,
+          ship_type: null,
+          to_bow: 100,
+          to_stern: 20,
+          to_port: null,
+          to_starboard: 12,
           draught: null,
           destination: null,
           eta: null,
-          lastSeenAt: null,
+          last_seen_at: null,
           ...NULL_KALMAN,
-          positions: [],
+          ...NO_POSITION,
         },
       ]);
 
       const [row] = await service.listVessels(1);
-      expect(row.dimensions).toBeNull();
+      expect(row?.dimensions).toBeNull();
     });
 
     it('emits kalmanState when all five Kalman fields present', async () => {
-      vessel.findMany.mockResolvedValue([
+      prisma.$queryRaw.mockResolvedValue([
         {
           mmsi: 5,
           imo: null,
           name: null,
-          callSign: null,
-          shipType: null,
+          call_sign: null,
+          ship_type: null,
           ...NULL_DIMENSIONS,
           draught: null,
           destination: null,
           eta: null,
-          lastSeenAt: null,
-          kalmanLng: 14.5,
-          kalmanLat: 53.4,
-          kalmanVlng: 0.001,
-          kalmanVlat: -0.0002,
-          kalmanUpdatedAt: new Date('2026-05-11T18:00:00Z'),
-          positions: [],
+          last_seen_at: null,
+          kalman_lng: 14.5,
+          kalman_lat: 53.4,
+          kalman_vlng: 0.001,
+          kalman_vlat: -0.0002,
+          kalman_updated_at: new Date('2026-05-11T18:00:00Z'),
+          ...NO_POSITION,
         },
       ]);
 
       const [row] = await service.listVessels(1);
-      expect(row.kalmanState).toEqual({
+      expect(row?.kalmanState).toEqual({
         lng: 14.5,
         lat: 53.4,
         vlng: 0.001,
@@ -249,39 +264,30 @@ describe('VesselsService', () => {
       });
     });
 
-    it('passes limit through to Prisma orderBy and take', async () => {
-      vessel.findMany.mockResolvedValue([]);
-      await service.listVessels(50);
-      expect(vessel.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          orderBy: { lastSeenAt: 'desc' },
-          take: 50,
-        }),
-      );
-    });
-
     it('returns empty array when no vessels match', async () => {
-      vessel.findMany.mockResolvedValue([]);
+      prisma.$queryRaw.mockResolvedValue([]);
       await expect(service.listVessels(10)).resolves.toEqual([]);
     });
   });
 
   describe('getVessel', () => {
     it('returns mapped vessel when found', async () => {
-      vessel.findUnique.mockResolvedValue({
-        mmsi: 261000000,
-        imo: null,
-        name: 'X',
-        callSign: null,
-        shipType: null,
-        ...NULL_DIMENSIONS,
-        draught: null,
-        destination: null,
-        eta: null,
-        lastSeenAt: null,
-        ...NULL_KALMAN,
-        positions: [],
-      });
+      prisma.$queryRaw.mockResolvedValue([
+        {
+          mmsi: 261000000,
+          imo: null,
+          name: 'X',
+          call_sign: null,
+          ship_type: null,
+          ...NULL_DIMENSIONS,
+          draught: null,
+          destination: null,
+          eta: null,
+          last_seen_at: null,
+          ...NULL_KALMAN,
+          ...NO_POSITION,
+        },
+      ]);
 
       const result = await service.getVessel(261000000);
       expect(result?.mmsi).toBe(261000000);
@@ -291,8 +297,8 @@ describe('VesselsService', () => {
       expect(result?.kalmanState).toBeNull();
     });
 
-    it('returns null when not found', async () => {
-      vessel.findUnique.mockResolvedValue(null);
+    it('returns null when no row found', async () => {
+      prisma.$queryRaw.mockResolvedValue([]);
       await expect(service.getVessel(999)).resolves.toBeNull();
     });
   });

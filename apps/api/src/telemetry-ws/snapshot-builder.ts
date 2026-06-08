@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import {
   type Mmsi,
   type SourceId,
@@ -44,33 +45,82 @@ export class SnapshotBuilder {
   async build(nowMs: number = Date.now()): Promise<VesselSnapshotFrame> {
     const cutoff = new Date(nowMs - SNAPSHOT_FRESHNESS_WINDOW_MS);
 
+    // Step 1: vessels with a live recent fix. Cheap query, indexed on
+    // last_seen_at. No relation include - we used to pull positions
+    // here via Prisma's `include + take` which on PostgreSQL emits an
+    // un-bounded IN-clause select on vessel_positions and trims to N
+    // per parent in JavaScript. With a vessel_positions table that
+    // grows unbounded that one query starved the connection pool. The
+    // LATERAL join below replaces it with a per-mmsi LIMIT pushed into
+    // the SQL planner.
     const vessels = await this.prisma.vessel.findMany({
       where: { lastSeenAt: { gte: cutoff } },
       orderBy: { lastSeenAt: 'desc' },
       take: SNAPSHOT_MAX_VESSELS,
-      include: {
-        positions: {
-          take: VESSEL_HISTORY_MAX_POINTS,
-          orderBy: { ingestTimestamp: 'desc' },
-        },
-      },
     });
+
+    if (vessels.length === 0) {
+      this.log.log(
+        `snapshot built: vessels=0 (within ${SNAPSHOT_FRESHNESS_WINDOW_MS / 60_000} min)`,
+      );
+      return {
+        kind: VESSEL_SNAPSHOT_FRAME_KIND,
+        serverTimeUnix: Math.floor(nowMs / 1000),
+        vessels: [],
+      };
+    }
+
+    // Step 2: top N positions per vessel via LATERAL JOIN over the
+    // mmsi array. unnest(int[]) produces one row per mmsi; the LATERAL
+    // subquery yields at most VESSEL_HISTORY_MAX_POINTS rows for each.
+    // Total result is bounded at vessels.length * N regardless of how
+    // many historical positions the table holds.
+    const mmsis = vessels.map((v) => v.mmsi);
+    const positionRows = await this.prisma.$queryRaw<PositionRow[]>`
+      SELECT m.mmsi AS vessel_mmsi,
+             p.lat, p.lng,
+             p.speed_over_ground, p.course_over_ground,
+             p.true_heading,
+             p.broadcast_timestamp, p.ingest_timestamp
+      FROM unnest(${Prisma.sql`ARRAY[${Prisma.join(mmsis)}]::integer[]`}) AS m(mmsi)
+      CROSS JOIN LATERAL (
+        SELECT lat, lng, speed_over_ground, course_over_ground,
+               true_heading, broadcast_timestamp, ingest_timestamp
+        FROM vessel_positions
+        WHERE vessel_mmsi = m.mmsi
+        ORDER BY ingest_timestamp DESC
+        LIMIT ${VESSEL_HISTORY_MAX_POINTS}
+      ) p
+    `;
+
+    // Group positions by mmsi for O(1) lookup during entry assembly.
+    // Map preserves insertion order; we reverse each list at emit so
+    // the FE receives chronological points without an extra sort.
+    const positionsByMmsi = new Map<number, PositionRow[]>();
+    for (const row of positionRows) {
+      const existing = positionsByMmsi.get(row.vessel_mmsi);
+      if (existing === undefined) {
+        positionsByMmsi.set(row.vessel_mmsi, [row]);
+      } else {
+        existing.push(row);
+      }
+    }
 
     const entries: VesselSnapshotEntry[] = vessels.map((v) => {
       const mmsi = v.mmsi as Mmsi;
-      const history = v.positions
-        // Re-sort to chronological so the FE can draw the trail in
-        // time order without flipping it client-side.
+      const rows = positionsByMmsi.get(v.mmsi) ?? [];
+      // Reverse from DESC (DB order) to chronological for the FE.
+      const history = rows
         .slice()
         .reverse()
         .map<VesselHistoryPoint>((p) => ({
           lng: p.lng,
           lat: p.lat,
-          sog: p.speedOverGround,
-          cog: p.courseOverGround,
-          trueHeading: p.trueHeading,
+          sog: p.speed_over_ground,
+          cog: p.course_over_ground,
+          trueHeading: p.true_heading,
           timestampUnix: Math.floor(
-            (p.broadcastTimestamp ?? p.ingestTimestamp).getTime() / 1000,
+            (p.broadcast_timestamp ?? p.ingest_timestamp).getTime() / 1000,
           ),
         }));
       return {
@@ -93,6 +143,17 @@ export class SnapshotBuilder {
     };
   }
 }
+
+type PositionRow = {
+  vessel_mmsi: number;
+  lat: number;
+  lng: number;
+  speed_over_ground: number | null;
+  course_over_ground: number | null;
+  true_heading: number | null;
+  broadcast_timestamp: Date | null;
+  ingest_timestamp: Date;
+};
 
 type VesselRow = {
   mmsi: number;
