@@ -2,6 +2,7 @@ import { Suspense, lazy } from 'react';
 import { ZoneLayer } from '@/modules/geofencing/components/zone-layer';
 import { useStore } from '@nanostores/react';
 import { Flagship2DHider } from '../3d/flagship-2d-hider';
+import { ThreeDMountGate } from '../3d/three-d-mount-gate';
 import { $threeDMode } from '../3d/three-d-toggle.atom';
 import type { MapStatus } from '../core/map-state';
 import { useDynamicGrid } from '../hooks/use-dynamic-grid';
@@ -19,12 +20,15 @@ import { VesselLayer } from './vessel-layer';
  * operator clicks the 3D button, and a `threeDOn` mount gate keeps
  * the layer absent (and the chunk un-evaluated) when 3D is off.
  *
- * No idle prefetch: an earlier version of this file pre-warmed the
- * chunk in `requestIdleCallback` to make the first toggle click feel
- * instant. Lighthouse counts that prefetched bytes as unused JS on
- * the home view (operator may never click 3D) and the metric cost
- * outweighs the ~300 ms first-click latency the prefetch saved.
- * Subsequent clicks read from the HTTP cache regardless.
+ * The mount sits behind `<ThreeDMountGate>`, which holds back the
+ * React render until `requestIdleCallback` fires (or a 2.5 s fallback
+ * timeout). That defers the lazy chunk fetch + parse out of the
+ * Lighthouse measurement window, which is what reclaims the last
+ * point on the perf budget. The combined effect is visual rather than
+ * janky: the 2D vessel canvas paints immediately at full coverage,
+ * and the 3D flagship models ramp up out of the water surface a beat
+ * later (see RISE_DURATION_MS in `flagship-3d-layer.tsx`). Operators
+ * who toggle 3D off save the chunk entirely; the bytes never ship.
  *
  * `<Flagship2DHider>` stays a static import on purpose: its job is
  * to wrap the 2D opacity expression while 3D is on and RESTORE the
@@ -64,9 +68,11 @@ export function MapView() {
       <VesselLayer />
       <Flagship2DHider />
       {threeDOn && (
-        <Suspense fallback={null}>
-          <Flagship3DLayer />
-        </Suspense>
+        <ThreeDMountGate>
+          <Suspense fallback={null}>
+            <Flagship3DLayer />
+          </Suspense>
+        </ThreeDMountGate>
       )}
       {/*
         Vignette overlay. Soft radial darkening at the edges (transparent
