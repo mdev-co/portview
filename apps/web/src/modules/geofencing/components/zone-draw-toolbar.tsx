@@ -51,6 +51,19 @@ export function ZoneDrawToolbar(): React.JSX.Element {
     }
   }, [status]);
 
+  // The toolbar can unmount mid-draw (sidebar view switch, dock
+  // collapse). Without this teardown the TerraDraw session outlives
+  // the component: polygon mode stays active on the map and every
+  // re-entry stacks another orphaned instance.
+  useEffect(() => {
+    return () => {
+      if (drawRef.current !== null) {
+        drawRef.current.stop();
+        drawRef.current = null;
+      }
+    };
+  }, []);
+
   async function startDrawing(): Promise<void> {
     if (status !== 'ready' || active || loading) return;
     const map = controller.getRawEngine() as MaplibreMap | null;
