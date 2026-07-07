@@ -252,4 +252,68 @@ describe('snapshot.codec', () => {
 
     expect(protobuf.byteLength).toBeLessThan(json.length);
   });
+
+  describe('adversarial decode', () => {
+    it('decodes a static frame whose wire omits the eta sub-message', () => {
+      // Message-typed fields are always optional on the protobuf wire,
+      // whatever the schema says. This payload is a legal StaticData
+      // carrying only field 1: tag 0x08 + varint(261182517).
+      const wire = new Uint8Array([BINARY_FRAME_TYPE_STATIC, 0x08, 0xb5, 0xa8, 0xc5, 0x7c]);
+      const decoded = decodeStaticFrame(wire);
+      expect(decoded.mmsi).toBe(261_182_517);
+      expect(decoded.eta).toEqual({ month: null, day: null, hour: null, minute: null });
+    });
+
+    it('throws on a frame truncated mid-field instead of returning garbage', () => {
+      // Field 2 (vessels) declares 3 length-delimited bytes, none follow.
+      const wire = new Uint8Array([BINARY_FRAME_TYPE_SNAPSHOT, 0x12, 0x03]);
+      expect(() => decodeSnapshot(wire)).toThrow();
+    });
+
+    it('drops a kalman entry with wrong covariance arity instead of feeding NaN into the filter', () => {
+      const frame: VesselSnapshotFrame = {
+        kind: VESSEL_SNAPSHOT_FRAME_KIND,
+        serverTimeUnix: 1_780_000_000,
+        vessels: [
+          {
+            mmsi: 261_182_517 as Mmsi,
+            staticData: null,
+            history: [],
+            kalman: {
+              lng: 14.575,
+              lat: 53.425,
+              vlng: 0.00001,
+              vlat: 0.000005,
+              covariance: [0.1, 0.2, 0.3],
+              updatedAtUnix: 1_779_999_960,
+            },
+            sourceId: null,
+          },
+        ],
+      };
+
+      const decoded = decodeSnapshot(encodeSnapshot(frame));
+      expect(decoded.vessels[0]?.kalman).toBeNull();
+    });
+
+    it('round-trips non-ASCII vessel names through the UTF-8 wire encoding', () => {
+      const frame: VesselStaticDataFrame = {
+        kind: VESSEL_STATIC_FRAME_KIND,
+        mmsi: 261_182_517 as Mmsi,
+        vesselName: 'ŚWINOUJŚCIE Ø',
+        imo: null,
+        callSign: 'SQAB',
+        shipType: 70 as unknown as ShipTypeCode,
+        dimensions: null,
+        draught: null,
+        destination: 'ŁEBA',
+        eta: { month: null, day: null, hour: null, minute: null },
+        receivedAt: 1_780_000_000_000,
+      };
+
+      const decoded = decodeStaticFrame(encodeStaticFrame(frame));
+      expect(decoded.vesselName).toBe('ŚWINOUJŚCIE Ø');
+      expect(decoded.destination).toBe('ŁEBA');
+    });
+  });
 });
