@@ -41,6 +41,19 @@ export type DeadLetterWriterOptions = {
   readonly path?: string;
   readonly maxBytes?: number;
   readonly rotateCheckEvery?: number;
+  /**
+   * Called exactly once, at the moment the writer latches into the
+   * failed state. Without an observer the latch is invisible: the FSM
+   * keeps counting FRAME_REJECTED so metrics look healthy while the
+   * audit trail is silently dead.
+   */
+  readonly onLatch?: (context: string, error: unknown) => void;
+};
+
+export type DlqStats = {
+  readonly failed: boolean;
+  readonly pending: number;
+  readonly written: number;
 };
 
 const DEFAULT_DIR_NAME = '.sps-data';
@@ -82,10 +95,12 @@ export class DeadLetterWriter {
   private readonly filePath: string;
   private readonly maxBytes: number;
   private readonly rotateCheckEvery: number;
+  private readonly onLatch?: (context: string, error: unknown) => void;
   private dirEnsured = false;
   private failed = false;
   private writesSinceRotateCheck = 0;
   private pending = 0;
+  private written = 0;
   private waiters: Array<() => void> = [];
 
   constructor(options: DeadLetterWriterOptions = {}) {
@@ -93,6 +108,15 @@ export class DeadLetterWriter {
       options.path ?? process.env[ENV_PATH_OVERRIDE] ?? defaultPath();
     this.maxBytes = options.maxBytes ?? DEFAULT_MAX_BYTES;
     this.rotateCheckEvery = options.rotateCheckEvery ?? DEFAULT_ROTATE_CHECK;
+    this.onLatch = options.onLatch;
+  }
+
+  stats(): DlqStats {
+    return {
+      failed: this.failed,
+      pending: this.pending,
+      written: this.written,
+    };
   }
 
   write(params: DlqWriteParams): void {
@@ -118,7 +142,9 @@ export class DeadLetterWriter {
     // event loop is not.
     appendFileAsync(this.filePath, `${JSON.stringify(row)}\n`, (err) => {
       if (err !== null) {
-        this.failed = true;
+        this.latch('append', err);
+      } else {
+        this.written += 1;
       }
       this.pending -= 1;
       if (this.pending === 0 && this.waiters.length > 0) {
@@ -155,8 +181,8 @@ export class DeadLetterWriter {
       }
       this.dirEnsured = true;
       return true;
-    } catch {
-      this.failed = true;
+    } catch (err) {
+      this.latch('mkdir', err);
       return false;
     }
   }
@@ -169,7 +195,13 @@ export class DeadLetterWriter {
     } catch (err) {
       const code = (err as NodeJS.ErrnoException).code;
       if (code === 'ENOENT') return;
-      this.failed = true;
+      this.latch('rotate', err);
     }
+  }
+
+  private latch(context: string, error: unknown): void {
+    if (this.failed) return;
+    this.failed = true;
+    this.onLatch?.(context, error);
   }
 }

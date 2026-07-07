@@ -97,7 +97,12 @@ type WarmSubscription = {
 export class IngestService implements OnModuleInit, OnModuleDestroy {
   private readonly log = new Logger(IngestService.name);
   private readonly decoder = new Decoder();
-  private readonly dlq = new DeadLetterWriter();
+  private readonly dlq = new DeadLetterWriter({
+    onLatch: (context, error) =>
+      this.log.error(
+        `dlq latched (${context}): ${String(error)} - rejected frames are no longer persisted`,
+      ),
+  });
   private readonly sources = new Map<SourceId, ISource>();
   private readonly mmsiLimiter = new PerMmsiRateLimiter();
   private readonly newMmsiBouncer = new NewMmsiBouncer();
@@ -160,14 +165,21 @@ export class IngestService implements OnModuleInit, OnModuleDestroy {
     }
     this.stateUnsub?.();
     this.stateUnsub = null;
-    if (this.activeSource !== null) {
-      try {
-        await this.activeSource.stop();
-      } catch (err) {
-        this.log.error(`active source stop failed: ${String(err)}`);
+    // Stop every registered transport, not just the active one: warm
+    // sources keep live sockets after a soft demote (WS to aisstream.io,
+    // UDP bind) and would otherwise leak fds / hold the API-key slot
+    // until process death. All stop() implementations are null-guarded,
+    // so double-stopping the already-detached active source is safe.
+    this.activeSource = null;
+    const results = await Promise.allSettled(
+      [...this.sources.values()].map((source) => source.stop()),
+    );
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        this.log.error(`source stop failed: ${String(result.reason)}`);
       }
-      this.activeSource = null;
     }
+    await this.dlq.flush();
     this.dlq.close();
   }
 
@@ -641,6 +653,7 @@ export class IngestService implements OnModuleInit, OnModuleDestroy {
   private reportStats(): void {
     const snapshot = this.actor?.getSnapshot();
     if (!snapshot) return;
+    const dlq = this.dlq.stats();
     this.log.log(
       `stats: state=${String(snapshot.value)} ` +
         `accepted=${snapshot.context.framesAccepted} ` +
@@ -649,7 +662,8 @@ export class IngestService implements OnModuleInit, OnModuleDestroy {
           snapshot.context.currentSourceId !== null
             ? sourceIdName(snapshot.context.currentSourceId)
             : 'none'
-        }`,
+        } ` +
+        `dlq=${dlq.failed ? 'FAILED' : 'ok'}/${dlq.written}w/${dlq.pending}p`,
     );
   }
 }
