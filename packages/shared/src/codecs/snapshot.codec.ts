@@ -242,7 +242,10 @@ type RawStaticData = {
   dimensions?: StaticDimensions;
   draught?: number;
   destination: string;
-  eta: { month?: number; day?: number; hour?: number; minute?: number };
+  // Message-typed fields are always optional on the protobuf wire,
+  // regardless of the schema lacking `optional`: a foreign or drifted
+  // encoder may legally omit the whole sub-message.
+  eta?: { month?: number; day?: number; hour?: number; minute?: number };
   receivedAt: number;
 };
 
@@ -311,10 +314,10 @@ function decodeStaticDataPayload(raw: RawStaticData): Omit<VesselStaticDataFrame
     draught: raw.draught ?? null,
     destination: raw.destination,
     eta: {
-      month: raw.eta.month ?? null,
-      day: raw.eta.day ?? null,
-      hour: raw.eta.hour ?? null,
-      minute: raw.eta.minute ?? null,
+      month: raw.eta?.month ?? null,
+      day: raw.eta?.day ?? null,
+      hour: raw.eta?.hour ?? null,
+      minute: raw.eta?.minute ?? null,
     } satisfies StaticEta,
     receivedAt: raw.receivedAt,
   };
@@ -331,7 +334,12 @@ function encodeKalmanPayload(kalman: VesselKalmanState): RawKalman {
   };
 }
 
-function decodeKalmanPayload(raw: RawKalman): VesselKalmanState {
+function decodeKalmanPayload(raw: RawKalman): VesselKalmanState | null {
+  // A covariance of the wrong arity would feed `undefined` into the
+  // filter maths and surface as NaN positions with no warning. Dropping
+  // the kalman entry is the correct sad path: the vessel still renders
+  // from its last measured position.
+  if (raw.covariance.length !== 16) return null;
   return {
     lng: raw.lng,
     lat: raw.lat,
