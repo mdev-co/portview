@@ -1,56 +1,112 @@
 <div align="center">
 
-# ⚓ Smart Port Szczecin (SPS)
+# ⚓ Smart Port Szczecin
 
-### Real-time AIS vessel tracker with custom SDR receiver
+**Real-time maritime tracking, built end to end: from a DIY radio antenna to the browser.**
 
-**[▶ Live demo - sps-radar.pl](https://sps-radar.pl)**
+[**▶ LIVE DEMO — sps-radar.pl**](https://sps-radar.pl)
 
-`TypeScript` · `NestJS` · `React 19` · `MapLibre GL` · `PostGIS` · `WebSocket`
+![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
+![React 19](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)
+![NestJS](https://img.shields.io/badge/NestJS-11-E0234E?logo=nestjs&logoColor=white)
+![MapLibre GL](https://img.shields.io/badge/MapLibre_GL-WebGL2-396CB2)
+![PostGIS](https://img.shields.io/badge/PostgreSQL-PostGIS-336791?logo=postgresql&logoColor=white)
+![XState](https://img.shields.io/badge/XState-5-121212)
+
+<!-- To show a screenshot here, add docs/preview.png and uncomment:
+<img src="docs/preview.png" alt="SPS operator view: live vessels on the Szczecin waterway" width="900">
+-->
 
 </div>
 
 ---
 
+## Reviewing this repo? Start here
+
+Three things that tell you the most, in about five minutes:
+
+1. **Open the [live demo](https://sps-radar.pl)** and watch vessels move. Every position on
+   screen travelled through hardware and code in this repository: antenna, decoder,
+   database, WebSocket, map engine.
+2. **Skim two ADRs**: [multipart AIS reassembly](adr/0003-ais-multipart-reassembly.md)
+   and [dead-reckoning extrapolation](adr/0011-dead-reckoning-extrapolation-freeze.md).
+   They show how decisions are made here: context, options, trade-offs, verdict.
+3. **Read one module**: [`apps/web/src/modules/map`](apps/web/src/modules/map) - the
+   bridge between React's declarative world and MapLibre's imperative engine.
+
 ## What this is
 
-An end-to-end maritime situational awareness platform, built solo - from a
-DIY radio antenna to the browser. Vessels transmitting AIS over 162 MHz are
-received by a custom SDR rig, decoded from raw NMEA 0183, persisted in
-PostGIS and streamed as binary WebSocket frames to a React + MapLibre
-front-end that renders continuously moving targets within a strict frame
-budget.
+A complete maritime situational awareness platform built solo. Ships broadcast AIS
+messages on 162 MHz; a custom SDR receiver picks them up, a hand-written NMEA 0183
+parser decodes them, and the live picture ends up in the browser - vessels moving
+smoothly on a map, several updates per second, within a strict render-frame budget.
 
-**Full signal path:** RTL-SDR antenna → NMEA 0183 decoder → NestJS ingest
-→ PostgreSQL/PostGIS → binary WebSocket → React / MapLibre GL
+```
+ RTL-SDR antenna → NMEA 0183 decoder → NestJS ingest → PostgreSQL / PostGIS
+                                                              │
+        React 19 + MapLibre GL  ←  binary WebSocket frames  ←─┘
+```
 
-## Engineering notes
+No third-party tracking API in the primary path. The radio signal is received,
+decoded and rendered by code in this repository.
 
-If you are evaluating this repository, these are the parts worth a look:
+## Where to look in the code
 
-| Area                                                     | Where                                                            |
-| -------------------------------------------------------- | ---------------------------------------------------------------- |
-| Architecture decisions (26 ADRs, with D2 diagrams)       | [`adr/`](adr/)                                                   |
-| AIS multipart message reassembly                         | [`adr/0003-ais-multipart-reassembly.md`](adr/)                   |
-| Binary WebSocket protocol + ingest co-location           | [`adr/0007-d5-binary-websocket-and-ingest-co-location.md`](adr/) |
-| Pluggable multi-source ingest (SDR → WebSDR → AISStream) | [`adr/0008-pluggable-source-architecture.md`](adr/)              |
-| Dead-reckoning extrapolation between position reports    | [`adr/0011-dead-reckoning-extrapolation-freeze.md`](adr/)        |
-| Branded numeric types for spec-correct AIS values        | [`adr/0013-branded-numeric-ais-types.md`](adr/)                  |
-| Map engine architecture (React ↔ imperative bridge)      | [`adr/0002-map-engine-architecture.md`](adr/)                    |
+| If you want to see...                        | Go to                                                                |
+| -------------------------------------------- | -------------------------------------------------------------------- |
+| React ↔ imperative map engine bridge         | [`apps/web/src/modules/map`](apps/web/src/modules/map)               |
+| Per-key store subscriptions (no over-render) | [`apps/web/src/modules/selection`](apps/web/src/modules/selection)   |
+| Live telemetry handling in the UI            | [`apps/web/src/modules/telemetry`](apps/web/src/modules/telemetry)   |
+| Geofencing (zones, alerts)                   | [`apps/web/src/modules/geofencing`](apps/web/src/modules/geofencing) |
+| NMEA 0183 / AIS parsers                      | [`packages/shared/src/parsers`](packages/shared/src/parsers)         |
+| Binary WebSocket codecs                      | [`packages/shared/src/codecs`](packages/shared/src/codecs)           |
+| Kalman filtering for track smoothing         | [`packages/shared/src/kalman`](packages/shared/src/kalman)           |
+| XState machines (ingest source failover)     | [`packages/shared/src/machines`](packages/shared/src/machines)       |
+| Multi-source ingest + dead-letter queue      | [`apps/api/src/ingest`](apps/api/src/ingest)                         |
+| Raspberry Pi edge bridge (UDP → mTLS WSS)    | [`apps/edge-bridge/src`](apps/edge-bridge/src)                       |
 
-## Highlights
+## Engineering highlights
 
-- Custom SDR receiving rig (RTL-SDR + LNA + bandpass + DIY 162 MHz dipole)
-- Custom NMEA 0183 parser (types 1/2/3/5/18) in NestJS
-- Multi-source ingest with XState fallback (SDR → WebSDR → AISStream)
-- Atomic vessel store with per-key subscription (Nano Stores `map()`)
-- Binary WebSocket frames for telemetry
-- PostGIS spatial queries (`ST_DWithin` with GiST index)
-- Built-in observability: `/?debug=1` dev panel
+- **Custom receiving hardware**: RTL-SDR Blog V4 + LNA + bandpass filter + DIY 162 MHz dipole
+- **Hand-written NMEA 0183 / AIS parser** covering message types 1/2/3/5/18, with
+  multipart reassembly and spec-correct branded numeric types
+- **Multi-source ingest with automatic failover** (local SDR → WebSDR → AISStream),
+  modelled as an XState state machine
+- **Binary WebSocket protocol** for telemetry: compact frames instead of JSON chatter
+- **Frame-budget rendering**: updates batched to what the display can actually show;
+  shapes drawn once and repositioned, not re-rendered
+- **Dead-reckoning extrapolation** between position reports, with an explicit freeze
+  policy when a source goes stale
+- **PostGIS spatial queries** (`ST_DWithin` on a GiST index) for zone logic
+- **26 Architecture Decision Records** with D2 diagrams documenting every significant
+  design choice
+
+## Decision log (ADRs)
+
+The [`adr/`](adr/) directory documents the reasoning behind the architecture.
+A few worth reading:
+
+| Decision                                     | ADR                                                            |
+| -------------------------------------------- | -------------------------------------------------------------- |
+| Map engine architecture (React ↔ imperative) | [0002](adr/0002-map-engine-architecture.md)                    |
+| AIS multipart message reassembly             | [0003](adr/0003-ais-multipart-reassembly.md)                   |
+| Binary WebSocket + ingest co-location        | [0007](adr/0007-d5-binary-websocket-and-ingest-co-location.md) |
+| Pluggable multi-source ingest                | [0008](adr/0008-pluggable-source-architecture.md)              |
+| Dead-reckoning extrapolation and freeze      | [0011](adr/0011-dead-reckoning-extrapolation-freeze.md)        |
+| Branded numeric AIS types                    | [0013](adr/0013-branded-numeric-ais-types.md)                  |
+
+## Stack
+
+**Front-end**: React 19, TypeScript 5, MapLibre GL (WebGL2), Tailwind v4 + shadcn/ui,
+Nano Stores, XState 5, Vite
+**Back-end**: NestJS 11, Prisma, PostgreSQL 16 + PostGIS 3.4, binary WS, OpenAPI
+**Edge**: Node on Raspberry Pi, UDP listener, mTLS over Tailscale
+**Infra**: Vercel (web), Fly.io (api), Docker, GitHub Actions CI with quality gates
+(format, lint, typecheck, tests, bundle budget, dead-code audit)
 
 ## Local development
 
-Requires: Node 22+, pnpm 9+, Docker (Postgres + PostGIS).
+Requires Node 22+, pnpm 9+, Docker (Postgres + PostGIS).
 
 ```sh
 pnpm install
@@ -59,22 +115,13 @@ pnpm --filter @sps/api db:migrate
 pnpm dev
 ```
 
-## Architecture
-
-[Day 7 deliverable]
-
-## Live demo
-
-[Day 7 deliverable]
-
 ## Licence
 
 Source-available for review only. You may read this code to evaluate the work.
-Any use, commercial or otherwise, plus redistribution and derivative
-works, requires written permission - see [LICENSE](LICENSE).
+Any use, commercial or otherwise, plus redistribution and derivative works,
+requires written permission - see [LICENSE](LICENSE).
 
 ## Author
 
-**Michał Roszko** - Software Engineer, React / TypeScript, real-time
-geospatial systems.
+**Michał Roszko** - Software Engineer · React / TypeScript · real-time geospatial systems
 [sps-radar.pl](https://sps-radar.pl) · grafogeum@gmail.com
