@@ -4,7 +4,7 @@
 
 ### Real-time AIS vessel tracker with custom SDR receiver
 
-**[▶ Live demo — sps-radar.pl](https://sps-radar.pl)**
+**[▶ Live demo - sps-radar.pl](https://sps-radar.pl)**
 
 `TypeScript` · `NestJS` · `React 19` · `MapLibre GL` · `PostGIS` · `WebSocket`
 
@@ -14,7 +14,7 @@
 
 ## What this is
 
-An end-to-end maritime situational awareness platform, built solo — from a
+An end-to-end maritime situational awareness platform, built solo - from a
 DIY radio antenna to the browser. Vessels transmitting AIS over 162 MHz are
 received by a custom SDR rig, decoded from raw NMEA 0183, persisted in
 PostGIS and streamed as binary WebSocket frames to a React + MapLibre
@@ -71,10 +71,10 @@ pnpm dev
 
 Source-available for review only. You may read this code to evaluate the work.
 Any use, commercial or otherwise, plus redistribution and derivative
-works, requires written permission — see [LICENSE](LICENSE).
+works, requires written permission - see [LICENSE](LICENSE).
 
 ## Author
 
-**Michał Roszko** — Software Engineer, React / TypeScript, real-time
+**Michał Roszko** - Software Engineer, React / TypeScript, real-time
 geospatial systems.
 [sps-radar.pl](https://sps-radar.pl) · grafogeum@gmail.com
