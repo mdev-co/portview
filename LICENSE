@@ -1,12 +1,27 @@
-Copyright (c) 2026 mdev
+Smart Port Szczecin (SPS)
+Copyright (c) 2026 Michal Roszko
 
-All rights reserved.
+SOURCE-AVAILABLE LICENCE
 
-No part of this repository, including source code, configuration, schema
-definitions, build artefacts, documentation, diagrams or test fixtures,
-may be copied, reproduced, modified, distributed, sublicensed or used to
-create derivative works without prior written permission from the
-copyright holder.
+This source code is made publicly available for one purpose only: to allow
+review and technical assessment of the author's work. Visibility of the
+source does not grant any right to use it.
+
+PERMITTED
+  - Viewing and reading the source code for evaluation purposes
+
+NOT PERMITTED without prior written permission from the copyright holder
+  - Commercial use of any part of this repository
+  - Redistribution, sublicensing or publication of this code, in whole
+    or in substantial part
+  - Creating derivative works or competing products based on this code
+  - Use of the project name, branding or associated assets
+
+The software is provided "as is", without warranty of any kind, express
+or implied. In no event shall the copyright holder be liable for any
+claim, damages or other liability arising from the use of this software.
 
 This notice does not grant any licence to any patent, trademark or
 trade-secret right held by the copyright holder.
+
+For commercial licensing enquiries: grafogeum@gmail.com
