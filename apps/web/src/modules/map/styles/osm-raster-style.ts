@@ -410,15 +410,15 @@ export const osmRasterStyle: StyleSpecification = {
      */
     'carto-positron-nolabels': {
       type: 'raster',
+      // CARTO free basemaps started serving "API KEY REQUIRED"-watermarked
+      // tiles (policy change); swapped to MapTiler dataviz-light on the same
+      // origin-locked key the tactical/backdrop/satellite modes already use.
       tiles: [
-        'https://a.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png',
-        'https://b.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png',
-        'https://c.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png',
-        'https://d.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png',
+        `https://api.maptiler.com/maps/dataviz-light/{z}/{x}/{y}.webp?key=${import.meta.env.VITE_MAPTILER_KEY ?? ''}`,
       ],
       tileSize: 256,
-      attribution: '\u00a9 OpenStreetMap contributors \u00a9 CARTO',
-      maxzoom: 20,
+      attribution: '\u00a9 MapTiler \u00a9 OpenStreetMap contributors',
+      maxzoom: 22,
     },
     [PRESENTATION_GRID_SOURCE_ID]: {
       type: 'geojson',
@@ -438,15 +438,14 @@ export const osmRasterStyle: StyleSpecification = {
     },
     'carto-dark-matter': {
       type: 'raster',
+      // Same CARTO watermark issue as above; dataviz-dark matches the old
+      // Dark Matter look closest and is already a proven source in this file.
       tiles: [
-        'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
-        'https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
-        'https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
-        'https://d.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+        `https://api.maptiler.com/maps/dataviz-dark/{z}/{x}/{y}.webp?key=${import.meta.env.VITE_MAPTILER_KEY ?? ''}`,
       ],
       tileSize: 256,
-      attribution: '\u00a9 OpenStreetMap contributors \u00a9 CARTO',
-      maxzoom: 20,
+      attribution: '\u00a9 MapTiler \u00a9 OpenStreetMap contributors',
+      maxzoom: 22,
     },
     /**
      * Esri ArcGIS Online tile services - served from Esri's global
