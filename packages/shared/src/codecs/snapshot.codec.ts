@@ -340,6 +340,11 @@ function decodeKalmanPayload(raw: RawKalman): VesselKalmanState | null {
   // the kalman entry is the correct sad path: the vessel still renders
   // from its last measured position.
   if (raw.covariance.length !== 16) return null;
+  // Same reasoning for NaN / +-Infinity: a single non-finite entry
+  // poisons every subsequent Kalman step. Reject the whole entry.
+  for (const c of raw.covariance) {
+    if (!Number.isFinite(c)) return null;
+  }
   return {
     lng: raw.lng,
     lat: raw.lat,

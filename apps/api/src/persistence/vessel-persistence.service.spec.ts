@@ -397,9 +397,7 @@ describe('VesselPersistenceService', () => {
       );
       expect(lastCreateArg.data.lng).toBe(14.9);
     });
-  });
 
-  describe('early returns', () => {
     it('backs off after repeated flush failures and resumes after success', async () => {
       prisma.$transaction
         .mockRejectedValueOnce(new Error('db down'))
@@ -424,7 +422,9 @@ describe('VesselPersistenceService', () => {
       expect(prisma.$transaction).toHaveBeenCalledTimes(4);
       expect(service.stats().buffered).toBe(0);
     });
+  });
 
+  describe('early returns', () => {
     it('skips static-data message types on the position channel', async () => {
       const event = {
         message: {

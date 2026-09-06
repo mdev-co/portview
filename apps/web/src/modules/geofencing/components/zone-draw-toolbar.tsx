@@ -49,6 +49,9 @@ export function ZoneDrawToolbar(): React.JSX.Element {
   // a torn-down map instance.
   useEffect(() => {
     if (status === 'ready') return;
+    // Any startup still awaiting its lazy import becomes stale; its
+    // `finally` still clears the loading flag, so the button re-enables
+    // once the import settles without binding to the torn-down map.
     startSeqRef.current += 1;
     if (drawRef.current !== null) {
       drawRef.current.stop();
@@ -111,7 +114,9 @@ export function ZoneDrawToolbar(): React.JSX.Element {
       drawRef.current = { stop: (): void => draw.stop() };
       setActive(true);
     } finally {
-      if (seq === startSeqRef.current) setLoading(false);
+      // Always clear: a stale startup (unmount / engine reset) is a
+      // no-op for React 18+ state, a live one re-enables the button.
+      setLoading(false);
     }
   }
 

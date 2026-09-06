@@ -1,3 +1,5 @@
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { Logger } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
@@ -93,6 +95,12 @@ type Harness = {
 };
 
 function createHarness(): Harness {
+  // Keep DeadLetterWriter output inside the test sandbox; the default
+  // path lives in the developer's home directory.
+  process.env['SPS_DLQ_PATH'] = join(
+    tmpdir(),
+    `sps-dlq-test-${String(process.pid)}-${String(Date.now())}.jsonl`,
+  );
   const eventBus = new EventEmitter2();
   const config = { get: () => undefined } as unknown as ConfigService;
   const service = new IngestService(config, eventBus);

@@ -186,8 +186,10 @@ export class VesselPersistenceService implements OnModuleInit, OnModuleDestroy {
       kalmanByMmsi = await this.readKalmanStates(positionMmsis);
     } catch (err) {
       this.remergeBatch(batch);
+      this.registerFailure();
       this.log.error(
-        `flush read failed, ${String(batch.size)} deltas requeued: ${String(err)}`,
+        `flush read failed, ${String(batch.size)} deltas requeued, ` +
+          `backing off ${String(this.skipTicks)} tick(s): ${String(err)}`,
       );
       return;
     }
@@ -217,11 +219,7 @@ export class VesselPersistenceService implements OnModuleInit, OnModuleDestroy {
         for (const [mmsi, delta] of rest) {
           this.remergeFailed(mmsi, delta);
         }
-        this.consecutiveFailures += 1;
-        this.skipTicks = Math.min(
-          2 ** (this.consecutiveFailures - 1) - 1,
-          FLUSH_BACKOFF_MAX_TICKS,
-        );
+        this.registerFailure();
         this.log.error(
           `flush chunk failed, ${String(rest.length)} deltas requeued, ` +
             `backing off ${String(this.skipTicks)} tick(s): ${String(err)}`,
@@ -327,6 +325,19 @@ export class VesselPersistenceService implements OnModuleInit, OnModuleDestroy {
       }),
     );
     return ops;
+  }
+
+  /**
+   * Counts a failed flush attempt (read or write) and arms the tick
+   * backoff: first failure retries next tick, then 1, 3, 7 ... skipped
+   * ticks up to FLUSH_BACKOFF_MAX_TICKS. Reset on a clean flush.
+   */
+  private registerFailure(): void {
+    this.consecutiveFailures += 1;
+    this.skipTicks = Math.min(
+      2 ** (this.consecutiveFailures - 1) - 1,
+      FLUSH_BACKOFF_MAX_TICKS,
+    );
   }
 
   private remergeBatch(batch: ReadonlyMap<number, BufferedDelta>): void {
