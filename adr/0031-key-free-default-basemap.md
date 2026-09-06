@@ -22,3 +22,15 @@ Side effect nobody priced in: from that commit on, every visitor consumed MapTil
 - The map renders for every visitor regardless of MapTiler account state. Keyed modes degrade to blank tiles when the key is dead; a graceful fallback to the default mode on HTTP 403 is a follow-up, not part of this change.
 - Esri Canvas tops out at z16 with real detail; the presentation register (topology only, no labels) is preserved. Slight visual change vs dataviz-light: cooler greys, softer water edge.
 - Next step (planned, separate ADR): self-hosted PMTiles basemap (Poland + Baltic extract on Cloudflare R2) with Protomaps themes, removing the last third-party basemap dependency and enabling a fully custom dark tactical style.
+
+## Diagram
+
+Source: `0031-key-free-default-basemap.d2` (render: `d2 --layout=elk adr/0031-key-free-default-basemap.d2 adr/0031-key-free-default-basemap.svg`).
+
+![ADR 0031 - before / after tile-source topology](0031-key-free-default-basemap.svg)
+
+## Evidence (2026-09-06, production after the merge)
+
+Top: Tactical on the suspended MapTiler account, every tile answers `403 "Invalid key"`; before #223 the default Presentation mode used the same key, so this is what every visitor saw on first paint after the quota was exhausted. Bottom: Presentation and OSM Dark on Esri Canvas, 0 MapTiler requests, live vessel stream intact. All three captured on sps-radar.pl at 1600x1000.
+
+![Before / after screenshots](0031-key-free-default-basemap-screens.png)
