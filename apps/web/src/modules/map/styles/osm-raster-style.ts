@@ -402,23 +402,27 @@ export const osmRasterStyle: StyleSpecification = {
       maxzoom: 19,
     },
     /**
-     * Carto "Positron No Labels" - greyscale OSM raster with every
-     * place / road label stripped. Ideal Airspace-Intelligence-style
-     * presentation backdrop: the chart reads as topology only, all
-     * attention budget goes to the live actors (vessels, zones,
-     * flagship 3D models). Same EU CDN as the other CARTO tiles.
+     * Presentation base - greyscale, label-free raster so the chart reads
+     * as topology only and all attention budget goes to the live actors
+     * (vessels, zones, flagship 3D models).
+     *
+     * History: CARTO Positron No Labels -> (watermark policy change) ->
+     * MapTiler dataviz-light (#222) -> Esri Light Gray Canvas Base (ADR 0031).
+     * The MapTiler hop put the DEFAULT mode on a keyed, quota-limited source;
+     * the 100k/month free quota burned in six days after the public launch
+     * and every visitor got a blank map. The default mode must never depend
+     * on an API key or a monthly quota. Esri Canvas is key-free, label-free
+     * (labels live in a separate Reference service we do not load), served
+     * from the same CDN as the imagery / topo modes already in this file.
      */
     'carto-positron-nolabels': {
       type: 'raster',
       tiles: [
-        'https://a.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png',
-        'https://b.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png',
-        'https://c.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png',
-        'https://d.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}.png',
+        'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
       ],
       tileSize: 256,
-      attribution: '\u00a9 OpenStreetMap contributors \u00a9 CARTO',
-      maxzoom: 20,
+      attribution: 'Tiles \u00a9 Esri \u2014 Esri, HERE, Garmin, \u00a9 OpenStreetMap contributors',
+      maxzoom: 16,
     },
     [PRESENTATION_GRID_SOURCE_ID]: {
       type: 'geojson',
@@ -438,15 +442,15 @@ export const osmRasterStyle: StyleSpecification = {
     },
     'carto-dark-matter': {
       type: 'raster',
+      // Key-free dark counterpart of the presentation base (ADR 0031). The
+      // dark MapTiler look stays available as the opt-in Tactical / Backdrop
+      // modes; the OSM Dark mode must work without any key or quota.
       tiles: [
-        'https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
-        'https://b.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
-        'https://c.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
-        'https://d.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
+        'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
       ],
       tileSize: 256,
-      attribution: '\u00a9 OpenStreetMap contributors \u00a9 CARTO',
-      maxzoom: 20,
+      attribution: 'Tiles \u00a9 Esri \u2014 Esri, HERE, Garmin, \u00a9 OpenStreetMap contributors',
+      maxzoom: 16,
     },
     /**
      * Esri ArcGIS Online tile services - served from Esri's global
@@ -478,30 +482,35 @@ export const osmRasterStyle: StyleSpecification = {
     },
     'maptiler-dataviz-dark': {
       type: 'raster',
+      // Opt-in keyed mode. maxzoom 16 is a quota guard (ADR 0031): MapLibre
+      // overscales raster tiles past source maxzoom instead of fetching more.
       tiles: [
         `https://api.maptiler.com/maps/dataviz-dark/{z}/{x}/{y}.webp?key=${import.meta.env.VITE_MAPTILER_KEY ?? ''}`,
       ],
       tileSize: 256,
       attribution: '\u00a9 MapTiler \u00a9 OpenStreetMap contributors',
-      maxzoom: 22,
+      maxzoom: 16,
     },
     'maptiler-backdrop-dark': {
       type: 'raster',
+      // Opt-in keyed mode. maxzoom 16 is a quota guard (ADR 0031): MapLibre
+      // overscales raster tiles past source maxzoom instead of fetching more.
       tiles: [
         `https://api.maptiler.com/maps/backdrop-dark/{z}/{x}/{y}.webp?key=${import.meta.env.VITE_MAPTILER_KEY ?? ''}`,
       ],
       tileSize: 256,
       attribution: '\u00a9 MapTiler \u00a9 OpenStreetMap contributors',
-      maxzoom: 22,
+      maxzoom: 16,
     },
     'maptiler-satellite': {
       type: 'raster',
+      // Opt-in keyed mode; maxzoom 16 is the quota guard (ADR 0031).
       tiles: [
         `https://api.maptiler.com/tiles/satellite-v2/{z}/{x}/{y}.jpg?key=${import.meta.env.VITE_MAPTILER_KEY ?? ''}`,
       ],
       tileSize: 256,
       attribution: '\u00a9 MapTiler \u00a9 Sentinel-2 cloudless ESA',
-      maxzoom: 20,
+      maxzoom: 16,
     },
     seamark: {
       type: 'raster',

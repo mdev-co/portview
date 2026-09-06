@@ -1,4 +1,9 @@
-import { getCorsAllowedOrigins, getPort, shouldExposeOpenApi } from '../env';
+import {
+  getCorsAllowedOrigins,
+  getPersistenceFlushMs,
+  getPort,
+  shouldExposeOpenApi,
+} from '../env';
 
 describe('env', () => {
   const original = process.env;
@@ -66,6 +71,30 @@ describe('env', () => {
       process.env.NODE_ENV = 'development';
       process.env.SPS_EXPOSE_OPENAPI = '1';
       expect(shouldExposeOpenApi()).toBe(false);
+    });
+  });
+
+  describe('getPersistenceFlushMs', () => {
+    it('defaults to 1000 when unset', () => {
+      delete process.env.SPS_PERSISTENCE_FLUSH_MS;
+      expect(getPersistenceFlushMs()).toBe(1000);
+    });
+
+    it('parses a positive override', () => {
+      process.env.SPS_PERSISTENCE_FLUSH_MS = '250';
+      expect(getPersistenceFlushMs()).toBe(250);
+    });
+
+    it('falls back to default on a non-numeric value', () => {
+      process.env.SPS_PERSISTENCE_FLUSH_MS = 'abc';
+      expect(getPersistenceFlushMs()).toBe(1000);
+    });
+
+    it('falls back to default on a zero or negative value', () => {
+      process.env.SPS_PERSISTENCE_FLUSH_MS = '0';
+      expect(getPersistenceFlushMs()).toBe(1000);
+      process.env.SPS_PERSISTENCE_FLUSH_MS = '-500';
+      expect(getPersistenceFlushMs()).toBe(1000);
     });
   });
 

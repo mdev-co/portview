@@ -68,6 +68,7 @@ export {
 
 export { ingestSourceMachine } from './machines/ingest-source-machine';
 export {
+  CONNECT_TIMEOUT_MS,
   DEGRADED_GRACE_MS,
   EXHAUSTED_RETRY_MS,
   HEALTHY_WINDOW_MS,

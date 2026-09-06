@@ -38,12 +38,18 @@ export function ZoneDrawToolbar(): React.JSX.Element {
   const [active, setActive] = useState(false);
   const [loading, setLoading] = useState(false);
   const drawRef = useRef<{ stop: () => void } | null>(null);
+  // Monotonic token for in-flight startups. `startDrawing` awaits a
+  // lazy import; if the component unmounts or the engine resets while
+  // that promise is pending, the token moves on and the stale startup
+  // must not create a TerraDraw instance or touch state.
+  const startSeqRef = useRef(0);
 
   // If the map engine resets (style swap, dispose), make sure we
   // stop the active draw session so we do not leak listeners onto
   // a torn-down map instance.
   useEffect(() => {
     if (status === 'ready') return;
+    startSeqRef.current += 1;
     if (drawRef.current !== null) {
       drawRef.current.stop();
       drawRef.current = null;
@@ -57,6 +63,7 @@ export function ZoneDrawToolbar(): React.JSX.Element {
   // re-entry stacks another orphaned instance.
   useEffect(() => {
     return () => {
+      startSeqRef.current += 1;
       if (drawRef.current !== null) {
         drawRef.current.stop();
         drawRef.current = null;
@@ -69,10 +76,15 @@ export function ZoneDrawToolbar(): React.JSX.Element {
     const map = controller.getRawEngine() as MaplibreMap | null;
     if (map === null) return;
     setLoading(true);
+    const seq = ++startSeqRef.current;
     try {
       // Lazy import: keeps terra-draw out of the initial bundle.
       const [{ TerraDraw, TerraDrawPolygonMode }, { TerraDrawMapLibreGLAdapter }] =
         await Promise.all([import('terra-draw'), import('terra-draw-maplibre-gl-adapter')]);
+
+      // Unmounted or engine reset while the import was pending: bail
+      // out before binding anything to a map we no longer own.
+      if (seq !== startSeqRef.current) return;
 
       const draw = new TerraDraw({
         adapter: new TerraDrawMapLibreGLAdapter({ map }),
@@ -99,7 +111,7 @@ export function ZoneDrawToolbar(): React.JSX.Element {
       drawRef.current = { stop: (): void => draw.stop() };
       setActive(true);
     } finally {
-      setLoading(false);
+      if (seq === startSeqRef.current) setLoading(false);
     }
   }
 

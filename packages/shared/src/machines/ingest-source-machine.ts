@@ -1,5 +1,6 @@
 import { assign, setup } from 'xstate';
 import {
+  CONNECT_TIMEOUT_MS,
   DEGRADED_GRACE_MS,
   EXHAUSTED_RETRY_MS,
   HEALTHY_WINDOW_MS,
@@ -51,6 +52,24 @@ export const ingestSourceMachine = setup({
     setErrorFromFailure: assign(({ event }) => ({
       errorMessage: event.type === 'SOURCE_FAILED' ? event.reason : null,
     })),
+    /**
+     * A warm source whose transport hard-failed (WS close, dial error)
+     * can never fire SOURCE_RECLAIMED again, so leaving it on the warm
+     * list would create a zombie: excluded from rotation (pickNextSource
+     * skips warm) yet unable to recover. Move it to the tried list so
+     * the IngestService closes the transport and the exhausted retry
+     * cycle re-dials it fresh.
+     */
+    dropWarmSourceToTried: assign(({ context, event }) => {
+      if (event.type !== 'SOURCE_FAILED') return {};
+      const failedId = event.sourceId;
+      return {
+        warmSourceIds: context.warmSourceIds.filter(id => id !== failedId),
+        triedSourceIds: context.triedSourceIds.includes(failedId)
+          ? context.triedSourceIds
+          : [...context.triedSourceIds, failedId],
+      };
+    }),
     recordFrameAccepted: assign(({ context, event }) => ({
       framesAccepted: context.framesAccepted + 1,
       lastFrameAt: event.type === 'FRAME_RECEIVED' ? event.frameAt : null,
@@ -112,6 +131,10 @@ export const ingestSourceMachine = setup({
       if (!('sourceId' in event)) return false;
       return event.sourceId === context.currentSourceId;
     },
+    isWarmSource: ({ context, event }) => {
+      if (!('sourceId' in event)) return false;
+      return context.warmSourceIds.includes(event.sourceId);
+    },
     /**
      * Allow reclaim only when the reclaiming source ranks strictly
      * higher (lower index in the prioritized list) than the current
@@ -151,16 +174,28 @@ export const ingestSourceMachine = setup({
       },
     },
     connecting: {
+      after: {
+        [CONNECT_TIMEOUT_MS]: {
+          target: 'switching',
+          actions: 'markCurrentSourceTried',
+        },
+      },
       on: {
         SOURCE_CONNECTED: {
           guard: 'isCurrentSource',
           target: 'active',
         },
-        SOURCE_FAILED: {
-          guard: 'isCurrentSource',
-          target: 'switching',
-          actions: ['markCurrentSourceTried', 'setErrorFromFailure'],
-        },
+        SOURCE_FAILED: [
+          {
+            guard: 'isCurrentSource',
+            target: 'switching',
+            actions: ['markCurrentSourceTried', 'setErrorFromFailure'],
+          },
+          {
+            guard: 'isWarmSource',
+            actions: 'dropWarmSourceToTried',
+          },
+        ],
         SOURCE_RECLAIMED: {
           guard: 'canReclaim',
           target: 'connecting',
@@ -184,11 +219,17 @@ export const ingestSourceMachine = setup({
         FRAME_REJECTED: {
           actions: 'recordFrameRejected',
         },
-        SOURCE_FAILED: {
-          guard: 'isCurrentSource',
-          target: 'switching',
-          actions: ['markCurrentSourceTried', 'setErrorFromFailure'],
-        },
+        SOURCE_FAILED: [
+          {
+            guard: 'isCurrentSource',
+            target: 'switching',
+            actions: ['markCurrentSourceTried', 'setErrorFromFailure'],
+          },
+          {
+            guard: 'isWarmSource',
+            actions: 'dropWarmSourceToTried',
+          },
+        ],
         SOURCE_RECLAIMED: {
           guard: 'canReclaim',
           target: 'connecting',
@@ -213,11 +254,17 @@ export const ingestSourceMachine = setup({
         FRAME_REJECTED: {
           actions: 'recordFrameRejected',
         },
-        SOURCE_FAILED: {
-          guard: 'isCurrentSource',
-          target: 'switching',
-          actions: ['markCurrentSourceTried', 'setErrorFromFailure'],
-        },
+        SOURCE_FAILED: [
+          {
+            guard: 'isCurrentSource',
+            target: 'switching',
+            actions: ['markCurrentSourceTried', 'setErrorFromFailure'],
+          },
+          {
+            guard: 'isWarmSource',
+            actions: 'dropWarmSourceToTried',
+          },
+        ],
         SOURCE_RECLAIMED: {
           guard: 'canReclaim',
           target: 'connecting',
@@ -228,6 +275,10 @@ export const ingestSourceMachine = setup({
     },
     switching: {
       on: {
+        SOURCE_FAILED: {
+          guard: 'isWarmSource',
+          actions: 'dropWarmSourceToTried',
+        },
         SOURCE_RECLAIMED: {
           guard: 'canReclaim',
           target: 'connecting',
@@ -251,6 +302,10 @@ export const ingestSourceMachine = setup({
         },
       },
       on: {
+        SOURCE_FAILED: {
+          guard: 'isWarmSource',
+          actions: 'dropWarmSourceToTried',
+        },
         SOURCE_RECLAIMED: {
           guard: 'canReclaim',
           target: 'connecting',

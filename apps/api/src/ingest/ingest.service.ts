@@ -72,6 +72,16 @@ type WarmSubscription = {
   frameUnsub: () => void;
   errorUnsub: () => void;
   lastReclaimAt: number;
+  /**
+   * Dedicated Decoder instance for reclaim probing. The active
+   * pipeline's Decoder is stateful (multipart AIS reassembly keyed by
+   * channel + message id); feeding warm-source fragments through it
+   * would interleave fragment streams from two transports and corrupt
+   * reassembly on both sides. A per-warm-source instance keeps the
+   * fragment buffers isolated and is disposable with the subscription
+   * (the reassembler holds no timers, only a TTL-pruned Map).
+   */
+  probe: Decoder;
 };
 
 /**
@@ -180,7 +190,7 @@ export class IngestService implements OnModuleInit, OnModuleDestroy {
       }
     }
     await this.dlq.flush();
-    this.dlq.close();
+    await this.dlq.close();
   }
 
   private registerSources(): readonly SourceId[] {
@@ -269,6 +279,12 @@ export class IngestService implements OnModuleInit, OnModuleDestroy {
     const desiredActive =
       currentId !== null ? (this.sources.get(currentId) ?? null) : null;
     const desiredWarm = new Set(warmIds);
+    // Snapshot BEFORE the cleanup loop below: promoting a warm source
+    // removes its warm subscription first, so reading warmSources at
+    // promotion time would always report "not warm" and force a
+    // redundant re-dial of a transport that never closed.
+    const wasWarm =
+      desiredActive !== null && this.warmSources.has(desiredActive.id);
 
     // Detach the previous active source if it changed. If it was
     // demoted to warm, KEEP the transport alive so the new warm
@@ -316,13 +332,12 @@ export class IngestService implements OnModuleInit, OnModuleDestroy {
     // Promote to active: either a fresh dial or a warm->active swap
     // (transport already running).
     if (desiredActive !== null && desiredActive !== this.activeSource) {
-      const wasWarm = this.warmSources.has(desiredActive.id);
       this.activeSource = desiredActive;
       this.attachSource(desiredActive);
       if (wasWarm) {
-        // Transport never closed; FSM expects SOURCE_CONNECTED to
-        // confirm the promotion.
-        this.warmSources.delete(desiredActive.id);
+        // Transport never closed (the warm subscription was already
+        // removed by the cleanup loop above); FSM expects
+        // SOURCE_CONNECTED to confirm the promotion.
         this.log.log(
           `source reclaimed: ${sourceIdName(desiredActive.id)} (warm transport reused)`,
         );
@@ -368,14 +383,20 @@ export class IngestService implements OnModuleInit, OnModuleDestroy {
   private attachWarmSource(source: ISource): void {
     const tracking: WarmSubscription = {
       lastReclaimAt: 0,
+      probe: new Decoder(),
       frameUnsub: source.onFrame((frame) => {
-        const now = frame.receivedAt;
         const current = this.warmSources.get(source.id);
         if (current === undefined) return;
+        // Reclaim only on proof of life: a frame that actually decodes
+        // to a validated AIS message. Raw byte activity is not enough -
+        // a poisoned source emitting garbage would otherwise cyclically
+        // recapture the pipeline (reclaim -> starve -> demote -> reclaim).
+        if (!this.isProofOfLife(current.probe, frame.raw)) return;
+        const now = frame.receivedAt;
         if (now - current.lastReclaimAt < RECLAIM_THROTTLE_MS) return;
         current.lastReclaimAt = now;
         this.log.log(
-          `warm-source frame received, requesting reclaim: ${sourceIdName(source.id)}`,
+          `warm-source frame decoded, requesting reclaim: ${sourceIdName(source.id)}`,
         );
         this.actor?.send({
           type: 'SOURCE_RECLAIMED',
@@ -395,6 +416,22 @@ export class IngestService implements OnModuleInit, OnModuleDestroy {
       }),
     };
     this.warmSources.set(source.id, tracking);
+  }
+
+  /**
+   * Mirrors the two accept paths of the active pipeline (JSON adapter
+   * for AisStream, NMEA Decoder for radio sources) without any of its
+   * side effects: no DLQ writes, no FSM counters, no event-bus fan-out.
+   * A multipart fragment buffers in the probe and reports no proof of
+   * life until the completing fragment decodes.
+   */
+  private isProofOfLife(probe: Decoder, raw: string): boolean {
+    if (this.isJsonFormat(raw)) {
+      const adapted = adaptAisStreamMessage(raw);
+      return adapted.kind === 'message' && validateAisMessage(adapted.value).ok;
+    }
+    if (!this.isNmeaFormat(raw)) return false;
+    return probe.decode(raw).kind === 'message';
   }
 
   private detachAllWarmSources(): void {
@@ -663,7 +700,8 @@ export class IngestService implements OnModuleInit, OnModuleDestroy {
             ? sourceIdName(snapshot.context.currentSourceId)
             : 'none'
         } ` +
-        `dlq=${dlq.failed ? 'FAILED' : 'ok'}/${dlq.written}w/${dlq.pending}p`,
+        `dlq=${dlq.failed ? 'FAILED' : 'ok'}/${dlq.written}w/${dlq.pending}p/` +
+        `${dlq.droppedByBackpressure}d`,
     );
   }
 }

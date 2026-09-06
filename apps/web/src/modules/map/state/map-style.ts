@@ -26,11 +26,12 @@ import {
  * trail vector layers stay mounted continuously and the visual
  * transition is a single render frame, not a re-init flash.
  *
- * Base sources come from a mix of providers: OSM Mapnik + CARTO Dark
- * Matter for the OSM pair (no key), Esri ArcGIS Online for the USGS
+ * Base sources come from a mix of providers: OSM Mapnik + Esri Dark
+ * Gray Canvas for the OSM pair (no key), Esri Light Gray Canvas for
+ * Presentation (no key, ADR 0031), Esri ArcGIS Online for the USGS
  * mirror pair (no key, EU CDN), MapTiler for Tactical / Backdrop /
- * Satellite (VITE_MAPTILER_KEY inlined at build time, origin-locked
- * on the MapTiler side).
+ * Satellite only (VITE_MAPTILER_KEY inlined at build time, origin-locked
+ * on the MapTiler side, maxzoom 16 as quota guard).
  *
  * Adding an eighth mode would mean: register a new MapStyleId here,
  * declare the source + layer in osm-raster-style.ts, list its base
@@ -65,7 +66,7 @@ export const MAP_STYLE_REGISTRY: Record<MapStyleId, MapStyleDescriptor> = {
     id: 'osm-dark',
     label: 'OSM Dark',
     description:
-      'CARTO Dark Matter - OpenStreetMap data, dark palette, EU CDN with fast tile delivery.',
+      'Esri Dark Gray Canvas - key-free dark greyscale base, OpenStreetMap-derived data, global CDN.',
     baseLayerId: BASE_OSM_DARK_LAYER_ID,
     overlayLayerIds: [SEAMARK_OVERLAY_LAYER_ID],
   },
@@ -117,7 +118,7 @@ export const MAP_STYLE_REGISTRY: Record<MapStyleId, MapStyleDescriptor> = {
     id: 'presentation',
     label: 'Presentation',
     description:
-      'CARTO Positron No Labels - greyscale chart with every street and place name stripped. Optimised for the Airspace-Intelligence-style demo view: the basemap reads as pure topology, water and green overlays carry the colour budget, and 3D flagship models pop on top.',
+      'Esri Light Gray Canvas - key-free greyscale chart with every street and place name stripped. Optimised for the Airspace-Intelligence-style demo view: the basemap reads as pure topology, water and green overlays carry the colour budget, and 3D flagship models pop on top.',
     baseLayerId: BASE_PRESENTATION_LAYER_ID,
     // Grid was previously presentation-exclusive — now it is a global
     // overlay gated by the `$gridVisible` atom and reachable from any

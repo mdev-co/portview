@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createActor } from 'xstate';
 import { ingestSourceMachine } from '../ingest-source-machine';
 import {
+  CONNECT_TIMEOUT_MS,
   DEGRADED_GRACE_MS,
   EXHAUSTED_RETRY_MS,
   HEALTHY_WINDOW_MS,
@@ -315,6 +316,178 @@ describe('ingestSourceMachine', () => {
       expect(snapshot.context.triedSourceIds).not.toContain(SourceId.LocalUdp);
     });
 
+    it('SOURCE_FAILED for a warm source in active moves it warm -> tried without disturbing the active source', () => {
+      const actor = makeActor();
+      actor.start();
+      actor.send({ type: 'START' });
+      actor.send({ type: 'SOURCE_CONNECTED', sourceId: SourceId.LocalUdp });
+      vi.advanceTimersByTime(HEALTHY_WINDOW_MS + DEGRADED_GRACE_MS);
+      actor.send({ type: 'SOURCE_CONNECTED', sourceId: SourceId.WebSdr });
+      expect(actor.getSnapshot().context.warmSourceIds).toContain(SourceId.LocalUdp);
+
+      // Warm transport dies (e.g. WS close after idle). Without a warm
+      // branch on SOURCE_FAILED this event matched nothing and the dead
+      // source stayed parked warm forever - a zombie that pickNextSource
+      // skips and that can never fire SOURCE_RECLAIMED.
+      actor.send({ type: 'SOURCE_FAILED', sourceId: SourceId.LocalUdp, reason: 'ws closed' });
+      const snapshot = actor.getSnapshot();
+      expect(snapshot.value).toBe('active');
+      expect(snapshot.context.currentSourceId).toBe(SourceId.WebSdr);
+      expect(snapshot.context.warmSourceIds).not.toContain(SourceId.LocalUdp);
+      expect(snapshot.context.triedSourceIds).toContain(SourceId.LocalUdp);
+    });
+
+    it('SOURCE_FAILED for a warm source in connecting drops the zombie but keeps the dial in flight', () => {
+      const actor = makeActor();
+      actor.start();
+      actor.send({ type: 'START' });
+      actor.send({ type: 'SOURCE_CONNECTED', sourceId: SourceId.LocalUdp });
+      vi.advanceTimersByTime(HEALTHY_WINDOW_MS + DEGRADED_GRACE_MS);
+      // Still connecting to WebSdr when the warm LocalUdp dies.
+      expect(actor.getSnapshot().value).toBe('connecting');
+      actor.send({ type: 'SOURCE_FAILED', sourceId: SourceId.LocalUdp, reason: 'ws closed' });
+      const snapshot = actor.getSnapshot();
+      expect(snapshot.value).toBe('connecting');
+      expect(snapshot.context.currentSourceId).toBe(SourceId.WebSdr);
+      expect(snapshot.context.warmSourceIds).toEqual([]);
+      expect(snapshot.context.triedSourceIds).toContain(SourceId.LocalUdp);
+    });
+
+    it('SOURCE_FAILED for a warm source in degraded drops the zombie without leaving degraded', () => {
+      const actor = makeActor();
+      actor.start();
+      actor.send({ type: 'START' });
+      actor.send({ type: 'SOURCE_CONNECTED', sourceId: SourceId.LocalUdp });
+      vi.advanceTimersByTime(HEALTHY_WINDOW_MS + DEGRADED_GRACE_MS);
+      actor.send({ type: 'SOURCE_CONNECTED', sourceId: SourceId.WebSdr });
+      vi.advanceTimersByTime(HEALTHY_WINDOW_MS);
+      expect(actor.getSnapshot().value).toBe('degraded');
+
+      actor.send({ type: 'SOURCE_FAILED', sourceId: SourceId.LocalUdp, reason: 'ws closed' });
+      const snapshot = actor.getSnapshot();
+      expect(snapshot.value).toBe('degraded');
+      expect(snapshot.context.currentSourceId).toBe(SourceId.WebSdr);
+      expect(snapshot.context.warmSourceIds).not.toContain(SourceId.LocalUdp);
+      expect(snapshot.context.triedSourceIds).toContain(SourceId.LocalUdp);
+    });
+
+    it('SOURCE_FAILED for a warm source in exhausted drops the zombie without resetting the retry timer', () => {
+      const actor = makeActor();
+      actor.start();
+      actor.send({ type: 'START' });
+      actor.send({ type: 'SOURCE_CONNECTED', sourceId: SourceId.LocalUdp });
+      vi.advanceTimersByTime(HEALTHY_WINDOW_MS + DEGRADED_GRACE_MS);
+      actor.send({ type: 'SOURCE_FAILED', sourceId: SourceId.WebSdr, reason: 'x' });
+      actor.send({ type: 'SOURCE_FAILED', sourceId: SourceId.AisStream, reason: 'x' });
+      expect(actor.getSnapshot().value).toBe('exhausted');
+      expect(actor.getSnapshot().context.warmSourceIds).toContain(SourceId.LocalUdp);
+
+      // Halfway through the retry wait the warm transport dies. The
+      // internal transition must not restart the exhausted timer.
+      vi.advanceTimersByTime(EXHAUSTED_RETRY_MS / 2);
+      actor.send({ type: 'SOURCE_FAILED', sourceId: SourceId.LocalUdp, reason: 'ws closed' });
+      let snapshot = actor.getSnapshot();
+      expect(snapshot.value).toBe('exhausted');
+      expect(snapshot.context.warmSourceIds).toEqual([]);
+      expect(snapshot.context.triedSourceIds).toContain(SourceId.LocalUdp);
+
+      vi.advanceTimersByTime(EXHAUSTED_RETRY_MS / 2);
+      snapshot = actor.getSnapshot();
+      expect(snapshot.value).toBe('connecting');
+      expect(snapshot.context.currentSourceId).toBe(SourceId.LocalUdp);
+    });
+
+    it('ignores SOURCE_FAILED for a source that is neither current nor warm', () => {
+      const actor = makeActor();
+      actor.start();
+      actor.send({ type: 'START' });
+      actor.send({ type: 'SOURCE_CONNECTED', sourceId: SourceId.LocalUdp });
+      actor.send({ type: 'SOURCE_FAILED', sourceId: SourceId.AisStream, reason: 'x' });
+      const snapshot = actor.getSnapshot();
+      expect(snapshot.value).toBe('active');
+      expect(snapshot.context.triedSourceIds).toEqual([]);
+      expect(snapshot.context.warmSourceIds).toEqual([]);
+    });
+
+    it('zombie regression: warm source dies, then active dies - failover proceeds without waiting for exhausted', () => {
+      const actor = makeActor();
+      actor.start();
+      actor.send({ type: 'START' });
+      actor.send({ type: 'SOURCE_CONNECTED', sourceId: SourceId.LocalUdp });
+      vi.advanceTimersByTime(HEALTHY_WINDOW_MS + DEGRADED_GRACE_MS);
+      actor.send({ type: 'SOURCE_CONNECTED', sourceId: SourceId.WebSdr });
+
+      actor.send({ type: 'SOURCE_FAILED', sourceId: SourceId.LocalUdp, reason: 'ws closed' });
+      actor.send({ type: 'SOURCE_FAILED', sourceId: SourceId.WebSdr, reason: 'refused' });
+
+      const snapshot = actor.getSnapshot();
+      expect(snapshot.value).toBe('connecting');
+      expect(snapshot.context.currentSourceId).toBe(SourceId.AisStream);
+      // Dead LocalUdp sits on the tried list, not the warm list, so
+      // the IngestService closes its transport and the next exhausted
+      // reset re-dials it from scratch.
+      expect(snapshot.context.warmSourceIds).toEqual([]);
+      expect(snapshot.context.triedSourceIds).toEqual([SourceId.LocalUdp, SourceId.WebSdr]);
+    });
+  });
+
+  describe('connect timeout', () => {
+    it('times out of connecting into switching and advances to the next source', () => {
+      const actor = makeActor();
+      actor.start();
+      actor.send({ type: 'START' });
+      expect(actor.getSnapshot().value).toBe('connecting');
+
+      vi.advanceTimersByTime(CONNECT_TIMEOUT_MS);
+      const snapshot = actor.getSnapshot();
+      expect(snapshot.value).toBe('connecting');
+      expect(snapshot.context.currentSourceId).toBe(SourceId.WebSdr);
+      expect(snapshot.context.triedSourceIds).toContain(SourceId.LocalUdp);
+    });
+
+    it('ignores a late SOURCE_CONNECTED from the timed-out source', () => {
+      const actor = makeActor();
+      actor.start();
+      actor.send({ type: 'START' });
+      vi.advanceTimersByTime(CONNECT_TIMEOUT_MS);
+      expect(actor.getSnapshot().context.currentSourceId).toBe(SourceId.WebSdr);
+
+      // The blackholed dial finally resolves after the FSM moved on.
+      // isCurrentSource must reject it - LocalUdp is no longer current.
+      actor.send({ type: 'SOURCE_CONNECTED', sourceId: SourceId.LocalUdp });
+      const snapshot = actor.getSnapshot();
+      expect(snapshot.value).toBe('connecting');
+      expect(snapshot.context.currentSourceId).toBe(SourceId.WebSdr);
+
+      actor.send({ type: 'SOURCE_CONNECTED', sourceId: SourceId.WebSdr });
+      expect(actor.getSnapshot().value).toBe('active');
+    });
+
+    it('does not fire once the source connected in time', () => {
+      const actor = makeActor();
+      actor.start();
+      actor.send({ type: 'START' });
+      actor.send({ type: 'SOURCE_CONNECTED', sourceId: SourceId.LocalUdp });
+      vi.advanceTimersByTime(CONNECT_TIMEOUT_MS);
+      const snapshot = actor.getSnapshot();
+      expect(snapshot.value).toBe('active');
+      expect(snapshot.context.currentSourceId).toBe(SourceId.LocalUdp);
+    });
+
+    it('walks every source to exhausted when all dials blackhole', () => {
+      const actor = makeActor();
+      actor.start();
+      actor.send({ type: 'START' });
+      vi.advanceTimersByTime(CONNECT_TIMEOUT_MS);
+      vi.advanceTimersByTime(CONNECT_TIMEOUT_MS);
+      vi.advanceTimersByTime(CONNECT_TIMEOUT_MS);
+      const snapshot = actor.getSnapshot();
+      expect(snapshot.value).toBe('exhausted');
+      expect(snapshot.context.triedSourceIds).toEqual(PRIORITIZED);
+    });
+  });
+
+  describe('exhausted retry cycle', () => {
     it('exhausted retry timer clears BOTH tried and warm lists for a fresh cycle', () => {
       const actor = makeActor();
       actor.start();
