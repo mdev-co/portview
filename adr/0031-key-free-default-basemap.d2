@@ -1,0 +1,52 @@
+direction: down
+vars: {
+  d2-config: {
+    theme-id: 8
+    pad: 40
+  }
+}
+
+title: |md
+  # ADR 0031 - default basemap must be key-free
+  Before #223 every visitor consumed MapTiler quota from first paint.
+| {near: top-center}
+
+before: "BEFORE (#222): every mode keyed" {
+  style.fill: "#fff1f2"
+  style.stroke: "#9f1239"
+  visitor: "Visitor / bot\nopens sps-radar.pl" {shape: oval; style.fill: "#fecdd3"}
+  presentation: "Presentation (DEFAULT)\nMapTiler dataviz-light\n?key=VITE_MAPTILER_KEY" {style.fill: "#fda4af"}
+  dark: "OSM Dark\nMaptiler dataviz-dark" {style.fill: "#fda4af"}
+  optin: "Tactical / Backdrop / Satellite\nMapTiler, maxzoom 20-22" {style.fill: "#fecdd3"}
+  quota: "MapTiler Free\n100 000 req / month" {shape: cylinder; style.fill: "#fecdd3"}
+  blank: "104 307 requests in 6 days\naccount suspended\nBLANK MAP for everyone" {shape: hexagon; style.fill: "#e11d48"; style.font-color: "#ffffff"}
+  visitor -> presentation: "first paint,\nno click"
+  presentation -> quota: "20-30 tiles per view,\nmore per pan / zoom"
+  dark -> quota
+  optin -> quota: "opt-in only"
+  quota -> blank: "quota exhausted"
+}
+
+after: "AFTER (#223): default is key-free, MapTiler opt-in + capped" {
+  style.fill: "#ecfdf5"
+  style.stroke: "#065f46"
+  visitor: "Visitor / bot\nopens sps-radar.pl" {shape: oval; style.fill: "#d1fae5"}
+  presentation: "Presentation (DEFAULT)\nEsri World_Light_Gray_Base\nno key, no quota, maxzoom 16" {style.fill: "#6ee7b7"}
+  dark: "OSM Dark\nEsri World_Dark_Gray_Base\nno key, no quota" {style.fill: "#6ee7b7"}
+  esri: "server.arcgisonline.com\n(same CDN as imagery / topo modes)" {shape: cylinder; style.fill: "#d1fae5"}
+  optin: "Tactical / Backdrop / Satellite\nMapTiler, origin-locked key,\nmaxzoom 16 (overscale, no fetch)" {style.fill: "#fef3c7"}
+  quota: "MapTiler Free quota\nspent only by operators\nwho click a keyed mode" {shape: cylinder; style.fill: "#fef3c7"}
+  visitor -> presentation: "first paint"
+  presentation -> esri
+  dark -> esri
+  visitor -> optin: "explicit click" {style.stroke-dash: 3}
+  optin -> quota
+}
+
+rule: "RULE: a mode reachable without an explicit operator choice\nmust never depend on an API key or a monthly quota.\nKey rotation = Vercel env + redeploy, always both." {
+  shape: page
+  style.fill: "#e0f2fe"
+  style.stroke: "#075985"
+}
+before -> after: "ADR 0031" {style.stroke-width: 3}
+after -> rule
