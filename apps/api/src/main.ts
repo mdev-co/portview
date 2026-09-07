@@ -13,6 +13,10 @@ import {
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.useWebSocketAdapter(new WsAdapter(app));
+  // Without this, SIGTERM (every Fly deploy) kills the process without
+  // running onModuleDestroy: in-flight DLQ rows are lost and WebSocket
+  // peers get a TCP reset instead of a clean close.
+  app.enableShutdownHooks();
   // `/` keeps the legacy Hello-World handler so any tooling that hits
   // the root still gets a response; `/healthz` is excluded from the
   // global `/api` prefix so the Fly edge proxy can probe a path that

@@ -15,6 +15,12 @@ import type { Zone } from './types';
  * For the Szczecin zone set (5 polygons, ~10 vertices each) this is
  * a few hundred floating-point comparisons per vessel update -
  * negligible at the AIS broadcast cadence (1-5 Hz per vessel).
+ *
+ * Constraints: the math is planar in lng/lat, so polygons crossing the
+ * antimeridian (±180) are not supported - irrelevant for Szczecin, but
+ * operator-drawn zones inherit the limit. Points exactly on an edge or
+ * vertex are FP-exact and effectively unspecified; the dwell-machine
+ * hysteresis absorbs that jitter.
  */
 export function isInsideZone(lng: number, lat: number, zone: Zone): boolean {
   // turf throws on NaN positions; we guard so a vessel that broadcasts

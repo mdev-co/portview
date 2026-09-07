@@ -1,15 +1,25 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  type OnModuleDestroy,
+  type OnModuleInit,
+} from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
+import type { Prisma } from '@prisma/client';
 import {
   AIS_HEADING_UNKNOWN_SENTINEL,
   AIS_RATE_OF_TURN_OUT_OF_RANGE_BOUND,
   AIS_SHIP_TYPE_DEFAULT,
   CLASS_B_STATIC_PART_A,
   CLASS_B_STATIC_PART_B,
+  type ClassBStaticData,
   initKalmanState2D,
   type KalmanState2D,
+  type SourceId,
+  type StaticData,
   stepKalman2D,
 } from '@sps/shared';
+import { getPersistenceFlushMs } from '../env';
 import {
   VESSEL_STATIC_EVENT,
   VESSEL_UPDATE_EVENT,
@@ -25,42 +35,76 @@ import { PrismaService } from '../prisma/prisma.service';
  * logged but never propagated back to the publisher (one bad row
  * cannot stall the live feed).
  *
- * Two responsibilities, mirrored on the two ingest event channels:
- * - Position frames (type 1/2/3/18) -> append a row to vessel_positions,
- *   advance the Kalman filter state and stamp lastSeenAt on the parent
- *   vessel row.
- * - Static frames (type 5 / 24) -> upsert the vessel row with name,
- *   callSign, shipType, dimensions, etc. Class B type 24 arrives in
- *   two parts; we keep whichever side carried a value (PartA = name,
- *   PartB = callSign + dimensions + shipType).
+ * Writes are BATCHED, not per-frame. Each incoming event is folded
+ * into an in-memory per-MMSI buffer and a timer flushes the buffer
+ * once per window (default 1 s, see `getPersistenceFlushMs`). One
+ * Prisma upsert per frame starved the connection pool on the shared
+ * 1-vCPU deployment; coalescing per MMSI and writing in chunked
+ * transactions cuts pool pressure by an order of magnitude at the
+ * cost of up to one window of write latency.
+ *
+ * Coalescing rules, mirrored on the two ingest event channels:
+ * - Position frames (type 1/2/3/18): the LATEST frame in the window
+ *   supersedes earlier ones for the same MMSI. At flush time the
+ *   Kalman filter state is read from the parent vessel row, advanced
+ *   with the coalesced measurement, and written back together with a
+ *   vessel_positions row in the same transaction.
+ * - Static frames (type 5 / 24): field-wise merge - a newer frame
+ *   overrides only the fields it actually carries, so Class B PartA
+ *   (name) and PartB (callSign + dimensions + shipType) arriving in
+ *   the same window combine instead of clobbering each other.
+ *
+ * Failure handling: a failed flush chunk is re-merged into the live
+ * buffer with live-wins semantics (deltas that arrived during the
+ * attempt stay newest) and retried on the next tick. Overlapping
+ * flushes are impossible - a tick that fires while a flush is in
+ * flight is skipped and the buffer simply keeps accumulating.
  */
 @Injectable()
-export class VesselPersistenceService {
+export class VesselPersistenceService implements OnModuleInit, OnModuleDestroy {
   private readonly log = new Logger(VesselPersistenceService.name);
+
+  private buffer = new Map<number, BufferedDelta>();
+  private droppedTotal = 0;
+  private flushTimer: NodeJS.Timeout | null = null;
+  /** Consecutive flush ticks that ended with a failed chunk; drives backoff. */
+  private consecutiveFailures = 0;
+  /** Ticks to skip before the next flush attempt (exponential backoff). */
+  private skipTicks = 0;
+  private flushInFlight: Promise<void> | null = null;
 
   constructor(private readonly prisma: PrismaService) {}
 
+  onModuleInit(): void {
+    this.flushTimer = setInterval(
+      () => this.flushTick(),
+      getPersistenceFlushMs(),
+    );
+    // Never keep the process alive for the sake of the flush loop.
+    this.flushTimer.unref();
+  }
+
+  async onModuleDestroy(): Promise<void> {
+    if (this.flushTimer !== null) {
+      clearInterval(this.flushTimer);
+      this.flushTimer = null;
+    }
+    // Drain: wait out any in-flight flush, then write what remains.
+    // enableShutdownHooks() in main.ts guarantees this runs on SIGTERM,
+    // so the final window of deltas survives a deploy.
+    if (this.flushInFlight !== null) {
+      await this.flushInFlight;
+    }
+    await this.flush();
+  }
+
+  /** Observability hook: buffer occupancy and cumulative cap drops. */
+  stats(): VesselPersistenceStats {
+    return { buffered: this.buffer.size, dropped: this.droppedTotal };
+  }
+
   @OnEvent(VESSEL_UPDATE_EVENT)
   onVesselUpdate(event: VesselUpdateEvent): void {
-    // Fire and forget: the ingest pipeline should not block on Postgres
-    // and a single failed write should not derail the live feed.
-    void this.persistPosition(event).catch((err) => {
-      this.log.warn(
-        `persistPosition failed for mmsi=${String(event.message.mmsi)}: ${String(err)}`,
-      );
-    });
-  }
-
-  @OnEvent(VESSEL_STATIC_EVENT)
-  onVesselStatic(event: VesselStaticEvent): void {
-    void this.persistStatic(event).catch((err) => {
-      this.log.warn(
-        `persistStatic failed for mmsi=${String(event.message.mmsi)}: ${String(err)}`,
-      );
-    });
-  }
-
-  private async persistPosition(event: VesselUpdateEvent): Promise<void> {
     const { message, sourceId, receivedAt } = event;
     if (
       message.messageType !== 1 &&
@@ -73,24 +117,131 @@ export class VesselPersistenceService {
     const position = message.position;
     if (position === null) return;
     const [lng, lat] = position;
-    const sog = message.speedOverGround;
-    const cog = message.courseOverGround;
-    const heading = normaliseHeading(message.trueHeading);
-    const rot =
-      'rateOfTurn' in message ? normaliseRateOfTurn(message.rateOfTurn) : null;
-    const navStatus =
-      'navigationStatus' in message ? message.navigationStatus : null;
+    this.bufferDelta(Number(message.mmsi), {
+      position: {
+        lng,
+        lat,
+        speedOverGround: message.speedOverGround,
+        courseOverGround: message.courseOverGround,
+        trueHeading: normaliseHeading(message.trueHeading),
+        rateOfTurn:
+          'rateOfTurn' in message
+            ? normaliseRateOfTurn(message.rateOfTurn)
+            : null,
+        navStatus:
+          'navigationStatus' in message ? message.navigationStatus : null,
+        sourceId,
+        receivedAt,
+      },
+      staticData: null,
+    });
+  }
 
-    const broadcastTimestamp = new Date(receivedAt);
-    const mmsi = Number(message.mmsi);
+  @OnEvent(VESSEL_STATIC_EVENT)
+  onVesselStatic(event: VesselStaticEvent): void {
+    const { message, sourceId, receivedAt } = event;
+    const fields = staticFieldsOf(message);
+    if (fields === null) return;
+    this.bufferDelta(Number(message.mmsi), {
+      position: null,
+      staticData: { fields, sourceId, receivedAt },
+    });
+  }
 
-    // Advance Kalman state. Read previous state from the parent vessel
-    // row (if any), predict-and-update with the new measurement, write
-    // both the new position row and the updated state in a single
-    // transaction so the snapshot consumer never sees a mismatch.
-    const existing = await this.prisma.vessel.findUnique({
-      where: { mmsi },
+  private bufferDelta(mmsi: number, incoming: BufferedDelta): void {
+    const existing = this.buffer.get(mmsi);
+    if (existing !== undefined) {
+      this.buffer.set(mmsi, mergeDeltas(existing, incoming));
+      return;
+    }
+    if (this.buffer.size >= BUFFER_HARD_CAP) {
+      this.droppedTotal += 1;
+      return;
+    }
+    this.buffer.set(mmsi, incoming);
+  }
+
+  private flushTick(): void {
+    if (this.flushInFlight !== null) return;
+    if (this.skipTicks > 0) {
+      this.skipTicks -= 1;
+      return;
+    }
+    this.flushInFlight = this.flush().finally(() => {
+      this.flushInFlight = null;
+    });
+  }
+
+  private async flush(): Promise<void> {
+    if (this.buffer.size === 0) return;
+    const batch = this.buffer;
+    this.buffer = new Map();
+
+    const positionMmsis = [...batch.entries()]
+      .filter(([, delta]) => delta.position !== null)
+      .map(([mmsi]) => mmsi);
+
+    let kalmanByMmsi: ReadonlyMap<number, StoredKalman>;
+    try {
+      kalmanByMmsi = await this.readKalmanStates(positionMmsis);
+    } catch (err) {
+      this.remergeBatch(batch);
+      this.registerFailure();
+      this.log.error(
+        `flush read failed, ${String(batch.size)} deltas requeued, ` +
+          `backing off ${String(this.skipTicks)} tick(s): ${String(err)}`,
+      );
+      return;
+    }
+
+    const entries = [...batch.entries()];
+    let written = 0;
+    let failed = 0;
+    for (let i = 0; i < entries.length; i += FLUSH_CHUNK_SIZE) {
+      const chunk = entries.slice(i, i + FLUSH_CHUNK_SIZE);
+      const ops = chunk.flatMap(([mmsi, delta]) =>
+        this.buildOps(mmsi, delta, kalmanByMmsi.get(mmsi) ?? null),
+      );
+      try {
+        await this.prisma.$transaction(ops);
+        written += chunk.length;
+      } catch (err) {
+        // One failed chunk almost always means the database is down or
+        // saturated; hammering the remaining chunks in the same tick
+        // only deepens the hole. Requeue this chunk AND everything not
+        // yet attempted. The first failure retries on the very next
+        // tick (transient blips are common); from the second consecutive
+        // failure on, skip 1, 3, 7 ... ticks, capped at
+        // FLUSH_BACKOFF_MAX_TICKS. Live-wins merge semantics are
+        // preserved by remergeFailed.
+        const rest = entries.slice(i);
+        failed += rest.length;
+        for (const [mmsi, delta] of rest) {
+          this.remergeFailed(mmsi, delta);
+        }
+        this.registerFailure();
+        this.log.error(
+          `flush chunk failed, ${String(rest.length)} deltas requeued, ` +
+            `backing off ${String(this.skipTicks)} tick(s): ${String(err)}`,
+        );
+        break;
+      }
+    }
+    if (failed === 0) this.consecutiveFailures = 0;
+    this.log.debug(
+      `flush: written=${String(written)} failed=${String(failed)} ` +
+        `droppedTotal=${String(this.droppedTotal)} pending=${String(this.buffer.size)}`,
+    );
+  }
+
+  private async readKalmanStates(
+    mmsis: readonly number[],
+  ): Promise<ReadonlyMap<number, StoredKalman>> {
+    if (mmsis.length === 0) return new Map();
+    const rows = await this.prisma.vessel.findMany({
+      where: { mmsi: { in: [...mmsis] } },
       select: {
+        mmsi: true,
         kalmanLng: true,
         kalmanLat: true,
         kalmanVlng: true,
@@ -99,162 +250,292 @@ export class VesselPersistenceService {
         kalmanUpdatedAt: true,
       },
     });
+    return new Map(rows.map((row) => [row.mmsi, row]));
+  }
 
-    const nowSeconds = Math.floor(receivedAt / 1000);
-    const nextKalman = advanceKalman(existing, lng, lat, nowSeconds);
+  /**
+   * One vessel upsert per buffered MMSI, followed by a
+   * vessel_positions insert when the window carried a position frame.
+   * Order matters: vesselPosition.vessel_mmsi is a foreign key to
+   * vessels.mmsi, so for a previously-unseen MMSI the parent upsert
+   * must run first or the transaction rolls back on FK violation.
+   */
+  private buildOps(
+    mmsi: number,
+    delta: BufferedDelta,
+    stored: StoredKalman | null,
+  ): Prisma.PrismaPromise<unknown>[] {
+    const { position, staticData } = delta;
+    const newest =
+      position !== null &&
+      (staticData === null || position.receivedAt >= staticData.receivedAt)
+        ? position
+        : staticData;
+    if (newest === null) return [];
 
-    // Order matters: vessel upsert must run before vesselPosition.create
-    // because vesselPosition.vessel_mmsi is a foreign key to vessels.mmsi.
-    // For a previously-unseen MMSI (common when an upstream feed reports a
-    // new vessel) the parent row does not exist yet; running the position
-    // insert first triggers a foreign-key violation that rolls back the
-    // whole transaction, dropping the frame.
-    await this.prisma.$transaction([
+    const data: VesselWriteData = {
+      ...(staticData?.fields ?? {}),
+      lastSeenAt: new Date(newest.receivedAt),
+      lastSourceId: newest.sourceId,
+    };
+
+    const ops: Prisma.PrismaPromise<unknown>[] = [];
+    if (position !== null) {
+      const broadcastTimestamp = new Date(position.receivedAt);
+      const nextKalman = advanceKalman(
+        stored,
+        position.lng,
+        position.lat,
+        Math.floor(position.receivedAt / 1000),
+      );
+      data.kalmanLng = nextKalman.lng;
+      data.kalmanLat = nextKalman.lat;
+      data.kalmanVlng = nextKalman.vlng;
+      data.kalmanVlat = nextKalman.vlat;
+      data.kalmanCovariance = nextKalman.covariance;
+      data.kalmanUpdatedAt = broadcastTimestamp;
+      ops.push(
+        this.prisma.vessel.upsert({
+          where: { mmsi },
+          update: data,
+          create: { mmsi, ...data },
+        }),
+        this.prisma.vesselPosition.create({
+          data: {
+            vesselMmsi: mmsi,
+            lng: position.lng,
+            lat: position.lat,
+            speedOverGround: position.speedOverGround,
+            courseOverGround: position.courseOverGround,
+            trueHeading: position.trueHeading,
+            rateOfTurn: position.rateOfTurn,
+            navStatus: position.navStatus,
+            sourceId: position.sourceId,
+            broadcastTimestamp,
+          },
+        }),
+      );
+      return ops;
+    }
+    ops.push(
       this.prisma.vessel.upsert({
         where: { mmsi },
-        update: {
-          lastSeenAt: broadcastTimestamp,
-          lastSourceId: sourceId,
-          kalmanLng: nextKalman.lng,
-          kalmanLat: nextKalman.lat,
-          kalmanVlng: nextKalman.vlng,
-          kalmanVlat: nextKalman.vlat,
-          kalmanCovariance: nextKalman.covariance,
-          kalmanUpdatedAt: broadcastTimestamp,
-        },
-        create: {
-          mmsi,
-          lastSeenAt: broadcastTimestamp,
-          lastSourceId: sourceId,
-          kalmanLng: nextKalman.lng,
-          kalmanLat: nextKalman.lat,
-          kalmanVlng: nextKalman.vlng,
-          kalmanVlat: nextKalman.vlat,
-          kalmanCovariance: nextKalman.covariance,
-          kalmanUpdatedAt: broadcastTimestamp,
-        },
+        update: data,
+        create: { mmsi, ...data },
       }),
-      this.prisma.vesselPosition.create({
-        data: {
-          vesselMmsi: mmsi,
-          lng,
-          lat,
-          speedOverGround: sog,
-          courseOverGround: cog,
-          trueHeading: heading,
-          rateOfTurn: rot,
-          navStatus,
-          sourceId,
-          broadcastTimestamp,
-        },
-      }),
-    ]);
+    );
+    return ops;
   }
 
-  private async persistStatic(event: VesselStaticEvent): Promise<void> {
-    const { message, sourceId, receivedAt } = event;
-    const mmsi = Number(message.mmsi);
-    const broadcastTimestamp = new Date(receivedAt);
+  /**
+   * Counts a failed flush attempt (read or write) and arms the tick
+   * backoff: first failure retries next tick, then 1, 3, 7 ... skipped
+   * ticks up to FLUSH_BACKOFF_MAX_TICKS. Reset on a clean flush.
+   */
+  private registerFailure(): void {
+    this.consecutiveFailures += 1;
+    this.skipTicks = Math.min(
+      2 ** (this.consecutiveFailures - 1) - 1,
+      FLUSH_BACKOFF_MAX_TICKS,
+    );
+  }
 
-    if (message.messageType === 5) {
-      await this.prisma.vessel.upsert({
-        where: { mmsi },
-        update: {
-          name: message.vesselName.trim() || undefined,
-          callSign: message.callSign.trim() || undefined,
-          imo: message.imo !== null ? Number(message.imo) : undefined,
-          shipType:
-            message.shipType !== AIS_SHIP_TYPE_DEFAULT
-              ? Number(message.shipType)
-              : undefined,
-          toBow: message.dimensions?.toBow ?? undefined,
-          toStern: message.dimensions?.toStern ?? undefined,
-          toPort: message.dimensions?.toPort ?? undefined,
-          toStarboard: message.dimensions?.toStarboard ?? undefined,
-          draught: message.draught ?? undefined,
-          destination: message.destination.trim() || undefined,
-          eta: etaToDate(message.eta) ?? undefined,
-          lastSeenAt: broadcastTimestamp,
-          lastSourceId: sourceId,
-        },
-        create: {
-          mmsi,
-          name: message.vesselName.trim() || null,
-          callSign: message.callSign.trim() || null,
-          imo: message.imo !== null ? Number(message.imo) : null,
-          shipType:
-            message.shipType !== AIS_SHIP_TYPE_DEFAULT
-              ? Number(message.shipType)
-              : null,
-          toBow: message.dimensions?.toBow ?? null,
-          toStern: message.dimensions?.toStern ?? null,
-          toPort: message.dimensions?.toPort ?? null,
-          toStarboard: message.dimensions?.toStarboard ?? null,
-          draught: message.draught ?? null,
-          destination: message.destination.trim() || null,
-          eta: etaToDate(message.eta),
-          lastSeenAt: broadcastTimestamp,
-          lastSourceId: sourceId,
-        },
-      });
-      return;
-    }
-
-    // Class B static (type 24) arrives in two halves. Each part is
-    // upserted with only the fields it actually carries; the merge
-    // policy (keep previous when incoming is blank) lives in the FE
-    // store. Here we use `undefined` for absent fields so Prisma leaves
-    // them at their previous value.
-    if (message.partNumber === CLASS_B_STATIC_PART_A) {
-      await this.prisma.vessel.upsert({
-        where: { mmsi },
-        update: {
-          name: message.vesselName.trim() || undefined,
-          lastSeenAt: broadcastTimestamp,
-          lastSourceId: sourceId,
-        },
-        create: {
-          mmsi,
-          name: message.vesselName.trim() || null,
-          lastSeenAt: broadcastTimestamp,
-          lastSourceId: sourceId,
-        },
-      });
-      return;
-    }
-    if (message.partNumber === CLASS_B_STATIC_PART_B) {
-      await this.prisma.vessel.upsert({
-        where: { mmsi },
-        update: {
-          callSign: message.callSign.trim() || undefined,
-          shipType:
-            message.shipType !== AIS_SHIP_TYPE_DEFAULT
-              ? Number(message.shipType)
-              : undefined,
-          toBow: message.dimensions?.toBow ?? undefined,
-          toStern: message.dimensions?.toStern ?? undefined,
-          toPort: message.dimensions?.toPort ?? undefined,
-          toStarboard: message.dimensions?.toStarboard ?? undefined,
-          lastSeenAt: broadcastTimestamp,
-          lastSourceId: sourceId,
-        },
-        create: {
-          mmsi,
-          callSign: message.callSign.trim() || null,
-          shipType:
-            message.shipType !== AIS_SHIP_TYPE_DEFAULT
-              ? Number(message.shipType)
-              : null,
-          toBow: message.dimensions?.toBow ?? null,
-          toStern: message.dimensions?.toStern ?? null,
-          toPort: message.dimensions?.toPort ?? null,
-          toStarboard: message.dimensions?.toStarboard ?? null,
-          lastSeenAt: broadcastTimestamp,
-          lastSourceId: sourceId,
-        },
-      });
+  private remergeBatch(batch: ReadonlyMap<number, BufferedDelta>): void {
+    for (const [mmsi, delta] of batch) {
+      this.remergeFailed(mmsi, delta);
     }
   }
+
+  /**
+   * Requeue a delta whose write failed. Deltas that arrived in the
+   * live buffer during the attempt are NEWER, so they win the merge:
+   * the failed position is kept only when no fresher one exists, and
+   * failed static fields sit underneath the live ones.
+   */
+  private remergeFailed(mmsi: number, failedDelta: BufferedDelta): void {
+    const live = this.buffer.get(mmsi);
+    if (live === undefined) {
+      // Requeue must respect the same memory bound as fresh ingest;
+      // otherwise a long outage grows the buffer past BUFFER_HARD_CAP.
+      if (this.buffer.size >= BUFFER_HARD_CAP) {
+        this.droppedTotal += 1;
+        return;
+      }
+      this.buffer.set(mmsi, failedDelta);
+      return;
+    }
+    this.buffer.set(mmsi, mergeDeltas(failedDelta, live));
+  }
+}
+
+export type VesselPersistenceStats = {
+  readonly buffered: number;
+  readonly dropped: number;
+};
+
+/**
+ * Flush interval and chunking constants. FLUSH_CHUNK_SIZE bounds a
+ * single transaction at 2 * chunk operations (upsert + position
+ * insert per MMSI) so one flush never holds a pool connection for an
+ * unbounded statement list. BUFFER_HARD_CAP bounds worst-case memory
+ * the same way the ingest limiters bound their LRU maps: real traffic
+ * (~200-500 vessels) never reaches it; hitting it means a flood, and
+ * frames for previously-unseen MMSIs are dropped and counted rather
+ * than growing the heap.
+ */
+const FLUSH_CHUNK_SIZE = 100;
+const BUFFER_HARD_CAP = 5000;
+/** Upper bound for exponential backoff after failed flushes (in ticks). */
+const FLUSH_BACKOFF_MAX_TICKS = 30;
+
+type PositionDelta = {
+  readonly lng: number;
+  readonly lat: number;
+  readonly speedOverGround: number | null;
+  readonly courseOverGround: number | null;
+  readonly trueHeading: number | null;
+  readonly rateOfTurn: number | null;
+  readonly navStatus: number | null;
+  readonly sourceId: SourceId;
+  readonly receivedAt: number;
+};
+
+/**
+ * Static vessel fields carried by a type 5 / 24 frame. Absent fields
+ * stay absent (not null) so a field-wise object spread implements the
+ * merge policy and Prisma's `undefined = leave unchanged` semantics
+ * apply on update.
+ */
+type StaticFields = {
+  name?: string;
+  callSign?: string;
+  imo?: number;
+  shipType?: number;
+  toBow?: number;
+  toStern?: number;
+  toPort?: number;
+  toStarboard?: number;
+  draught?: number;
+  destination?: string;
+  eta?: Date;
+};
+
+type StaticDelta = {
+  readonly fields: StaticFields;
+  readonly sourceId: SourceId;
+  readonly receivedAt: number;
+};
+
+type BufferedDelta = {
+  readonly position: PositionDelta | null;
+  readonly staticData: StaticDelta | null;
+};
+
+type VesselWriteData = StaticFields & {
+  lastSeenAt: Date;
+  lastSourceId: number;
+  kalmanLng?: number;
+  kalmanLat?: number;
+  kalmanVlng?: number;
+  kalmanVlat?: number;
+  kalmanCovariance?: KalmanState2D['covariance'];
+  kalmanUpdatedAt?: Date;
+};
+
+function mergeDeltas(
+  older: BufferedDelta,
+  newer: BufferedDelta,
+): BufferedDelta {
+  return {
+    position: newer.position ?? older.position,
+    staticData: mergeStatic(older.staticData, newer.staticData),
+  };
+}
+
+function mergeStatic(
+  older: StaticDelta | null,
+  newer: StaticDelta | null,
+): StaticDelta | null {
+  if (older === null) return newer;
+  if (newer === null) return older;
+  return {
+    fields: { ...older.fields, ...newer.fields },
+    sourceId: newer.sourceId,
+    receivedAt: Math.max(older.receivedAt, newer.receivedAt),
+  };
+}
+
+/**
+ * Normalise an incoming static frame to the fields it actually
+ * carries. Type 5 (Class A) carries the full record; Class B type 24
+ * arrives in two parts (PartA = name, PartB = callSign + dimensions +
+ * shipType). Blank strings and AIS sentinel values are treated as
+ * absent so they never overwrite previously-known values.
+ */
+function staticFieldsOf(
+  message: StaticData | ClassBStaticData,
+): StaticFields | null {
+  if (message.messageType === 5) {
+    const fields: StaticFields = {};
+    assignIfPresent(fields, 'name', message.vesselName.trim() || undefined);
+    assignIfPresent(fields, 'callSign', message.callSign.trim() || undefined);
+    assignIfPresent(
+      fields,
+      'imo',
+      message.imo !== null ? Number(message.imo) : undefined,
+    );
+    assignIfPresent(fields, 'shipType', normaliseShipType(message.shipType));
+    assignDimensions(fields, message.dimensions);
+    assignIfPresent(fields, 'draught', message.draught ?? undefined);
+    assignIfPresent(
+      fields,
+      'destination',
+      message.destination.trim() || undefined,
+    );
+    assignIfPresent(fields, 'eta', etaToDate(message.eta) ?? undefined);
+    return fields;
+  }
+  if (message.partNumber === CLASS_B_STATIC_PART_A) {
+    const fields: StaticFields = {};
+    assignIfPresent(fields, 'name', message.vesselName.trim() || undefined);
+    return fields;
+  }
+  if (message.partNumber === CLASS_B_STATIC_PART_B) {
+    const fields: StaticFields = {};
+    assignIfPresent(fields, 'callSign', message.callSign.trim() || undefined);
+    assignIfPresent(fields, 'shipType', normaliseShipType(message.shipType));
+    assignDimensions(fields, message.dimensions);
+    return fields;
+  }
+  return null;
+}
+
+function assignIfPresent<K extends keyof StaticFields>(
+  fields: StaticFields,
+  key: K,
+  value: StaticFields[K] | undefined,
+): void {
+  if (value !== undefined) fields[key] = value;
+}
+
+function assignDimensions(
+  fields: StaticFields,
+  dimensions: {
+    toBow: number;
+    toStern: number;
+    toPort: number;
+    toStarboard: number;
+  } | null,
+): void {
+  if (dimensions === null) return;
+  fields.toBow = dimensions.toBow;
+  fields.toStern = dimensions.toStern;
+  fields.toPort = dimensions.toPort;
+  fields.toStarboard = dimensions.toStarboard;
+}
+
+function normaliseShipType(shipType: number): number | undefined {
+  return shipType !== AIS_SHIP_TYPE_DEFAULT ? Number(shipType) : undefined;
 }
 
 function normaliseHeading(value: number | null): number | null {

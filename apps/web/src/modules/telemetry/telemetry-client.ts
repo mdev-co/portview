@@ -354,6 +354,9 @@ export function createTelemetryClient(options: TelemetryClientOptions = {}): Tel
 
   function open(): void {
     if (stopped) return;
+    // A live socket must never be silently overwritten: two sockets
+    // sharing one dispatcher would deliver every frame twice.
+    if (socket !== null) return;
     state = 'connecting';
     const ws = new WebSocket(url);
     ws.binaryType = 'arraybuffer';
@@ -389,6 +392,12 @@ export function createTelemetryClient(options: TelemetryClientOptions = {}): Tel
     start(): void {
       if (state !== 'idle' && state !== 'closed') return;
       stopped = false;
+      // 'closed' is also the state while a reconnect timer is pending;
+      // clear it so the timer cannot fire a second open() after this one.
+      if (reconnectTimer !== null) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
       // Subscribe to the tab visibility domain store. When the user
       // returns after >= REFOCUS_REFRESH_THRESHOLD_MS hidden, force a
       // socket close so the existing reconnect path opens a fresh

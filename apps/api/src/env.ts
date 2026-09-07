@@ -19,6 +19,7 @@ const CORS_ALLOWED_ORIGINS = 'CORS_ALLOWED_ORIGINS';
 const EXTERNAL_FEED_TOKEN = 'EXTERNAL_FEED_TOKEN';
 const EXTERNAL_FEED_ENDPOINT = 'EXTERNAL_FEED_ENDPOINT';
 const SPS_EXPOSE_OPENAPI = 'SPS_EXPOSE_OPENAPI';
+const SPS_PERSISTENCE_FLUSH_MS = 'SPS_PERSISTENCE_FLUSH_MS';
 const EDGE_INGEST_PORT = 'EDGE_INGEST_PORT';
 const EDGE_INGEST_SERVER_CERT_PATH = 'EDGE_INGEST_SERVER_CERT_PATH';
 const EDGE_INGEST_SERVER_KEY_PATH = 'EDGE_INGEST_SERVER_KEY_PATH';
@@ -30,6 +31,7 @@ const TRUTHY = 'true';
 
 const DEFAULT_PORT = 3000;
 const DEFAULT_EDGE_INGEST_PORT = 8443;
+const DEFAULT_PERSISTENCE_FLUSH_MS = 1000;
 
 export function isProduction(): boolean {
   return process.env[NODE_ENV] === PRODUCTION_ENV;
@@ -55,6 +57,22 @@ export function getPort(): number {
   if (raw === undefined || raw === '') return DEFAULT_PORT;
   const parsed = Number(raw);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_PORT;
+}
+
+/**
+ * Interval (ms) between persistence flushes. Buffered AIS deltas are
+ * written to Postgres once per window instead of once per frame, so
+ * this value trades write latency against connection-pool pressure.
+ * Default 1000 ms; any non-positive or non-numeric override falls
+ * back to the default.
+ */
+export function getPersistenceFlushMs(): number {
+  const raw = process.env[SPS_PERSISTENCE_FLUSH_MS];
+  if (raw === undefined || raw === '') return DEFAULT_PERSISTENCE_FLUSH_MS;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0
+    ? parsed
+    : DEFAULT_PERSISTENCE_FLUSH_MS;
 }
 
 export function getCorsAllowedOrigins(): string[] {
@@ -109,6 +127,7 @@ export const ENV_KEYS = {
   EXTERNAL_FEED_TOKEN,
   EXTERNAL_FEED_ENDPOINT,
   SPS_EXPOSE_OPENAPI,
+  SPS_PERSISTENCE_FLUSH_MS,
   EDGE_INGEST_PORT,
   EDGE_INGEST_SERVER_CERT_PATH,
   EDGE_INGEST_SERVER_KEY_PATH,

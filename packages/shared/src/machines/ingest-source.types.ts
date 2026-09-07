@@ -105,3 +105,13 @@ export const DEGRADED_GRACE_MS = 600_000;
  * Time in "exhausted" before retrying from the highest-priority source.
  */
 export const EXHAUSTED_RETRY_MS = 60_000;
+
+/**
+ * Maximum time the FSM waits in "connecting" for a SOURCE_CONNECTED
+ * before marking the current source tried and moving on. Guards
+ * against blackholed dials (DNS/TCP blackhole on a WS endpoint) that
+ * neither resolve nor reject: without a deadline the FSM would park in
+ * "connecting" forever at cold start, when no warm source exists to
+ * interrupt it.
+ */
+export const CONNECT_TIMEOUT_MS = 30_000;

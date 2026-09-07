@@ -76,10 +76,19 @@ export const SWAGGER_CUSTOM_OPTIONS: SwaggerCustomOptions = {
  * skips the docs route instead of crashing the api at startup.
  */
 export function loadOpenApiDocument(): OpenAPIObject | null {
+  let raw: string;
   try {
-    const raw = readFileSync(SPEC_PATH, 'utf8');
+    raw = readFileSync(SPEC_PATH, 'utf8');
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
+      console.warn(`[openapi] spec file unreadable: ${String(err)}`);
+    }
+    return null;
+  }
+  try {
     return JSON.parse(raw) as OpenAPIObject;
-  } catch {
+  } catch (err) {
+    console.warn(`[openapi] spec file corrupt: ${String(err)}`);
     return null;
   }
 }
