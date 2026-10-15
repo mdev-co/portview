@@ -1,4 +1,4 @@
-import { $vessels, type LiveVessel } from '@/modules/telemetry';
+import { $vessels, type LiveVessel, displayNowSeconds } from '@/modules/telemetry';
 import {
   DEFAULT_DWELL_CONFIG,
   type Mmsi,
@@ -128,7 +128,7 @@ function createPipelineInstance(): PipelineInstance {
 
   function evictVessel(mmsi: Mmsi): void {
     const prevState = $geofenceMembership.get();
-    const evictionNow = lastSeenFor(prevState, mmsi) ?? Date.now();
+    const evictionNow = lastSeenFor(prevState, mmsi) ?? displayNowSeconds() * 1_000;
     const result = forceExitVessel(prevState, mmsi, evictionNow);
     setMembershipState(result.state);
     if (result.events.length > 0) appendGeofenceEvents(result.events);
@@ -226,7 +226,7 @@ function createPipelineInstance(): PipelineInstance {
   const sweepHandle = setInterval(() => {
     const state = $geofenceMembership.get();
     if (state.size === 0) return;
-    const result = sweepGhosts(state, Date.now(), DEFAULT_DWELL_CONFIG);
+    const result = sweepGhosts(state, displayNowSeconds() * 1_000, DEFAULT_DWELL_CONFIG);
     setMembershipState(result.state);
     if (result.events.length > 0) appendGeofenceEvents(result.events);
     // After a ghost sweep, presence for any vessel that lost zones

@@ -1,6 +1,7 @@
 import { EmptyState } from '@/components/ui/empty-state';
 import { Placeholder } from '@/components/ui/placeholder';
 import type { VesselStatus } from '@/modules/map/styles/vessel-palette';
+import { $archiveAnchorUnix } from '@/modules/telemetry';
 import { useStore } from '@nanostores/react';
 import {
   Activity,
@@ -24,6 +25,7 @@ import { VesselListItem } from './vessel-list-item';
 const SIDEBAR_TEXT = {
   ariaLabel: 'Live vessels sidebar',
   vesselsTitle: 'Vessels',
+  archiveNotice: 'Receiver offline. Showing last known positions from',
   emptyTitle: 'Waiting for AIS feed.',
   emptyHint:
     'Anchored vessels broadcast every ~3 minutes; first results may take a moment after start-up.',
@@ -40,7 +42,15 @@ const styles = {
   outerScroll:
     'flex-1 overflow-y-auto [scrollbar-gutter:stable] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-border/60 [&::-webkit-scrollbar-track]:bg-transparent',
   list: 'divide-border/50 divide-y',
+  archiveNotice: 'text-muted-foreground border-border/50 border-b px-3 py-2 text-xs',
 } as const;
+
+const ARCHIVE_TIME_FORMAT = new Intl.DateTimeFormat('en-GB', {
+  day: 'numeric',
+  month: 'short',
+  hour: '2-digit',
+  minute: '2-digit',
+});
 
 const GROUP_ICON: Record<VesselStatus, LucideIcon> = {
   underway: ShipWheel,
@@ -53,6 +63,7 @@ export function VesselSidebar() {
   const fullList = useVesselList();
   const groups = useGroupedVesselList();
   const selectedMmsi = useStore($selectedMmsi);
+  const archiveAnchorUnix = useStore($archiveAnchorUnix);
   const hasSelection = selectedMmsi !== null;
   const { isOpen, toggleGroup } = useSidebarGroupExpansion(groups, selectedMmsi);
 
@@ -75,6 +86,12 @@ export function VesselSidebar() {
               changes but the layout does not, eliminating the
               0.158 CLS the Vessels section was tripping. */}
           <div className={styles.outerScroll}>
+            {archiveAnchorUnix !== null && (
+              <p role="status" className={styles.archiveNotice}>
+                {SIDEBAR_TEXT.archiveNotice} {ARCHIVE_TIME_FORMAT.format(archiveAnchorUnix * 1_000)}
+                .
+              </p>
+            )}
             {fullList.length === 0 ? (
               <EmptyState
                 icon={Ship}

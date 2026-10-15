@@ -5,6 +5,7 @@ import {
   $vesselPositionHistory,
   $vesselStaticData,
   $vessels,
+  displayNowSeconds,
 } from '@/modules/telemetry';
 import type { MapLayerMouseEvent, MapMouseEvent, Map as MaplibreMap } from 'maplibre-gl';
 import { useMapEngine } from '../hooks/use-map-engine';
@@ -71,7 +72,7 @@ export function VesselLayer(): null {
     const transitionTracker = createTransitionTracker(TRANSITION_DURATION_MS);
 
     const renderVessels = (): void => {
-      const nowSeconds = Math.floor(Date.now() / 1_000);
+      const nowSeconds = displayNowSeconds();
       controller.setSourceData(
         VESSEL_SOURCE_ID,
         vesselsToGeoJSON(

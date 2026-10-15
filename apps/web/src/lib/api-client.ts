@@ -22,6 +22,15 @@ export type VesselPositionSummary = {
   readonly updatedAt: string;
 };
 
+/** Persisted Kalman filter state: the last filtered fix of the vessel. */
+export type VesselKalmanSummary = {
+  readonly lng: number;
+  readonly lat: number;
+  readonly vlng: number;
+  readonly vlat: number;
+  readonly updatedAt: string;
+};
+
 export type VesselSummary = {
   readonly mmsi: number;
   readonly imo: number | null;
@@ -32,6 +41,7 @@ export type VesselSummary = {
   readonly eta: string | null;
   readonly lastSeenAt: string | null;
   readonly position: VesselPositionSummary | null;
+  readonly kalmanState: VesselKalmanSummary | null;
 };
 
 export type VesselListResponse = {
