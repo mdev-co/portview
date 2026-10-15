@@ -7,7 +7,7 @@ import { getVesselDisplayPosition } from '@/modules/map/lib/vessel-display-posit
 import { toggleTrailForVessel } from '@/modules/map/state/trail-visibility';
 import { paletteFor as sourcePaletteFor } from '@/modules/map/styles/source-palette';
 import { VESSEL_CATEGORY_PALETTE, VESSEL_PALETTE } from '@/modules/map/styles/vessel-palette';
-import { $vesselKalmanState, type LiveVessel } from '@/modules/telemetry';
+import { $vesselKalmanState, type LiveVessel, displayNowSeconds } from '@/modules/telemetry';
 import {
   Anchor,
   CalendarClock,
@@ -276,7 +276,7 @@ function Label() {
     const stale = staleRef.current;
     if (!time) return;
     const tick = (): void => {
-      const nowSec = Math.floor(Date.now() / 1_000);
+      const nowSec = displayNowSeconds();
       time.textContent = formatRelativeTime(vessel.timestampUnix, nowSec);
       if (stale) {
         const isStale = nowSec - vessel.timestampUnix >= STALE_BADGE_SECONDS;
@@ -334,7 +334,7 @@ function Actions() {
           // Kalman state read lazily on click; subscribing per row would
           // pay a listener for every position frame when only the click
           // handler consumes the value.
-          const now = Math.floor(Date.now() / 1_000);
+          const now = displayNowSeconds();
           const kalmanState = $vesselKalmanState.get()[vessel.mmsi];
           const display = getVesselDisplayPosition(vessel, kalmanState, now);
           const target: [number, number] = display

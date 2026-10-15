@@ -8,6 +8,7 @@ import { MapStyleSwitcher } from '@/modules/map/components/map-style-switcher';
 import { SeamarkToggle } from '@/modules/map/components/seamark-toggle';
 import { ThreeDToggleButton } from '@/modules/map/components/three-d-toggle-button';
 import { TrailsToggle } from '@/modules/map/components/trails-toggle';
+import { installArchiveSnapshot } from '@/modules/telemetry';
 import { ThemeToggle } from '@/modules/theme';
 import { IndexRoute } from '@/routes/index-route';
 import { AppShell } from '@/shell/app-shell';
@@ -91,6 +92,7 @@ function App() {
     installDemoController();
     return () => uninstallDemoController();
   }, []);
+  useEffect(() => installArchiveSnapshot(), []);
   return (
     <>
       <RouterProvider router={router} />

@@ -1,3 +1,5 @@
+export { $archiveAnchorUnix, displayNowSeconds } from './archive-clock';
+export { installArchiveSnapshot } from './archive-snapshot';
 export { createTelemetryClient } from './telemetry-client';
 export type { TelemetryClient, TelemetryClientOptions } from './telemetry-client';
 export {

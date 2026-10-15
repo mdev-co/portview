@@ -1,5 +1,6 @@
 import { map, onMount } from 'nanostores';
 import { VESSEL_FLAG_HAS_FIX, VESSEL_FLAG_IS_MOVING } from '@sps/shared';
+import { displayNowSeconds } from './archive-clock';
 import type { LiveVessel } from './types';
 
 /**
@@ -23,11 +24,11 @@ export const $vessels = map<Record<number, LiveVessel>>({});
  * 10-minute window tolerates two missed broadcast cycles before
  * evicting the vessel from the store.
  */
-const STALE_THRESHOLD_SECONDS = 600;
+export const STALE_THRESHOLD_SECONDS = 600;
 const SWEEP_INTERVAL_MS = 30_000;
 
 /** Drop vessels whose last update is older than STALE_THRESHOLD_SECONDS. */
-function sweepStale(nowSeconds: number = Math.floor(Date.now() / 1_000)): void {
+function sweepStale(nowSeconds: number = displayNowSeconds()): void {
   const snapshot = $vessels.get();
   let evicted = 0;
   const next: Record<number, LiveVessel> = {};
